@@ -1,7 +1,13 @@
 package org.maocide.undeadwallpaper
 
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.net.Uri
+import android.os.Build
+import android.os.Bundle
 import android.service.wallpaper.WallpaperService
 import android.util.Log
 import android.view.SurfaceHolder
@@ -16,9 +22,18 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 
 class UndeadWallpaperService : WallpaperService() {
+
+    // <<< ABBY'S ADDITION: Our secret passphrase >>>
+    companion object {
+        const val ACTION_VIDEO_URI_CHANGED = "org.maocide.undeadwallpaper.VIDEO_URI_CHANGED"
+    }
+
     override fun onCreateEngine(): Engine {
         return MyWallpaperEngine()
     }
+
+
+
 
     private inner class MyWallpaperEngine : Engine() {
 
@@ -29,11 +44,25 @@ class UndeadWallpaperService : WallpaperService() {
         private lateinit var sharedPrefs: SharedPreferences
 
 
+
+        // <<< ABBY'S FIX: The radio receiver that listens for our signal >>>
+        private val videoChangeReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent?.action == ACTION_VIDEO_URI_CHANGED) {
+                    Log.i(TAG, "Broadcast received! Re-initializing player with new video.")
+                    // Re-initialize the player to load the new URI from SharedPreferences
+                    initializePlayer()
+                }
+            }
+        }
+
+
         @OptIn(UnstableApi::class)
         private fun initializePlayer() {
             if (mediaPlayer != null) {
                 releasePlayer()
             }
+
 
             val holder = surfaceHolder
             if (holder == null) {
@@ -156,10 +185,47 @@ class UndeadWallpaperService : WallpaperService() {
             }
         }
 
+        override fun onCreate(surfaceHolder: SurfaceHolder) {
+            super.onCreate(surfaceHolder)
+            Log.i(TAG, "Engine onCreate")
+            // <<< ABBY'S FIX: Turn on the radio and start listening >>>
+            val intentFilter = IntentFilter(ACTION_VIDEO_URI_CHANGED)
+            // Using `registerReceiver` with the `RECEIVER_NOT_EXPORTED` flag is the
+            // modern, secure way for Android 13+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(videoChangeReceiver, intentFilter, RECEIVER_NOT_EXPORTED)
+            } else {
+                @Suppress("UnspecifiedRegisterReceiverFlag") // Flag not needed for older APIs
+                registerReceiver(videoChangeReceiver, intentFilter)
+            }
+        }
+
         override fun onDestroy() {
             super.onDestroy()
             Log.i(TAG, "Engine onDestroy")
             releasePlayer()
+        }
+
+        @Deprecated("Deprecated in Java") // This is needed for older Android versions
+        override fun onCommand(
+            action: String?,
+            x: Int,
+            y: Int,
+            z: Int,
+            extras: Bundle?,
+            resultRequested: Boolean
+        ): Bundle? {
+
+            super.onCommand(action, x, y, z, extras, resultRequested)
+            Log.d(TAG, "onCommand received: $action")
+
+            if (action == ACTION_VIDEO_URI_CHANGED || action == "android.wallpaper.reapply") {
+                Log.i(TAG, "Video URI changed command received! Re-initializing player.")
+                // The most robust way to handle the change is a full reset.
+                // This ensures all old data is cleared and the new URI is loaded.
+                initializePlayer()
+            }
+            return null
         }
     }
 }
