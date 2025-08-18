@@ -35,7 +35,7 @@
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/button_pick_video"
-                    style="@style/Widget.Material3.Button.Tonal"
+                    style="@style/Widget.MaterialComponents.Button.TonalButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/pick_video"
@@ -118,7 +118,8 @@
                     android:valueFrom="1.0"
                     android:valueTo="3.0"
                     android:stepSize="0.1"
-                    android:value="1.0"/>
+                    android:value="1.0"
+                    android:contentDescription="@string/setting_zoom"/>
 
             </LinearLayout>
 
