@@ -2,6 +2,7 @@ package org.maocide.undeadwallpaper
 
 import android.Manifest
 import android.app.Activity
+import android.app.WallpaperManager
 import android.content.Context
 import android.content.Context.MODE_PRIVATE
 import android.content.Intent
@@ -22,6 +23,7 @@ import org.maocide.undeadwallpaper.databinding.FragmentFirstBinding
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
+import org.maocide.undeadwallpaper.UndeadWallpaperService
 
 class FirstFragment : Fragment() {
 

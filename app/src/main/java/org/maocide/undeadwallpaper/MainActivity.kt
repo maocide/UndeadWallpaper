@@ -5,6 +5,7 @@ import android.app.WallpaperManager
 import android.content.ComponentName
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import androidx.appcompat.app.AppCompatActivity
@@ -22,6 +23,15 @@ class MainActivity : AppCompatActivity() {
     private lateinit var appBarConfiguration: AppBarConfiguration
     private lateinit var binding: ActivityMainBinding
 
+    // this will not work when called when changing directly because the wallpaper service dies, but will work when called from any button not calling the setwallpaper
+    private fun notifyWallpaperServiceAboutChange() {
+        Log.d("MainActivity", "Sending broadcast to update wallpaper.")
+        val intent = Intent(UndeadWallpaperService.ACTION_VIDEO_URI_CHANGED)
+        // `requireContext()` is the correct way to get the context in a Fragment
+        this.sendBroadcast(intent)
+    }
+
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -34,8 +44,9 @@ class MainActivity : AppCompatActivity() {
         appBarConfiguration = AppBarConfiguration(navController.graph)
         setupActionBarWithNavController(navController, appBarConfiguration)
 
+
         binding.fab.setOnClickListener { view ->
-            Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
+            Snackbar.make(view, "Setting Wallpaper!", Snackbar.LENGTH_LONG)
                 .setAction("Action", null)
                 .setAnchorView(R.id.fab).show()
                 val intent = Intent(
@@ -45,6 +56,7 @@ class MainActivity : AppCompatActivity() {
                     WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
                     ComponentName(this, UndeadWallpaperService::class.java)
                 )
+                notifyWallpaperServiceAboutChange()
                 startActivity(intent)
         }
     }
