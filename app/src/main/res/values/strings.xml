@@ -22,4 +22,6 @@
     <string name="video_scaling_mode" translatable="false">video_scaling_mode</string>
     <string name="video_zoom_level" translatable="false">video_zoom_level</string>
 
+    <string name="lorem_ipsum">This is a placeholder text for the second fragment.</string>
+
 </resources>
