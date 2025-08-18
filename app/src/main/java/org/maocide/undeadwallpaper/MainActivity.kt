@@ -35,12 +35,11 @@ class MainActivity : AppCompatActivity() {
         setupActionBarWithNavController(navController, appBarConfiguration)
 
         binding.fab.setOnClickListener { view ->
-            Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                .setAction("Action", null)
+            Snackbar.make(view, "Activating wallpaper...", Snackbar.LENGTH_SHORT)
                 .setAnchorView(R.id.fab).show()
-                val intent = Intent(
-                    WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER
-                )
+            val intent = Intent(
+                WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER
+            )
                 intent.putExtra(
                     WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
                     ComponentName(this, UndeadWallpaperService::class.java)
