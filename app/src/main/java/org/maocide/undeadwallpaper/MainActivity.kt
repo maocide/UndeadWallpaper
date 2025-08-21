@@ -67,9 +67,12 @@ class MainActivity : AppCompatActivity() {
         // Handle action bar item clicks here. The action bar will
         // automatically handle clicks on the Home/Up button, so long
         // as you specify a parent activity in AndroidManifest.xml.
+        val navController = findNavController(R.id.nav_host_fragment_content_main)
         return when (item.itemId) {
             R.id.action_settings -> {
-                findNavController(R.id.nav_host_fragment_content_main).navigate(R.id.action_FirstFragment_to_SecondFragment)
+                if (navController.currentDestination?.id != R.id.SecondFragment) {
+                    navController.navigate(R.id.action_FirstFragment_to_SecondFragment)
+                }
                 true
             }
             else -> super.onOptionsItemSelected(item)
