@@ -21,11 +21,4 @@
         android:layout_marginEnd="8dp"
         android:textAppearance="?attr/textAppearanceBody1" />
 
-    <ImageButton
-        android:id="@+id/delete_button"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:src="@android:drawable/ic_menu_delete"
-        android:contentDescription="@string/action_settings" />
-
 </LinearLayout>

@@ -90,17 +90,27 @@ class FirstFragment : Fragment() {
         recentFilesAdapter = RecentFilesAdapter(
             recentFiles,
             onItemClick = { recentFile ->
-                val fileUri = Uri.fromFile(recentFile.file)
-                sharedPrefs.edit().putString(getString(R.string.video_uri), fileUri.toString()).apply()
-                setupVideoPreview(fileUri)
-            },
-            onDeleteClick = { recentFile ->
-                recentFile.file.delete()
+                val newFile = copyRecentFile(recentFile.file)
+                val newFileUri = Uri.fromFile(newFile)
+                sharedPrefs.edit().putString(getString(R.string.video_uri), newFileUri.toString()).apply()
+                setupVideoPreview(newFileUri)
                 loadRecentFiles()
             }
         )
         binding.recyclerViewRecentFiles.layoutManager = LinearLayoutManager(context)
         binding.recyclerViewRecentFiles.adapter = recentFilesAdapter
+    }
+
+    private fun copyRecentFile(file: File): File {
+        val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+        val extension = file.name.substringAfterLast('.', "")
+        val newFileName = if (extension.isNotEmpty()) "VIDEO_${timeStamp}.$extension" else "VIDEO_$timeStamp"
+
+        val outputDir = getAppSpecificAlbumStorageDir(requireContext(), "videos")
+        val newFile = File(outputDir, newFileName)
+
+        copyStreamToFile(file.inputStream(), newFile)
+        return newFile
     }
 
     private fun loadRecentFiles() {

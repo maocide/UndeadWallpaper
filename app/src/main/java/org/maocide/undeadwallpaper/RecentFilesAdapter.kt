@@ -4,7 +4,6 @@ import android.graphics.Bitmap
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
@@ -17,8 +16,7 @@ data class RecentFile(
 
 class RecentFilesAdapter(
     private val recentFiles: MutableList<RecentFile>,
-    private val onItemClick: (RecentFile) -> Unit,
-    private val onDeleteClick: (RecentFile) -> Unit
+    private val onItemClick: (RecentFile) -> Unit
 ) : RecyclerView.Adapter<RecentFilesAdapter.ViewHolder>() {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -29,7 +27,7 @@ class RecentFilesAdapter(
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val recentFile = recentFiles[position]
-        holder.bind(recentFile, onItemClick, onDeleteClick)
+        holder.bind(recentFile, onItemClick)
     }
 
     override fun getItemCount(): Int = recentFiles.size
@@ -43,19 +41,16 @@ class RecentFilesAdapter(
     class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val thumbnail: ImageView = itemView.findViewById(R.id.thumbnail)
         private val fileName: TextView = itemView.findViewById(R.id.file_name)
-        private val deleteButton: ImageButton = itemView.findViewById(R.id.delete_button)
 
         fun bind(
             recentFile: RecentFile,
-            onItemClick: (RecentFile) -> Unit,
-            onDeleteClick: (RecentFile) -> Unit
+            onItemClick: (RecentFile) -> Unit
         ) {
             fileName.text = recentFile.file.name
             if (recentFile.thumbnail != null) {
                 thumbnail.setImageBitmap(recentFile.thumbnail)
             }
             itemView.setOnClickListener { onItemClick(recentFile) }
-            deleteButton.setOnClickListener { onDeleteClick(recentFile) }
         }
     }
 }
