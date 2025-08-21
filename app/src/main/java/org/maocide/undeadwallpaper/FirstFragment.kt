@@ -25,7 +25,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.maocide.undeadwallpaper.databinding.FragmentFirstBinding
 import java.io.File
 import java.io.FileOutputStream
@@ -90,11 +94,15 @@ class FirstFragment : Fragment() {
         recentFilesAdapter = RecentFilesAdapter(
             recentFiles,
             onItemClick = { recentFile ->
-                val newFile = copyRecentFile(recentFile.file)
-                val newFileUri = Uri.fromFile(newFile)
-                sharedPrefs.edit().putString(getString(R.string.video_uri), newFileUri.toString()).apply()
-                setupVideoPreview(newFileUri)
-                loadRecentFiles()
+                viewLifecycleOwner.lifecycleScope.launch {
+                    val newFile = withContext(Dispatchers.IO) {
+                        copyRecentFile(recentFile.file)
+                    }
+                    val newFileUri = Uri.fromFile(newFile)
+                    sharedPrefs.edit().putString(getString(R.string.video_uri), newFileUri.toString()).apply()
+                    setupVideoPreview(newFileUri)
+                    loadRecentFiles()
+                }
             }
         )
         binding.recyclerViewRecentFiles.layoutManager = LinearLayoutManager(context)
@@ -114,16 +122,20 @@ class FirstFragment : Fragment() {
     }
 
     private fun loadRecentFiles() {
-        recentFiles.clear()
-        val videosDir = getAppSpecificAlbumStorageDir(requireContext(), "videos")
-        val files = videosDir.listFiles()
-        if (files != null) {
-            for (file in files) {
-                val thumbnail = createVideoThumbnail(file.path)
-                recentFiles.add(RecentFile(file, thumbnail))
+        viewLifecycleOwner.lifecycleScope.launch {
+            val files = withContext(Dispatchers.IO) {
+                val videosDir = getAppSpecificAlbumStorageDir(requireContext(), "videos")
+                videosDir.listFiles()?.map { file ->
+                    val thumbnail = createVideoThumbnail(file.path)
+                    RecentFile(file, thumbnail)
+                }
+            }
+            if (files != null) {
+                recentFiles.clear()
+                recentFiles.addAll(files)
+                recentFilesAdapter.notifyDataSetChanged()
             }
         }
-        recentFilesAdapter.notifyDataSetChanged()
     }
 
     private fun createVideoThumbnail(filePath: String): Bitmap? {
@@ -202,16 +214,20 @@ class FirstFragment : Fragment() {
         val takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION
         contentResolver.takePersistableUriPermission(uri, takeFlags)
 
-        val copiedFile = createFileFromContentUri(uri)
-        val savedFileUri = Uri.fromFile(copiedFile)
+        viewLifecycleOwner.lifecycleScope.launch {
+            val copiedFile = withContext(Dispatchers.IO) {
+                createFileFromContentUri(uri)
+            }
+            val savedFileUri = Uri.fromFile(copiedFile)
 
-        Log.d(tag, "File copied to: $savedFileUri")
+            Log.d(tag, "File copied to: $savedFileUri")
 
-        sharedPrefs.edit().putString(getString(R.string.video_uri), savedFileUri.toString()).apply()
+            sharedPrefs.edit().putString(getString(R.string.video_uri), savedFileUri.toString()).apply()
 
-        // Set up the video preview
-        setupVideoPreview(savedFileUri)
-        loadRecentFiles()
+            // Set up the video preview
+            setupVideoPreview(savedFileUri)
+            loadRecentFiles()
+        }
     }
 
     private fun setupVideoPreview(uri: Uri) {
