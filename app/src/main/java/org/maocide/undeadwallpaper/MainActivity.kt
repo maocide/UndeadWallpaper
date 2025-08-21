@@ -7,6 +7,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.navigation.findNavController
@@ -21,6 +22,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var appBarConfiguration: AppBarConfiguration
     private lateinit var binding: ActivityMainBinding
+    private lateinit var preferencesManager: PreferencesManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,17 +36,24 @@ class MainActivity : AppCompatActivity() {
         appBarConfiguration = AppBarConfiguration(navController.graph)
         setupActionBarWithNavController(navController, appBarConfiguration)
 
+        preferencesManager = PreferencesManager(this)
+
         binding.fab.setOnClickListener { view ->
-            Snackbar.make(view, "Activating wallpaper...", Snackbar.LENGTH_SHORT)
-                .setAnchorView(R.id.fab).show()
-            val intent = Intent(
-                WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER
-            )
+            val videoUri = preferencesManager.getVideoUri()
+            if (videoUri != null) {
+                Snackbar.make(view, "Activating wallpaper...", Snackbar.LENGTH_SHORT)
+                    .setAnchorView(R.id.fab).show()
+                val intent = Intent(
+                    WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER
+                )
                 intent.putExtra(
                     WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
                     ComponentName(this, UndeadWallpaperService::class.java)
                 )
                 startActivity(intent)
+            } else {
+                Toast.makeText(this, "Please select a video first", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 

@@ -9,11 +9,6 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import java.io.File
 
-data class RecentFile(
-    val file: File,
-    val thumbnail: Bitmap?
-)
-
 class RecentFilesAdapter(
     private val recentFiles: MutableList<RecentFile>,
     private val onItemClick: (RecentFile) -> Unit

@@ -2,20 +2,11 @@ package org.maocide.undeadwallpaper
 
 import android.Manifest
 import android.app.Activity
-import android.app.WallpaperManager
-import android.content.Context
-import android.content.Context.MODE_PRIVATE
 import android.content.Intent
-import android.content.SharedPreferences
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.media.ThumbnailUtils
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.Environment
-import android.provider.MediaStore
-import android.provider.OpenableColumns
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
@@ -32,22 +23,25 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.maocide.undeadwallpaper.databinding.FragmentFirstBinding
 import java.io.File
-import java.io.FileOutputStream
-import java.io.InputStream
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import org.maocide.undeadwallpaper.UndeadWallpaperService
 
+/**
+ * A simple [Fragment] subclass as the default destination in the navigation.
+ * This fragment allows the user to select a video and set it as a live wallpaper.
+ */
 class FirstFragment : Fragment() {
 
     private var _binding: FragmentFirstBinding? = null
     private val binding get() = _binding!!
     private val tag: String = javaClass.simpleName
-    private lateinit var sharedPrefs: SharedPreferences
+
+    private lateinit var preferencesManager: PreferencesManager
+    private lateinit var videoFileManager: VideoFileManager
     private lateinit var recentFilesAdapter: RecentFilesAdapter
     private val recentFiles = mutableListOf<RecentFile>()
 
+    /**
+     * Launcher for picking media from the file system.
+     */
     private val pickMediaLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             result.data?.data?.let { uri ->
@@ -56,6 +50,9 @@ class FirstFragment : Fragment() {
         }
     }
 
+    /**
+     * Launcher for requesting permissions.
+     */
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
@@ -72,7 +69,8 @@ class FirstFragment : Fragment() {
         savedInstanceState: Bundle?
     ): View {
         _binding = FragmentFirstBinding.inflate(inflater, container, false)
-        sharedPrefs = requireContext().getSharedPreferences("DEFAULT", MODE_PRIVATE)
+        preferencesManager = PreferencesManager(requireContext())
+        videoFileManager = VideoFileManager(requireContext())
         return binding.root
     }
 
@@ -90,94 +88,74 @@ class FirstFragment : Fragment() {
         loadRecentFiles()
     }
 
+    /**
+     * Sets up the RecyclerView for displaying recent files.
+     */
     private fun setupRecyclerView() {
         recentFilesAdapter = RecentFilesAdapter(
             recentFiles,
             onItemClick = { recentFile ->
-                viewLifecycleOwner.lifecycleScope.launch {
-                    val newFile = withContext(Dispatchers.IO) {
-                        copyRecentFile(recentFile.file)
-                    }
-                    val newFileUri = Uri.fromFile(newFile)
-                    sharedPrefs.edit().putString(getString(R.string.video_uri), newFileUri.toString()).apply()
-                    setupVideoPreview(newFileUri)
-                    loadRecentFiles()
-                }
+                val fileUri = Uri.fromFile(recentFile.file)
+                preferencesManager.saveVideoUri(fileUri.toString())
+                setupVideoPreview(fileUri)
             }
         )
         binding.recyclerViewRecentFiles.layoutManager = LinearLayoutManager(context)
         binding.recyclerViewRecentFiles.adapter = recentFilesAdapter
     }
 
-    private fun copyRecentFile(file: File): File {
-        val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-        val extension = file.name.substringAfterLast('.', "")
-        val newFileName = if (extension.isNotEmpty()) "VIDEO_${timeStamp}.$extension" else "VIDEO_$timeStamp"
-
-        val outputDir = getAppSpecificAlbumStorageDir(requireContext(), "videos")
-        val newFile = File(outputDir, newFileName)
-
-        copyStreamToFile(file.inputStream(), newFile)
-        return newFile
-    }
-
+    /**
+     * Loads the list of recent files and updates the RecyclerView.
+     */
     private fun loadRecentFiles() {
         viewLifecycleOwner.lifecycleScope.launch {
             val files = withContext(Dispatchers.IO) {
-                val videosDir = getAppSpecificAlbumStorageDir(requireContext(), "videos")
-                videosDir.listFiles()?.map { file ->
-                    val thumbnail = createVideoThumbnail(file.path)
-                    RecentFile(file, thumbnail)
-                }
+                videoFileManager.loadRecentFiles()
             }
-            if (files != null) {
-                recentFiles.clear()
-                recentFiles.addAll(files)
-                recentFilesAdapter.notifyDataSetChanged()
-            }
+            recentFiles.clear()
+            recentFiles.addAll(files)
+            recentFilesAdapter.notifyDataSetChanged()
         }
     }
 
-    private fun createVideoThumbnail(filePath: String): Bitmap? {
-        return ThumbnailUtils.createVideoThumbnail(
-            filePath,
-            MediaStore.Images.Thumbnails.MINI_KIND
-        )
-    }
-
+    /**
+     * Loads and applies user preferences.
+     */
     private fun loadAndApplyPreferences() {
         // Load and apply the video URI for preview
-        val videoUriString = sharedPrefs.getString(getString(R.string.video_uri), null)
+        val videoUriString = preferencesManager.getVideoUri()
         if (videoUriString != null) {
             val videoUri = videoUriString.toUri()
             setupVideoPreview(videoUri)
         }
 
         // Load and apply audio setting
-        val isAudioEnabled = sharedPrefs.getBoolean(getString(R.string.video_audio_enabled), false)
-        binding.switchAudio.isChecked = isAudioEnabled
+        binding.switchAudio.isChecked = preferencesManager.isAudioEnabled()
 
         // Load and apply scaling mode
         val defaultScaleMode = R.id.radio_scale_crop
-        val selectedScaleMode = sharedPrefs.getInt(getString(R.string.video_scaling_mode), defaultScaleMode)
+        val selectedScaleMode = preferencesManager.getScalingMode(defaultScaleMode)
         binding.radioGroupScaling.check(selectedScaleMode)
-
     }
 
+    /**
+     * Sets up listeners for preference changes.
+     */
     private fun setupPreferenceListeners() {
-        val editor = sharedPrefs.edit()
-
         // Listener for audio switch
         binding.switchAudio.setOnCheckedChangeListener { _, isChecked ->
-            editor.putBoolean(getString(R.string.video_audio_enabled), isChecked).apply()
+            preferencesManager.saveAudioEnabled(isChecked)
         }
 
         // Listener for scaling mode radio group
         binding.radioGroupScaling.setOnCheckedChangeListener { _, checkedId ->
-            editor.putInt(getString(R.string.video_scaling_mode), checkedId).apply()
+            preferencesManager.saveScalingMode(checkedId)
         }
     }
 
+    /**
+     * Checks for storage permissions and opens the file picker.
+     */
     private fun checkPermissionAndOpenFilePicker() {
         val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             Manifest.permission.READ_MEDIA_VIDEO
@@ -198,6 +176,9 @@ class FirstFragment : Fragment() {
         }
     }
 
+    /**
+     * Opens the file picker for selecting a video.
+     */
     private fun openFilePicker() {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
@@ -207,6 +188,11 @@ class FirstFragment : Fragment() {
         pickMediaLauncher.launch(intent)
     }
 
+    /**
+     * Handles the selected media URI.
+     *
+     * @param uri The URI of the selected media.
+     */
     private fun handleSelectedMedia(uri: Uri) {
         Log.d(tag, "Handling selected media URI: $uri")
 
@@ -216,20 +202,25 @@ class FirstFragment : Fragment() {
 
         viewLifecycleOwner.lifecycleScope.launch {
             val copiedFile = withContext(Dispatchers.IO) {
-                createFileFromContentUri(uri)
+                videoFileManager.createFileFromContentUri(uri)
             }
-            val savedFileUri = Uri.fromFile(copiedFile)
-
-            Log.d(tag, "File copied to: $savedFileUri")
-
-            sharedPrefs.edit().putString(getString(R.string.video_uri), savedFileUri.toString()).apply()
-
-            // Set up the video preview
-            setupVideoPreview(savedFileUri)
-            loadRecentFiles()
+            if (copiedFile != null) {
+                val savedFileUri = Uri.fromFile(copiedFile)
+                Log.d(tag, "File copied to: $savedFileUri")
+                preferencesManager.saveVideoUri(savedFileUri.toString())
+                setupVideoPreview(savedFileUri)
+                loadRecentFiles()
+            } else {
+                Log.e(tag, "Failed to copy file from URI: $uri")
+            }
         }
     }
 
+    /**
+     * Sets up the video preview.
+     *
+     * @param uri The URI of the video to be previewed.
+     */
     private fun setupVideoPreview(uri: Uri) {
         binding.videoPreview.setVideoURI(uri)
         val mediaController = MediaController(requireContext())
@@ -238,47 +229,6 @@ class FirstFragment : Fragment() {
         binding.videoPreview.setOnPreparedListener {
             it.isLooping = true
             binding.videoPreview.start()
-        }
-    }
-
-    private fun createFileFromContentUri(fileUri: Uri): File {
-        var originalFileName = ""
-        requireActivity().contentResolver.query(fileUri, null, null, null, null)?.use { cursor ->
-            val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-            cursor.moveToFirst()
-            originalFileName = cursor.getString(nameIndex)
-        }
-
-        val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-        val extension = originalFileName.substringAfterLast('.', "")
-        val fileName = if (extension.isNotEmpty()) "VIDEO_${timeStamp}.$extension" else "VIDEO_$timeStamp"
-
-
-        val iStream: InputStream = requireActivity().contentResolver.openInputStream(fileUri)!!
-        val outputDir = getAppSpecificAlbumStorageDir(requireContext(), "videos")
-        val outputFile = File(outputDir, fileName)
-        copyStreamToFile(iStream, outputFile)
-        iStream.close()
-        return outputFile
-    }
-
-    private fun getAppSpecificAlbumStorageDir(context: Context, albumName: String): File {
-        val file = File(context.getExternalFilesDir(Environment.DIRECTORY_MOVIES), albumName)
-        if (!file.mkdirs()) {
-            Log.e(tag, "Directory not created or already exists")
-        }
-        return file
-    }
-
-    private fun copyStreamToFile(inputStream: InputStream, outputFile: File) {
-        inputStream.use { input ->
-            FileOutputStream(outputFile).use { output ->
-                val buffer = ByteArray(4 * 1024)
-                var byteCount: Int
-                while (input.read(buffer).also { byteCount = it } != -1) {
-                    output.write(buffer, 0, byteCount)
-                }
-            }
         }
     }
 
