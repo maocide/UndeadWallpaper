@@ -111,23 +111,19 @@
                         android:text="@string/scaling_mode_fit"/>
                 </RadioGroup>
 
-                <!-- Zoom Control -->
+                <!-- Recent Files -->
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
-                    android:text="@string/setting_zoom"
+                    android:text="@string/recent_files"
                     android:textAppearance="?attr/textAppearanceTitleMedium" />
 
-                <com.google.android.material.slider.Slider
-                    android:id="@+id/slider_zoom"
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recycler_view_recent_files"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:valueFrom="1.0"
-                    android:valueTo="3.0"
-                    android:stepSize="0.1"
-                    android:value="1.0"
-                    android:contentDescription="@string/setting_zoom"/>
+                    android:layout_marginTop="8dp" />
 
             </LinearLayout>
 

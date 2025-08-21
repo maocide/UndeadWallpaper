@@ -13,7 +13,7 @@
     <string name="setting_scaling_mode">Scaling Mode</string>
     <string name="scaling_mode_crop">Crop to Fill Screen</string>
     <string name="scaling_mode_fit">Fit to Screen</string>
-    <string name="setting_zoom">Zoom</string>
+    <string name="recent_files">Recent Files</string>
     <string name="wallpaper_description">A live wallpaper that plays video.</string>
 
     <!-- SharedPreferences Keys. These are not meant for translation. -->

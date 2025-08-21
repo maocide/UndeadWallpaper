@@ -8,10 +8,13 @@ import android.content.Context.MODE_PRIVATE
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.media.ThumbnailUtils
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.util.Log
 import android.view.LayoutInflater
@@ -22,10 +25,14 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.fragment.app.Fragment
+import androidx.recyclerview.widget.LinearLayoutManager
 import org.maocide.undeadwallpaper.databinding.FragmentFirstBinding
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import org.maocide.undeadwallpaper.UndeadWallpaperService
 
 class FirstFragment : Fragment() {
@@ -34,6 +41,8 @@ class FirstFragment : Fragment() {
     private val binding get() = _binding!!
     private val tag: String = javaClass.simpleName
     private lateinit var sharedPrefs: SharedPreferences
+    private lateinit var recentFilesAdapter: RecentFilesAdapter
+    private val recentFiles = mutableListOf<RecentFile>()
 
     private val pickMediaLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
@@ -72,6 +81,46 @@ class FirstFragment : Fragment() {
         binding.buttonPickVideo.setOnClickListener {
             checkPermissionAndOpenFilePicker()
         }
+
+        setupRecyclerView()
+        loadRecentFiles()
+    }
+
+    private fun setupRecyclerView() {
+        recentFilesAdapter = RecentFilesAdapter(
+            recentFiles,
+            onItemClick = { recentFile ->
+                val fileUri = Uri.fromFile(recentFile.file)
+                sharedPrefs.edit().putString(getString(R.string.video_uri), fileUri.toString()).apply()
+                setupVideoPreview(fileUri)
+            },
+            onDeleteClick = { recentFile ->
+                recentFile.file.delete()
+                loadRecentFiles()
+            }
+        )
+        binding.recyclerViewRecentFiles.layoutManager = LinearLayoutManager(context)
+        binding.recyclerViewRecentFiles.adapter = recentFilesAdapter
+    }
+
+    private fun loadRecentFiles() {
+        recentFiles.clear()
+        val videosDir = getAppSpecificAlbumStorageDir(requireContext(), "videos")
+        val files = videosDir.listFiles()
+        if (files != null) {
+            for (file in files) {
+                val thumbnail = createVideoThumbnail(file.path)
+                recentFiles.add(RecentFile(file, thumbnail))
+            }
+        }
+        recentFilesAdapter.notifyDataSetChanged()
+    }
+
+    private fun createVideoThumbnail(filePath: String): Bitmap? {
+        return ThumbnailUtils.createVideoThumbnail(
+            filePath,
+            MediaStore.Images.Thumbnails.MINI_KIND
+        )
     }
 
     private fun loadAndApplyPreferences() {
@@ -91,9 +140,6 @@ class FirstFragment : Fragment() {
         val selectedScaleMode = sharedPrefs.getInt(getString(R.string.video_scaling_mode), defaultScaleMode)
         binding.radioGroupScaling.check(selectedScaleMode)
 
-        // Load and apply zoom level
-        val zoomLevel = sharedPrefs.getFloat(getString(R.string.video_zoom_level), 1.0f)
-        binding.sliderZoom.value = zoomLevel
     }
 
     private fun setupPreferenceListeners() {
@@ -107,11 +153,6 @@ class FirstFragment : Fragment() {
         // Listener for scaling mode radio group
         binding.radioGroupScaling.setOnCheckedChangeListener { _, checkedId ->
             editor.putInt(getString(R.string.video_scaling_mode), checkedId).apply()
-        }
-
-        // Listener for zoom slider
-        binding.sliderZoom.addOnChangeListener { _, value, _ ->
-            editor.putFloat(getString(R.string.video_zoom_level), value).apply()
         }
     }
 
@@ -160,6 +201,7 @@ class FirstFragment : Fragment() {
 
         // Set up the video preview
         setupVideoPreview(savedFileUri)
+        loadRecentFiles()
     }
 
     private fun setupVideoPreview(uri: Uri) {
@@ -174,12 +216,17 @@ class FirstFragment : Fragment() {
     }
 
     private fun createFileFromContentUri(fileUri: Uri): File {
-        var fileName = ""
+        var originalFileName = ""
         requireActivity().contentResolver.query(fileUri, null, null, null, null)?.use { cursor ->
             val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
             cursor.moveToFirst()
-            fileName = cursor.getString(nameIndex)
+            originalFileName = cursor.getString(nameIndex)
         }
+
+        val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+        val extension = originalFileName.substringAfterLast('.', "")
+        val fileName = if (extension.isNotEmpty()) "VIDEO_${timeStamp}.$extension" else "VIDEO_$timeStamp"
+
 
         val iStream: InputStream = requireActivity().contentResolver.openInputStream(fileUri)!!
         val outputDir = getAppSpecificAlbumStorageDir(requireContext(), "videos")

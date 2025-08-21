@@ -76,8 +76,7 @@ class UndeadWallpaperService : WallpaperService() {
             // --- Load Settings from SharedPreferences ---
             val isAudioEnabled = sharedPrefs.getBoolean(getString(R.string.video_audio_enabled), false)
             val scalingModeId = sharedPrefs.getInt(getString(R.string.video_scaling_mode), R.id.radio_scale_crop)
-            val zoomLevel = sharedPrefs.getFloat(getString(R.string.video_zoom_level), 1.0f)
-            Log.d(TAG, "Loaded Settings: Audio=$isAudioEnabled, ScalingModeID=$scalingModeId, Zoom=$zoomLevel")
+            Log.d(TAG, "Loaded Settings: Audio=$isAudioEnabled, ScalingModeID=$scalingModeId")
             // Note: Zoom is logged but not implemented visually, as it's complex with SurfaceView.
 
             val loadControl = DefaultLoadControl.Builder()
