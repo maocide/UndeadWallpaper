@@ -1,10 +1,10 @@
 <resources>
     <string name="app_name">UndeadWallpaper</string>
-    <string name="action_settings">Settings</string>
+    <string name="action_settings">About</string>
 
     <!-- Strings used for fragments for navigation -->
     <string name="first_fragment_label">Wallpaper Settings</string>
-    <string name="second_fragment_label">Second Fragment</string>
+    <string name="second_fragment_label">About</string>
     <string name="previous">Previous</string>
 
     <!-- UI Strings -->
@@ -22,6 +22,6 @@
     <string name="video_scaling_mode" translatable="false">video_scaling_mode</string>
     <string name="video_zoom_level" translatable="false">video_zoom_level</string>
 
-    <string name="lorem_ipsum">This is a placeholder text for the second fragment.</string>
+    <string name="about_text">Undead Wallpaper\n\nVersion 1.0\n\nThis app allows you to use your favorite videos as a live wallpaper on your Android device.\n\nDeveloped by maocide.</string>
 
 </resources>
