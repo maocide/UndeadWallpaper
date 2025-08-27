@@ -6,8 +6,8 @@ import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
-import com.arthenica.mobileffmpeg.Config
-import com.arthenica.mobileffmpeg.FFmpeg
+import com.arthenica.ffmpegkit.FFmpegKit
+import com.arthenica.ffmpegkit.ReturnCode
 import java.io.File
 
 class VideoClipWorker(
@@ -45,15 +45,14 @@ class VideoClipWorker(
 
         Log.d("VideoClipWorker", "Executing FFmpeg command: $command")
 
-        val rc = FFmpeg.execute(command)
+        val session = FFmpegKit.execute(command)
 
-        return if (rc == Config.RETURN_CODE_SUCCESS) {
+        return if (ReturnCode.isSuccess(session.returnCode)) {
             Log.d("VideoClipWorker", "FFmpeg command succeeded")
             val outputData = workDataOf(KEY_OUTPUT_PATH to outputFile.absolutePath)
             Result.success(outputData)
         } else {
-            Log.e("VideoClipWorker", "FFmpeg command failed with rc=$rc")
-            Config.printLastCommandOutput(Log.ERROR)
+            Log.e("VideoClipWorker", "FFmpeg command failed with state ${session.state} and rc ${session.returnCode}.${session.failStackTrace}")
             Result.failure()
         }
     }
