@@ -13,7 +13,7 @@ navigationFragmentKtx = "2.8.9"
 navigationUiKtx = "2.8.9"
 coroutines = "1.7.3"
 lifecycle = "2.6.2"
-ffmpeg-kit = "6.0.LTS"
+ffmpeg-kit = "6.0-2"
 workmanager = "2.8.0"
 
 [libraries]
