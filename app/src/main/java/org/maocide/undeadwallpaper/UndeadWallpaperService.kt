@@ -57,7 +57,9 @@ class UndeadWallpaperService : WallpaperService() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 if (intent?.action == ACTION_VIDEO_URI_CHANGED) {
                     Log.i(TAG, "Broadcast received! Re-initializing player with new video.")
-                    // Re-initialize the player to load the new URI from SharedPreferences
+                    // Reset playhead position to the beginning of the clip whenever the
+                    // video source or its parameters (like trimming) are changed.
+                    playheadTime = 0L
                     initializePlayer()
                 }
             }
