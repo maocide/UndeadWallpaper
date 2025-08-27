@@ -56,7 +56,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.lifecycle.runtime.ktx)
 
-    implementation(libs.ffmpeg.kit.full.gpl)
+    implementation(libs.ffmpeg.kit.full)
     implementation(libs.androidx.work.runtime.ktx)
 
     testImplementation(libs.junit)
