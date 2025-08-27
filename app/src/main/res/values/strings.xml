@@ -12,6 +12,7 @@
     <string name="trim_video">Trim Video</string>
     <string name="setting_audio_enabled">Enable Audio</string>
     <string name="recent_files">Recent Files</string>
+    <string name="apply_trim">Apply</string>
     <string name="wallpaper_description">A live wallpaper that plays video.</string>
 
     <!-- SharedPreferences Keys. These are not meant for translation. -->

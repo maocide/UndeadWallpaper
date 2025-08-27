@@ -13,8 +13,12 @@ navigationFragmentKtx = "2.8.9"
 navigationUiKtx = "2.8.9"
 coroutines = "1.7.3"
 lifecycle = "2.6.2"
+mobile-ffmpeg = "4.4"
+workmanager = "2.8.0"
 
 [libraries]
+mobile-ffmpeg-full = { module = "com.arthenica:mobile-ffmpeg-full-gpl", version.ref = "mobile-ffmpeg" }
+androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workmanager" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
 androidx-lifecycle-runtime-ktx = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "lifecycle" }

@@ -17,9 +17,14 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
+import androidx.work.workDataOf
 import com.google.android.material.slider.RangeSlider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -103,6 +108,10 @@ class FirstFragment : Fragment() {
 
         binding.buttonPickVideo.setOnClickListener {
             checkPermissionAndOpenFilePicker()
+        }
+
+        binding.buttonApplyTrim.setOnClickListener {
+            applyVideoTrim()
         }
 
         setupRecyclerView()
@@ -263,23 +272,72 @@ class FirstFragment : Fragment() {
             }
 
             override fun onStopTrackingTouch(slider: RangeSlider) {
-                val values = slider.values
-                val startMs = values[0].toLong()
-                val endMs = values[1].toLong()
-
-                // Save the new clipping times
-                preferencesManager.saveClippingTimes(startMs, endMs)
-
-                // Notify the service to apply the new times dynamically
-                val intent = Intent(UndeadWallpaperService.ACTION_TRIM_TIMES_CHANGED).apply {
-                    putExtra("startMs", startMs)
-                    putExtra("endMs", endMs)
-                }
-                context?.sendBroadcast(intent)
-
-                Toast.makeText(context, "Trimming times applied.", Toast.LENGTH_SHORT).show()
+                // No-op. The user will now press the "Apply" button.
             }
         })
+    }
+
+    private fun applyVideoTrim() {
+        val videoUriString = preferencesManager.getVideoUri()
+        if (videoUriString == null) {
+            Toast.makeText(context, "No video selected.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val values = binding.trimSlider.values
+        val startMs = values[0].toLong()
+        val endMs = values[1].toLong()
+
+        setUiEnabled(false)
+
+        val workRequest = OneTimeWorkRequestBuilder<VideoClipWorker>()
+            .setInputData(workDataOf(
+                VideoClipWorker.KEY_INPUT_URI to videoUriString,
+                VideoClipWorker.KEY_START_MS to startMs,
+                VideoClipWorker.KEY_END_MS to endMs
+            ))
+            .build()
+
+        val workManager = WorkManager.getInstance(requireContext())
+        workManager.enqueue(workRequest)
+
+        workManager.getWorkInfoByIdLiveData(workRequest.id)
+            .observe(viewLifecycleOwner) { workInfo ->
+                if (workInfo != null) {
+                    when (workInfo.state) {
+                        WorkInfo.State.SUCCEEDED -> {
+                            setUiEnabled(true)
+                            val outputPath = workInfo.outputData.getString(VideoClipWorker.KEY_OUTPUT_PATH)
+                            if (outputPath != null) {
+                                val outputFileUri = Uri.fromFile(File(outputPath))
+                                updateVideoSource(outputFileUri)
+                                Toast.makeText(context, "Video clip saved and applied.", Toast.LENGTH_LONG).show()
+                            } else {
+                                Toast.makeText(context, "Error: Clipped video path not found.", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                        WorkInfo.State.FAILED -> {
+                            setUiEnabled(true)
+                            Toast.makeText(context, "Failed to clip video.", Toast.LENGTH_LONG).show()
+                        }
+                        WorkInfo.State.RUNNING -> {
+                            // The UI is already in a "processing" state.
+                        }
+                        else -> {
+                            // Other states (ENQUEUED, CANCELLED, BLOCKED) can be handled here if needed.
+                        }
+                    }
+                }
+            }
+    }
+
+    private fun setUiEnabled(isEnabled: Boolean) {
+        binding.buttonPickVideo.isEnabled = isEnabled
+        binding.buttonApplyTrim.isEnabled = isEnabled
+        binding.switchAudio.isEnabled = isEnabled
+        binding.trimSlider.isEnabled = isEnabled
+        binding.recyclerViewRecentFiles.isEnabled = isEnabled
+        binding.progressBar.isVisible = !isEnabled
     }
 
 

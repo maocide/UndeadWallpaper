@@ -63,24 +63,6 @@ class UndeadWallpaperService : WallpaperService() {
                         playheadTime = 0L
                         initializePlayer()
                     }
-                    ACTION_TRIM_TIMES_CHANGED -> {
-                        Log.i(TAG, "Broadcast received: Dynamic trim update requested.")
-                        val startMs = intent.getLongExtra("startMs", 0L)
-                        val endMs = intent.getLongExtra("endMs", C.TIME_END_OF_SOURCE)
-
-                        mediaPlayer?.let { player ->
-                            val mediaUri = getMediaUri() ?: return
-                            val mediaItem = MediaItem.fromUri(mediaUri)
-                            val mediaSource = ProgressiveMediaSource.Factory(DefaultDataSource.Factory(baseContext))
-                                .createMediaSource(mediaItem)
-                            val startUs = startMs * 1000
-                            val endUs = if (endMs == C.TIME_END_OF_SOURCE) C.TIME_END_OF_SOURCE else endMs * 1000
-                            val clippedSource = ClippingMediaSource(mediaSource, startUs, endUs)
-                            player.setMediaSource(clippedSource)
-                            player.prepare() // Prepare the new source
-                            player.seekTo(0) // Start from the beginning of the new clip
-                        }
-                    }
                 }
             }
         }
@@ -126,17 +108,8 @@ class UndeadWallpaperService : WallpaperService() {
                     val mediaSource = ProgressiveMediaSource.Factory(DefaultDataSource.Factory(baseContext))
                         .createMediaSource(mediaItem)
 
-                    // 3. Load the clipping times from preferences.
-                    val startMs = sharedPrefs.getLong(getString(R.string.video_start_ms), 0L)
-                    val endMs = sharedPrefs.getLong(getString(R.string.video_end_ms), C.TIME_END_OF_SOURCE)
-
-                    // 4. Use ClippingMediaSource to "cut" the video to the desired segment.
-                    val startUs = startMs * 1000
-                    val endUs = if (endMs == C.TIME_END_OF_SOURCE) C.TIME_END_OF_SOURCE else endMs * 1000
-                    val clippedSource = ClippingMediaSource(mediaSource, startUs, endUs)
-
                     // 5. Set the clipped source directly. Manual looping is handled in the listener.
-                    setMediaSource(clippedSource)
+                    setMediaSource(mediaSource)
                     volume = if (isAudioEnabled) 1f else 0f
 
                     addListener(object : Player.Listener {
@@ -248,7 +221,6 @@ class UndeadWallpaperService : WallpaperService() {
             // <<< ABBY'S FIX: Turn on the radio and start listening >>>
             val intentFilter = IntentFilter().apply {
                 addAction(ACTION_VIDEO_URI_CHANGED)
-                addAction(ACTION_TRIM_TIMES_CHANGED)
             }
             // Using `registerReceiver` with the `RECEIVER_NOT_EXPORTED` flag is the
             // modern, secure way for Android 13+
