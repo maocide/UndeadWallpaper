@@ -210,6 +210,7 @@ class UndeadWallpaperService : WallpaperService() {
             super.onDestroy()
             Log.i(TAG, "Engine onDestroy")
             releasePlayer()
+            unregisterReceiver(videoChangeReceiver)
         }
 
         @Deprecated("Deprecated in Java") // This is needed for older Android versions
