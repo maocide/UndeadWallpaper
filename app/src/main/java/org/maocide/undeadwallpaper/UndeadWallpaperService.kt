@@ -25,7 +25,6 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.SeekParameters
 import androidx.media3.exoplayer.source.ClippingMediaSource
-import androidx.media3.exoplayer.source.LoopingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 
 class UndeadWallpaperService : WallpaperService() {
@@ -77,8 +76,7 @@ class UndeadWallpaperService : WallpaperService() {
                             val startUs = startMs * 1000
                             val endUs = if (endMs == C.TIME_END_OF_SOURCE) C.TIME_END_OF_SOURCE else endMs * 1000
                             val clippedSource = ClippingMediaSource(mediaSource, startUs, endUs)
-                            val loopingSource = LoopingMediaSource(clippedSource)
-                            player.setMediaSource(loopingSource)
+                            player.setMediaSource(clippedSource)
                             player.prepare() // Prepare the new source
                             player.seekTo(0) // Start from the beginning of the new clip
                         }
@@ -113,7 +111,7 @@ class UndeadWallpaperService : WallpaperService() {
 
             val player = ExoPlayer.Builder(baseContext)
                 .setLoadControl(loadControl)
-                .setSeekParameters(SeekParameters.PREVIOUS_SYNC)
+                .setSeekParameters(SeekParameters.CLOSEST_SYNC)
                 .build().apply {
                     val mediaUri = getMediaUri()
                     if (mediaUri == null) {
@@ -137,14 +135,18 @@ class UndeadWallpaperService : WallpaperService() {
                     val endUs = if (endMs == C.TIME_END_OF_SOURCE) C.TIME_END_OF_SOURCE else endMs * 1000
                     val clippedSource = ClippingMediaSource(mediaSource, startUs, endUs)
 
-                    // 5. NOW, wrap the already-clipped source in the LoopingMediaSource.
-                    val loopingMediaSource = LoopingMediaSource(clippedSource)
-
-                    // 6. Set the final, composite source on the player.
-                    setMediaSource(loopingMediaSource)
+                    // 5. Set the clipped source directly. Manual looping is handled in the listener.
+                    setMediaSource(clippedSource)
                     volume = if (isAudioEnabled) 1f else 0f
 
                     addListener(object : Player.Listener {
+                        override fun onPlaybackStateChanged(state: Int) {
+                            if (state == Player.STATE_ENDED) {
+                                // Manual loop
+                                seekTo(0)
+                                play()
+                            }
+                        }
                         override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
                             super.onVideoSizeChanged(videoSize)
 
