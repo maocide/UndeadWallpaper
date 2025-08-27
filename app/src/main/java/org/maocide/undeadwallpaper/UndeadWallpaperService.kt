@@ -48,6 +48,7 @@ class UndeadWallpaperService : WallpaperService() {
         private var playheadTime: Long = 0L
         private val TAG: String = javaClass.simpleName
         private lateinit var sharedPrefs: SharedPreferences
+        private var isScalingModeSet = false
 
 
 
@@ -122,27 +123,26 @@ class UndeadWallpaperService : WallpaperService() {
                         override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
                             super.onVideoSizeChanged(videoSize)
 
-                            // Only proceed if we have a valid, non-zero video size.
+                            // Sanity check for 0x0 size
                             if (videoSize.width == 0 || videoSize.height == 0) {
                                 Log.w(TAG, "Ignoring invalid 0x0 video size change.")
-                                return // Abort if the size is invalid
+                                return
                             }
 
-                            Log.i(TAG, "Valid video size detected: ${videoSize.width}x${videoSize.height}")
+                            // Only run this logic if we haven't already set the scaling mode for this video
+                            if (!isScalingModeSet) {
+                                Log.i(TAG, "Valid video size detected: ${videoSize.width}x${videoSize.height}. Setting scaling mode ONCE.")
 
-                            // Calculate the aspect ratio of the video
-                            val videoAspectRatio = videoSize.width.toFloat() / videoSize.height.toFloat()
+                                val videoAspectRatio = videoSize.width.toFloat() / videoSize.height.toFloat()
+                                val isHorizontalVideo = videoAspectRatio > 1.0
 
-                            // Check if the video is horizontal (wider than it is tall)
-                            val isHorizontalVideo = videoAspectRatio > 1.0
+                                this@apply.videoScalingMode = if (isHorizontalVideo) {
+                                    VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
+                                } else {
+                                    VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
+                                }
 
-                            // Apply a different scaling mode based on the video's orientation
-                            this@apply.videoScalingMode = if (isHorizontalVideo) {
-                                Log.i(TAG, "Horizontal video detected. Applying SCALE_TO_FIT_WITH_CROPPING.")
-                                VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
-                            } else {
-                                Log.i(TAG, "Vertical/Square video detected. Applying SCALE_TO_FIT_WITH_CROPPING.")
-                                VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
+                                isScalingModeSet = true // SET THE FLAG SO THIS DOESN'T RUN AGAIN
                             }
                         }
                     })
@@ -164,6 +164,7 @@ class UndeadWallpaperService : WallpaperService() {
                 player.release()
             }
             mediaPlayer = null
+            isScalingModeSet = false
         }
 
         private fun getMediaUri(): Uri? {
