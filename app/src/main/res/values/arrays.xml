@@ -1,0 +1,6 @@
+<resources>
+    <array name="initial_range_slider_values">
+        <item>0.0</item>
+        <item>100.0</item>
+    </array>
+</resources>

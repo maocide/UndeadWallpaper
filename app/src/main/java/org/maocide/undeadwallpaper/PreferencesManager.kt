@@ -88,4 +88,14 @@ class PreferencesManager(context: Context) {
         val endMs = sharedPrefs.getLong(KEY_VIDEO_END_MS, -1L)
         return Pair(startMs, endMs)
     }
+
+    /**
+     * Removes the video clipping times from SharedPreferences.
+     */
+    fun removeClippingTimes() {
+        sharedPrefs.edit {
+            remove(KEY_VIDEO_START_MS)
+            remove(KEY_VIDEO_END_MS)
+        }
+    }
 }

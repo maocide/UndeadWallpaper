@@ -13,18 +13,18 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.MediaController
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.google.android.material.slider.RangeSlider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import android.widget.Toast
 import kotlinx.coroutines.withContext
 import org.maocide.undeadwallpaper.databinding.FragmentFirstBinding
-import java.io.File
 
 /**
  * A simple [Fragment] subclass as the default destination in the navigation.
@@ -110,6 +110,46 @@ class FirstFragment : Fragment() {
     }
 
     /**
+     * Centralized function to handle setting or changing the video source.
+     * This function ensures that whenever a new video is selected, the UI and
+     * preferences are reset and updated correctly.
+     *
+     * @param uri The URI of the new video file.
+     */
+    private fun updateVideoSource(uri: Uri) {
+        // 1. Clear any previous trimming data
+        preferencesManager.removeClippingTimes()
+
+        // 2. Save the new video URI
+        preferencesManager.saveVideoUri(uri.toString())
+
+        // 3. Get duration and update UI
+        currentVideoDurationMs = getVideoDuration(uri)
+        if (currentVideoDurationMs > 0) {
+            binding.trimSlider.valueFrom = 0f
+            binding.trimSlider.valueTo = currentVideoDurationMs.toFloat()
+            binding.trimSlider.values = listOf(0f, currentVideoDurationMs.toFloat())
+            binding.tvStartTime.text = formatMillisecondsToHHMMSSmmm(0)
+            binding.tvEndTime.text = formatMillisecondsToHHMMSSmmm(currentVideoDurationMs)
+        } else {
+            // Handle case where duration is invalid or video is corrupt
+            binding.trimSlider.isEnabled = false
+            Toast.makeText(context, "Could not read video duration. Trimming disabled.", Toast.LENGTH_LONG).show()
+        }
+
+        // 4. Update the video preview
+        setupVideoPreview(uri)
+
+        // 5. Notify the service to reload the video
+        val intent = Intent(UndeadWallpaperService.ACTION_VIDEO_URI_CHANGED)
+        context?.sendBroadcast(intent)
+
+        // 6. Refresh the recent files list
+        loadRecentFiles()
+    }
+
+
+    /**
      * Sets up the RecyclerView for displaying recent files.
      */
     private fun setupRecyclerView() {
@@ -117,8 +157,7 @@ class FirstFragment : Fragment() {
             recentFiles,
             onItemClick = { recentFile ->
                 val fileUri = Uri.fromFile(recentFile.file)
-                preferencesManager.saveVideoUri(fileUri.toString())
-                setupVideoPreview(fileUri)
+                updateVideoSource(fileUri)
             }
         )
         binding.recyclerViewRecentFiles.layoutManager = LinearLayoutManager(context)
@@ -140,32 +179,61 @@ class FirstFragment : Fragment() {
     }
 
     /**
-     * Loads and applies user preferences.
+     * Loads and applies user preferences on startup.
+     * This function is "paranoid" and validates saved clipping times against the
+     * video's actual duration to prevent crashes or weird behavior from stale data.
      */
     private fun loadAndApplyPreferences() {
-        // Load and apply the video URI for preview
-        val videoUriString = preferencesManager.getVideoUri()
-        if (videoUriString != null) {
-            val videoUri = videoUriString.toUri()
-            setupVideoPreview(videoUri)
-            currentVideoDurationMs = getVideoDuration(videoUri)
-        }
-
-        // Load and apply audio setting
+        // Load audio setting first
         binding.switchAudio.isChecked = preferencesManager.isAudioEnabled()
 
-        // Load and apply clipping times
-        val (startMs, endMs) = preferencesManager.getClippingTimes()
-        binding.etStartTime.setText(formatMillisecondsToHHMMSSmmm(startMs))
-        if (endMs != -1L) {
-            binding.etEndTime.setText(formatMillisecondsToHHMMSSmmm(endMs))
-        } else {
-            binding.etEndTime.setText("") // Clear if not set
+        // Load video URI
+        val videoUriString = preferencesManager.getVideoUri()
+        if (videoUriString == null) {
+            // No video set, disable the slider
+            binding.trimSlider.isEnabled = false
+            return
         }
 
-        // The scaling mode has been removed from the user settings.
-        // The wallpaper service now uses a smart scaling logic by default.
+        val videoUri = videoUriString.toUri()
+        currentVideoDurationMs = getVideoDuration(videoUri)
+
+        if (currentVideoDurationMs <= 0) {
+            // Invalid video or duration, disable slider
+            binding.trimSlider.isEnabled = false
+            setupVideoPreview(videoUri) // Still try to show preview
+            return
+        }
+
+        // Video is valid, enable and configure slider
+        binding.trimSlider.isEnabled = true
+        binding.trimSlider.valueFrom = 0f
+        binding.trimSlider.valueTo = currentVideoDurationMs.toFloat()
+
+        // Load saved clipping times
+        var (startMs, endMs) = preferencesManager.getClippingTimes()
+
+        // If endMs is default, set it to the full duration for the UI
+        if (endMs == -1L || endMs > currentVideoDurationMs) {
+            endMs = currentVideoDurationMs
+        }
+
+        // **Sanity Check:** Validate saved times against the video's duration.
+        if (startMs < 0 || startMs >= endMs || startMs > currentVideoDurationMs) {
+            // If times are invalid (e.g., from a different video), reset to full range.
+            startMs = 0L
+            endMs = currentVideoDurationMs
+        }
+
+        // Apply the validated values to the slider and text views
+        binding.trimSlider.values = listOf(startMs.toFloat(), endMs.toFloat())
+        binding.tvStartTime.text = formatMillisecondsToHHMMSSmmm(startMs)
+        binding.tvEndTime.text = formatMillisecondsToHHMMSSmmm(endMs)
+
+        // Finally, set up the video preview
+        setupVideoPreview(videoUri)
     }
+
 
     /**
      * Sets up listeners for preference changes.
@@ -174,51 +242,43 @@ class FirstFragment : Fragment() {
         // Listener for audio switch
         binding.switchAudio.setOnCheckedChangeListener { _, isChecked ->
             preferencesManager.saveAudioEnabled(isChecked)
-        }
-
-        binding.buttonSaveTimes.setOnClickListener {
-            val startTimeString = binding.etStartTime.text.toString()
-            val endTimeString = binding.etEndTime.text.toString()
-
-            val startMs = parseHHMMSSmmmToMilliseconds(startTimeString)
-            val endMs = if (endTimeString.isNotBlank()) {
-                parseHHMMSSmmmToMilliseconds(endTimeString)
-            } else {
-                -1L
-            }
-
-            // --- Validation ---
-            if (startMs == -1L) {
-                Toast.makeText(context, "Invalid start time format. Use HH:MM:SS.mmm", Toast.LENGTH_LONG).show()
-                return@setOnClickListener
-            }
-            if (endTimeString.isNotBlank() && endMs == -1L) {
-                Toast.makeText(context, "Invalid end time format. Use HH:MM:SS.mmm", Toast.LENGTH_LONG).show()
-                return@setOnClickListener
-            }
-            if (endMs != -1L && endMs <= startMs) {
-                Toast.makeText(context, "End time must be after start time.", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            if (currentVideoDurationMs > 0) {
-                if (startMs >= currentVideoDurationMs) {
-                    Toast.makeText(context, "Start time must be less than video duration (${formatMillisecondsToHHMMSSmmm(currentVideoDurationMs)}).", Toast.LENGTH_LONG).show()
-                    return@setOnClickListener
-                }
-                if (endMs != -1L && endMs > currentVideoDurationMs) {
-                    Toast.makeText(context, "End time cannot be greater than video duration (${formatMillisecondsToHHMMSSmmm(currentVideoDurationMs)}).", Toast.LENGTH_LONG).show()
-                    return@setOnClickListener
-                }
-            }
-
-            preferencesManager.saveClippingTimes(startMs, endMs)
-
+            // Notify service immediately if audio preference changes
             val intent = Intent(UndeadWallpaperService.ACTION_VIDEO_URI_CHANGED)
             context?.sendBroadcast(intent)
-
-            Toast.makeText(context, "Clipping times applied.", Toast.LENGTH_SHORT).show()
         }
+
+        // Listener for trim slider value changes (updates text views in real-time)
+        binding.trimSlider.addOnChangeListener { slider, _, _ ->
+            val values = slider.values
+            val startMs = values[0].toLong()
+            val endMs = values[1].toLong()
+            binding.tvStartTime.text = formatMillisecondsToHHMMSSmmm(startMs)
+            binding.tvEndTime.text = formatMillisecondsToHHMMSSmmm(endMs)
+        }
+
+        // Listener for when the user lifts their finger from the slider
+        binding.trimSlider.addOnSliderTouchListener(object : RangeSlider.OnSliderTouchListener {
+            override fun onStartTrackingTouch(slider: RangeSlider) {
+                // No-op
+            }
+
+            override fun onStopTrackingTouch(slider: RangeSlider) {
+                val values = slider.values
+                val startMs = values[0].toLong()
+                val endMs = values[1].toLong()
+
+                // Save the new clipping times
+                preferencesManager.saveClippingTimes(startMs, endMs)
+
+                // Notify the service to apply the new times
+                val intent = Intent(UndeadWallpaperService.ACTION_VIDEO_URI_CHANGED)
+                context?.sendBroadcast(intent)
+
+                Toast.makeText(context, "Trimming times applied.", Toast.LENGTH_SHORT).show()
+            }
+        })
     }
+
 
     /**
      * Checks for storage permissions and opens the file picker.
@@ -235,6 +295,7 @@ class FirstFragment : Fragment() {
                 openFilePicker()
             }
             shouldShowRequestPermissionRationale(permission) -> {
+                // We can show a rationale here if needed in the future
                 requestPermissionLauncher.launch(permission)
             }
             else -> {
@@ -250,23 +311,35 @@ class FirstFragment : Fragment() {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
             type = "video/*"
+            // We request persistable permissions to access the file across device reboots.
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
         }
         pickMediaLauncher.launch(intent)
     }
 
     /**
-     * Handles the selected media URI.
+     * Handles the selected media URI from the file picker.
+     * It copies the selected video to the app's private storage to ensure
+     * persistent access and then updates the video source.
      *
-     * @param uri The URI of the selected media.
+     * @param uri The content URI of the selected media.
      */
     private fun handleSelectedMedia(uri: Uri) {
         Log.d(tag, "Handling selected media URI: $uri")
 
+        // Ensure we have persistable permission for this URI
         val contentResolver = requireActivity().contentResolver
         val takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION
-        contentResolver.takePersistableUriPermission(uri, takeFlags)
+        try {
+            contentResolver.takePersistableUriPermission(uri, takeFlags)
+        } catch (e: SecurityException) {
+            Log.e(tag, "Failed to take persistable URI permission for $uri", e)
+            Toast.makeText(context, "Failed to get permission for the selected file.", Toast.LENGTH_LONG).show()
+            return
+        }
 
+
+        // Copy the file to internal storage in a background thread
         viewLifecycleOwner.lifecycleScope.launch {
             val copiedFile = withContext(Dispatchers.IO) {
                 videoFileManager.createFileFromContentUri(uri)
@@ -274,12 +347,10 @@ class FirstFragment : Fragment() {
             if (copiedFile != null) {
                 val savedFileUri = Uri.fromFile(copiedFile)
                 Log.d(tag, "File copied to: $savedFileUri")
-                currentVideoDurationMs = getVideoDuration(savedFileUri)
-                preferencesManager.saveVideoUri(savedFileUri.toString())
-                setupVideoPreview(savedFileUri)
-                loadRecentFiles()
+                updateVideoSource(savedFileUri) // Centralized update logic
             } else {
                 Log.e(tag, "Failed to copy file from URI: $uri")
+                Toast.makeText(context, "Failed to copy video file.", Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -298,6 +369,10 @@ class FirstFragment : Fragment() {
             it.isLooping = true
             binding.videoPreview.start()
         }
+        binding.videoPreview.setOnErrorListener { _, _, _ ->
+            Toast.makeText(context, "Cannot play this video file.", Toast.LENGTH_SHORT).show()
+            true
+        }
     }
 
     /**
@@ -312,39 +387,6 @@ class FirstFragment : Fragment() {
         val seconds = (millis % (1000 * 60)) / 1000
         val milliseconds = millis % 1000
         return String.format("%02d:%02d:%02d.%03d", hours, minutes, seconds, milliseconds)
-    }
-
-    /**
-     * Parses a HH:MM:SS.mmm formatted string into milliseconds.
-     * @param timeString The time string in HH:MM:SS.mmm format.
-     * @return The time in milliseconds, or -1 if the format is invalid.
-     */
-    private fun parseHHMMSSmmmToMilliseconds(timeString: String): Long {
-        if (timeString.isBlank()) return -1
-        return try {
-            val mainParts = timeString.split('.')
-            val hmsParts = mainParts[0].split(':')
-
-            if (hmsParts.size != 3) return -1
-
-            val hours = hmsParts[0].toLong()
-            val minutes = hmsParts[1].toLong()
-            val seconds = hmsParts[2].toLong()
-
-            val millis = if (mainParts.size == 2 && mainParts[1].isNotBlank()) {
-                val mmmString = mainParts[1].padEnd(3, '0').substring(0, 3)
-                if (mmmString.length != 3) return -1
-                mmmString.toLong()
-            } else {
-                0L
-            }
-
-            if (hours < 0 || minutes < 0 || minutes > 59 || seconds < 0 || seconds > 59 || millis < 0 || millis > 999) return -1
-
-            (hours * 3600 + minutes * 60 + seconds) * 1000 + millis
-        } catch (e: Exception) { // Catch broader exceptions
-            -1
-        }
     }
 
     override fun onDestroyView() {
