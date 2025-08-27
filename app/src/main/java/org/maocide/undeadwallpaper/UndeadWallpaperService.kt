@@ -24,6 +24,8 @@ import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.SeekParameters
+import androidx.media3.exoplayer.source.ClippingMediaSource
+import androidx.media3.exoplayer.source.LoopingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 
 class UndeadWallpaperService : WallpaperService() {
@@ -31,6 +33,7 @@ class UndeadWallpaperService : WallpaperService() {
     // <<< ABBY'S ADDITION: Our secret passphrase >>>
     companion object {
         const val ACTION_VIDEO_URI_CHANGED = "org.maocide.undeadwallpaper.VIDEO_URI_CHANGED"
+        const val ACTION_TRIM_TIMES_CHANGED = "org.maocide.undeadwallpaper.TRIM_TIMES_CHANGED"
     }
 
     override fun onCreateEngine(): Engine {
@@ -53,13 +56,33 @@ class UndeadWallpaperService : WallpaperService() {
 
         // <<< ABBY'S FIX: The radio receiver that listens for our signal >>>
         private val videoChangeReceiver = object : BroadcastReceiver() {
+            @OptIn(UnstableApi::class)
             override fun onReceive(context: Context?, intent: Intent?) {
-                if (intent?.action == ACTION_VIDEO_URI_CHANGED) {
-                    Log.i(TAG, "Broadcast received! Re-initializing player with new video.")
-                    // Reset playhead position to the beginning of the clip whenever the
-                    // video source or its parameters (like trimming) are changed.
-                    playheadTime = 0L
-                    initializePlayer()
+                when (intent?.action) {
+                    ACTION_VIDEO_URI_CHANGED -> {
+                        Log.i(TAG, "Broadcast received: Full re-initialization requested.")
+                        playheadTime = 0L
+                        initializePlayer()
+                    }
+                    ACTION_TRIM_TIMES_CHANGED -> {
+                        Log.i(TAG, "Broadcast received: Dynamic trim update requested.")
+                        val startMs = intent.getLongExtra("startMs", 0L)
+                        val endMs = intent.getLongExtra("endMs", C.TIME_END_OF_SOURCE)
+
+                        mediaPlayer?.let { player ->
+                            val mediaUri = getMediaUri() ?: return
+                            val mediaItem = MediaItem.fromUri(mediaUri)
+                            val mediaSource = ProgressiveMediaSource.Factory(DefaultDataSource.Factory(baseContext))
+                                .createMediaSource(mediaItem)
+                            val startUs = startMs * 1000
+                            val endUs = if (endMs == C.TIME_END_OF_SOURCE) C.TIME_END_OF_SOURCE else endMs * 1000
+                            val clippedSource = ClippingMediaSource(mediaSource, startUs, endUs)
+                            val loopingSource = LoopingMediaSource(clippedSource)
+                            player.setMediaSource(loopingSource)
+                            player.seekTo(0) // Start from the beginning of the new clip
+                            player.prepare() // Prepare the new source
+                        }
+                    }
                 }
             }
         }
@@ -98,38 +121,30 @@ class UndeadWallpaperService : WallpaperService() {
                         return
                     }
 
-                    // 1. Load the clipping times from preferences.
-                    val startMs = sharedPrefs.getLong(getString(R.string.video_start_ms), 0L)
-                    val endMs = sharedPrefs.getLong(getString(R.string.video_end_ms), C.TIME_END_OF_SOURCE)
+                    // 1. Build a NORMAL MediaItem WITHOUT the clipping config.
+                    val mediaItem = MediaItem.fromUri(mediaUri)
 
-                    // 2. Build a MediaItem with the clipping configuration. This is the modern
-                    //    and more robust way to handle trimming in ExoPlayer.
-                    val mediaItem = MediaItem.Builder()
-                        .setUri(mediaUri)
-                        .setClippingConfiguration(
-                            MediaItem.ClippingConfiguration.Builder()
-                                .setStartPositionMs(startMs)
-                                .setEndPositionMs(if (endMs == C.TIME_END_OF_SOURCE) C.TIME_END_OF_SOURCE else endMs)
-                                .build()
-                        )
-                        .build()
-
-                    // 3. Create the base MediaSource from the clipped MediaItem.
+                    // 2. Create the base MediaSource from that item.
                     val mediaSource = ProgressiveMediaSource.Factory(DefaultDataSource.Factory(baseContext))
                         .createMediaSource(mediaItem)
 
-                    // 4. Set the source on the player. No LoopingMediaSource needed as we handle it manually.
-                    setMediaSource(mediaSource)
+                    // 3. Load the clipping times from preferences.
+                    val startMs = sharedPrefs.getLong(getString(R.string.video_start_ms), 0L)
+                    val endMs = sharedPrefs.getLong(getString(R.string.video_end_ms), C.TIME_END_OF_SOURCE)
+
+                    // 4. Use ClippingMediaSource to "cut" the video to the desired segment.
+                    val startUs = startMs * 1000
+                    val endUs = if (endMs == C.TIME_END_OF_SOURCE) C.TIME_END_OF_SOURCE else endMs * 1000
+                    val clippedSource = ClippingMediaSource(mediaSource, startUs, endUs)
+
+                    // 5. NOW, wrap the already-clipped source in the LoopingMediaSource.
+                    val loopingMediaSource = LoopingMediaSource(clippedSource)
+
+                    // 6. Set the final, composite source on the player.
+                    setMediaSource(loopingMediaSource)
                     volume = if (isAudioEnabled) 1f else 0f
 
                     addListener(object : Player.Listener {
-                        override fun onPlaybackStateChanged(playbackState: Int) {
-                            if (playbackState == Player.STATE_ENDED) {
-                                // Manual loop
-                                seekTo(0)
-                                play()
-                            }
-                        }
                         override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
                             super.onVideoSizeChanged(videoSize)
 
@@ -229,7 +244,10 @@ class UndeadWallpaperService : WallpaperService() {
             super.onCreate(surfaceHolder)
             Log.i(TAG, "Engine onCreate")
             // <<< ABBY'S FIX: Turn on the radio and start listening >>>
-            val intentFilter = IntentFilter(ACTION_VIDEO_URI_CHANGED)
+            val intentFilter = IntentFilter().apply {
+                addAction(ACTION_VIDEO_URI_CHANGED)
+                addAction(ACTION_TRIM_TIMES_CHANGED)
+            }
             // Using `registerReceiver` with the `RECEIVER_NOT_EXPORTED` flag is the
             // modern, secure way for Android 13+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

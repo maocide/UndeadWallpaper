@@ -270,8 +270,11 @@ class FirstFragment : Fragment() {
                 // Save the new clipping times
                 preferencesManager.saveClippingTimes(startMs, endMs)
 
-                // Notify the service to apply the new times
-                val intent = Intent(UndeadWallpaperService.ACTION_VIDEO_URI_CHANGED)
+                // Notify the service to apply the new times dynamically
+                val intent = Intent(UndeadWallpaperService.ACTION_TRIM_TIMES_CHANGED).apply {
+                    putExtra("startMs", startMs)
+                    putExtra("endMs", endMs)
+                }
                 context?.sendBroadcast(intent)
 
                 Toast.makeText(context, "Trimming times applied.", Toast.LENGTH_SHORT).show()
