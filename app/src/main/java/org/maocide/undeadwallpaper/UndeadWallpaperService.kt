@@ -84,11 +84,27 @@ class UndeadWallpaperService : WallpaperService() {
             val player = ExoPlayer.Builder(baseContext)
                 .setLoadControl(loadControl)
                 .build().apply {
-                    val mediaItem = getMediaUri()?.let { MediaItem.fromUri(it) }
-                    if (mediaItem == null) {
+                    val mediaUri = getMediaUri()
+                    if (mediaUri == null) {
                         Log.e(TAG, "Media URI is null, cannot play video.")
                         return
                     }
+
+                    // Load the clipping times from preferences
+                    val startMs = sharedPrefs.getLong(getString(R.string.video_start_ms), 0L)
+                    val endMs = sharedPrefs.getLong(getString(R.string.video_end_ms), C.TIME_END_OF_SOURCE)
+
+                    // Build the MediaItem with the clipping configuration
+                    val mediaItem = MediaItem.Builder()
+                        .setUri(mediaUri)
+                        .setClippingConfiguration(
+                            MediaItem.ClippingConfiguration.Builder()
+                                .setStartPositionMs(startMs)
+                                .setEndPositionMs(endMs)
+                                .build()
+                        )
+                        .build()
+
                     setMediaItem(mediaItem)
                     repeatMode = Player.REPEAT_MODE_ONE
                     volume = if (isAudioEnabled) 1f else 0f

@@ -84,6 +84,54 @@
                     android:text="@string/setting_audio_enabled"
                     android:checked="false"/>
 
+                <!-- Start Time -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="Start Time"/>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etStartTime"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="HH:MM:SS"
+                        android:inputType="time" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- End Time -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="End Time"/>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etEndTime"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="HH:MM:SS"
+                        android:inputType="time" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/button_save_times"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="end"
+                    android:layout_marginTop="16dp"
+                    android:text="Apply Times" />
+
                 <!-- Recent Files -->
                 <TextView
                     android:layout_width="wrap_content"

@@ -17,6 +17,8 @@
     <string name="video_uri" translatable="false">video_uri</string>
     <string name="video_audio_enabled" translatable="false">video_audio_enabled</string>
     <string name="video_zoom_level" translatable="false">video_zoom_level</string>
+    <string name="video_start_ms" translatable="false">video_start_ms</string>
+    <string name="video_end_ms" translatable="false">video_end_ms</string>
 
     <string name="about_text">Undead Wallpaper\n\nVersion 1.0\n\nThis app allows you to use your favorite videos as a live wallpaper on your Android device.\n\nDeveloped by maocide.</string>
 

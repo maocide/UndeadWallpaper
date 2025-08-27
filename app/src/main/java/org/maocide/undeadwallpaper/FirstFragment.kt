@@ -20,6 +20,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import android.widget.Toast
 import kotlinx.coroutines.withContext
 import org.maocide.undeadwallpaper.databinding.FragmentFirstBinding
 import java.io.File
@@ -132,6 +133,15 @@ class FirstFragment : Fragment() {
         // Load and apply audio setting
         binding.switchAudio.isChecked = preferencesManager.isAudioEnabled()
 
+        // Load and apply clipping times
+        val (startMs, endMs) = preferencesManager.getClippingTimes()
+        binding.etStartTime.setText(formatMillisecondsToHHMMSS(startMs))
+        if (endMs != -1L) {
+            binding.etEndTime.setText(formatMillisecondsToHHMMSS(endMs))
+        } else {
+            binding.etEndTime.setText("") // Clear if not set
+        }
+
         // The scaling mode has been removed from the user settings.
         // The wallpaper service now uses a smart scaling logic by default.
     }
@@ -143,6 +153,38 @@ class FirstFragment : Fragment() {
         // Listener for audio switch
         binding.switchAudio.setOnCheckedChangeListener { _, isChecked ->
             preferencesManager.saveAudioEnabled(isChecked)
+        }
+
+        binding.buttonSaveTimes.setOnClickListener {
+            val startTimeString = binding.etStartTime.text.toString()
+            val endTimeString = binding.etEndTime.text.toString()
+
+            val startMs = parseHHMMSSToMilliseconds(startTimeString)
+            val endMs = if (endTimeString.isNotBlank()) {
+                parseHHMMSSToMilliseconds(endTimeString)
+            } else {
+                -1L
+            }
+
+            if (startMs == -1L) {
+                Toast.makeText(context, "Invalid start time format. Use HH:MM:SS.", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            if (endTimeString.isNotBlank() && endMs == -1L) {
+                Toast.makeText(context, "Invalid end time format. Use HH:MM:SS.", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            if (endMs != -1L && endMs <= startMs) {
+                Toast.makeText(context, "End time must be after start time.", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            preferencesManager.saveClippingTimes(startMs, endMs)
+
+            val intent = Intent(UndeadWallpaperService.ACTION_VIDEO_URI_CHANGED)
+            context?.sendBroadcast(intent)
+
+            Toast.makeText(context, "Clipping times applied.", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -222,6 +264,40 @@ class FirstFragment : Fragment() {
         binding.videoPreview.setOnPreparedListener {
             it.isLooping = true
             binding.videoPreview.start()
+        }
+    }
+
+    /**
+     * Converts milliseconds to a HH:MM:SS formatted string.
+     * @param millis The time in milliseconds.
+     * @return A string in HH:MM:SS format.
+     */
+    private fun formatMillisecondsToHHMMSS(millis: Long): String {
+        val hours = millis / (1000 * 60 * 60)
+        val minutes = (millis % (1000 * 60 * 60)) / (1000 * 60)
+        val seconds = (millis % (1000 * 60)) / 1000
+        return String.format("%02d:%02d:%02d", hours, minutes, seconds)
+    }
+
+    /**
+     * Parses a HH:MM:SS formatted string into milliseconds.
+     * @param timeString The time string in HH:MM:SS format.
+     * @return The time in milliseconds, or -1 if the format is invalid.
+     */
+    private fun parseHHMMSSToMilliseconds(timeString: String): Long {
+        return try {
+            val parts = timeString.split(":")
+            if (parts.size != 3) return -1
+
+            val hours = parts[0].toLong()
+            val minutes = parts[1].toLong()
+            val seconds = parts[2].toLong()
+
+            if (hours < 0 || minutes < 0 || minutes > 59 || seconds < 0 || seconds > 59) return -1
+
+            (hours * 3600 + minutes * 60 + seconds) * 1000
+        } catch (e: NumberFormatException) {
+            -1
         }
     }
 
