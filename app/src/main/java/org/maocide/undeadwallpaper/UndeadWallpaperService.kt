@@ -23,6 +23,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.SeekParameters
 import androidx.media3.exoplayer.source.ClippingMediaSource
 import androidx.media3.exoplayer.source.LoopingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
@@ -91,6 +92,7 @@ class UndeadWallpaperService : WallpaperService() {
 
             val player = ExoPlayer.Builder(baseContext)
                 .setLoadControl(loadControl)
+                .setSeekParameters(SeekParameters.CLOSEST_SYNC)
                 .build().apply {
                     val mediaUri = getMediaUri()
                     if (mediaUri == null) {
