@@ -113,7 +113,7 @@ class UndeadWallpaperService : WallpaperService() {
 
             val player = ExoPlayer.Builder(baseContext)
                 .setLoadControl(loadControl)
-                .setSeekParameters(SeekParameters.CLOSEST_SYNC)
+                .setSeekParameters(SeekParameters.PREVIOUS_SYNC)
                 .build().apply {
                     val mediaUri = getMediaUri()
                     if (mediaUri == null) {
