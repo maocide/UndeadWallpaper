@@ -24,7 +24,6 @@ import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.SeekParameters
-import androidx.media3.exoplayer.source.LoopingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 
 class UndeadWallpaperService : WallpaperService() {
@@ -119,14 +118,18 @@ class UndeadWallpaperService : WallpaperService() {
                     val mediaSource = ProgressiveMediaSource.Factory(DefaultDataSource.Factory(baseContext))
                         .createMediaSource(mediaItem)
 
-                    // 4. Wrap the source in a LoopingMediaSource to make the wallpaper loop.
-                    val loopingMediaSource = LoopingMediaSource(mediaSource)
-
-                    // 5. Set the final, composite source on the player.
-                    setMediaSource(loopingMediaSource)
+                    // 4. Set the source on the player. No LoopingMediaSource needed as we handle it manually.
+                    setMediaSource(mediaSource)
                     volume = if (isAudioEnabled) 1f else 0f
 
                     addListener(object : Player.Listener {
+                        override fun onPlaybackStateChanged(playbackState: Int) {
+                            if (playbackState == Player.STATE_ENDED) {
+                                // Manual loop
+                                seekTo(0)
+                                play()
+                            }
+                        }
                         override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
                             super.onVideoSizeChanged(videoSize)
 
