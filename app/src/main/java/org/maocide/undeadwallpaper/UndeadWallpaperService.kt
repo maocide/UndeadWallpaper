@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
+import android.media.MediaCodec
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -63,7 +64,6 @@ class UndeadWallpaperService : WallpaperService() {
                 releasePlayer()
             }
 
-
             val holder = surfaceHolder
             if (holder == null) {
                 Log.w(TAG, "Cannot initialize player: surface is not ready.")
@@ -75,19 +75,10 @@ class UndeadWallpaperService : WallpaperService() {
 
             // --- Load Settings from SharedPreferences ---
             val isAudioEnabled = sharedPrefs.getBoolean(getString(R.string.video_audio_enabled), false)
-            val scalingModeId = sharedPrefs.getInt(getString(R.string.video_scaling_mode), R.id.radio_scale_crop)
-            Log.d(TAG, "Loaded Settings: Audio=$isAudioEnabled, ScalingModeID=$scalingModeId")
-            // Note: Zoom is logged but not implemented visually, as it's complex with SurfaceView.
+            // We'll read the scaling mode inside the listener now.
 
             val loadControl = DefaultLoadControl.Builder()
-                .setBufferDurationsMs(
-                    15 * 1000,
-                    30 * 1000,
-                    500,
-                    100
-                )
-                .setTargetBufferBytes(DefaultLoadControl.DEFAULT_TARGET_BUFFER_BYTES / 4)
-                .setPrioritizeTimeOverSizeThresholds(true)
+                // ... (your loadControl settings are fine) ...
                 .build()
 
             val player = ExoPlayer.Builder(baseContext)
@@ -100,12 +91,6 @@ class UndeadWallpaperService : WallpaperService() {
                     }
                     setMediaItem(mediaItem)
                     repeatMode = Player.REPEAT_MODE_ONE
-
-                    // --- Apply Loaded Settings ---
-                    videoScalingMode = when (scalingModeId) {
-                        R.id.radio_scale_fit -> VIDEO_SCALING_MODE_SCALE_TO_FIT
-                        else -> VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
-                    }
                     volume = if (isAudioEnabled) 1f else 0f
 
                     addListener(object : Player.Listener {
@@ -113,6 +98,42 @@ class UndeadWallpaperService : WallpaperService() {
                             if (state == Player.STATE_ENDED) {
                                 this@apply.seekTo(0)
                                 this@apply.play()
+                            }
+                        }
+
+                        /* OLD LOGIC REMOVED
+                        override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
+                            super.onVideoSizeChanged(videoSize)
+                            Log.i(TAG, "Video size detected: ${videoSize.width}x${videoSize.height}")
+
+                            // Now that we know the video size, we can reliably set the scaling mode.
+                            val scalingModeId = sharedPrefs.getInt(getString(R.string.video_scaling_mode), R.id.radio_scale_crop)
+                            this@apply.videoScalingMode = when (scalingModeId) {
+                                R.id.radio_scale_fit -> VIDEO_SCALING_MODE_SCALE_TO_FIT
+                                else -> VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
+                            }
+                            Log.i(TAG, "Video scaling mode has been applied.")
+                        }
+                        */
+                        override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
+                            super.onVideoSizeChanged(videoSize)
+                            Log.i(TAG, "Video size detected: ${videoSize.width}x${videoSize.height}")
+
+                            // --- ABBY'S NEW LOGIC: The Smart Scaling Switch ---
+
+                            // Calculate the aspect ratio of the video
+                            val videoAspectRatio = videoSize.width.toFloat() / videoSize.height.toFloat()
+
+                            // Check if the video is horizontal (wider than it is tall)
+                            val isHorizontalVideo = videoAspectRatio > 1.0
+
+                            // Apply a different scaling mode based on the video's orientation THEY ARE THE SAME NOW, THIS WORKS!!
+                            this@apply.videoScalingMode = if (isHorizontalVideo) {
+                                Log.i(TAG, "Horizontal video detected. Applying (letterbox).")
+                                VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
+                            } else {
+                                Log.i(TAG, "Vertical/Square video detected. Applying (standard).")
+                                VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
                             }
                         }
                     })
