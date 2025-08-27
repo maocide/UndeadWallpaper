@@ -23,6 +23,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.ClippingMediaSource
 import androidx.media3.exoplayer.source.LoopingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 
@@ -94,29 +95,26 @@ class UndeadWallpaperService : WallpaperService() {
                         return
                     }
 
-                    // Load the clipping times from preferences
-                    val startMs = sharedPrefs.getLong(getString(R.string.video_start_ms), 0L)
-                    val endMs = sharedPrefs.getLong(getString(R.string.video_end_ms), C.TIME_END_OF_SOURCE)
+                    // 1. Build a NORMAL MediaItem WITHOUT the clipping config.
+                    val mediaItem = MediaItem.fromUri(mediaUri)
 
-                    // Build the MediaItem with the clipping configuration
-                    val mediaItem = MediaItem.Builder()
-                        .setUri(mediaUri)
-                        .setClippingConfiguration(
-                            MediaItem.ClippingConfiguration.Builder()
-                                .setStartPositionMs(startMs)
-                                .setEndPositionMs(endMs)
-                                .build()
-                        )
-                        .build()
-
-                    // Create a MediaSource from the MediaItem.
+                    // 2. Create the base MediaSource from that item.
                     val mediaSource = ProgressiveMediaSource.Factory(DefaultDataSource.Factory(baseContext))
                         .createMediaSource(mediaItem)
 
-                    // Wrap it in a LoopingMediaSource for seamless looping.
-                    val loopingMediaSource = LoopingMediaSource(mediaSource)
+                    // 3. Load the clipping times from preferences.
+                    val startMs = sharedPrefs.getLong(getString(R.string.video_start_ms), 0L)
+                    val endMs = sharedPrefs.getLong(getString(R.string.video_end_ms), C.TIME_END_OF_SOURCE)
 
-                    // Set the looping media source to the player.
+                    // 4. Use ClippingMediaSource to "cut" the video to the desired segment.
+                    val startUs = startMs * 1000
+                    val endUs = if (endMs == C.TIME_END_OF_SOURCE) C.TIME_END_OF_SOURCE else endMs * 1000
+                    val clippedSource = ClippingMediaSource(mediaSource, startUs, endUs)
+
+                    // 5. NOW, wrap the already-clipped source in the LoopingMediaSource.
+                    val loopingMediaSource = LoopingMediaSource(clippedSource)
+
+                    // 6. Set the final, composite source on the player.
                     setMediaSource(loopingMediaSource)
                     volume = if (isAudioEnabled) 1f else 0f
 
