@@ -20,8 +20,11 @@ import androidx.media3.common.C.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.LoopingMediaSource
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
 
 class UndeadWallpaperService : WallpaperService() {
 
@@ -106,8 +109,15 @@ class UndeadWallpaperService : WallpaperService() {
                         )
                         .build()
 
-                    setMediaItem(mediaItem)
-                    repeatMode = Player.REPEAT_MODE_ONE
+                    // Create a MediaSource from the MediaItem.
+                    val mediaSource = ProgressiveMediaSource.Factory(DefaultDataSource.Factory(baseContext))
+                        .createMediaSource(mediaItem)
+
+                    // Wrap it in a LoopingMediaSource for seamless looping.
+                    val loopingMediaSource = LoopingMediaSource(mediaSource)
+
+                    // Set the looping media source to the player.
+                    setMediaSource(loopingMediaSource)
                     volume = if (isAudioEnabled) 1f else 0f
 
                     addListener(object : Player.Listener {
