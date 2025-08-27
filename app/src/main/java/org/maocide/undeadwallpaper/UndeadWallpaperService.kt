@@ -24,7 +24,6 @@ import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.SeekParameters
-import androidx.media3.exoplayer.source.ClippingMediaSource
 import androidx.media3.exoplayer.source.LoopingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 
@@ -100,26 +99,30 @@ class UndeadWallpaperService : WallpaperService() {
                         return
                     }
 
-                    // 1. Build a NORMAL MediaItem WITHOUT the clipping config.
-                    val mediaItem = MediaItem.fromUri(mediaUri)
-
-                    // 2. Create the base MediaSource from that item.
-                    val mediaSource = ProgressiveMediaSource.Factory(DefaultDataSource.Factory(baseContext))
-                        .createMediaSource(mediaItem)
-
-                    // 3. Load the clipping times from preferences.
+                    // 1. Load the clipping times from preferences.
                     val startMs = sharedPrefs.getLong(getString(R.string.video_start_ms), 0L)
                     val endMs = sharedPrefs.getLong(getString(R.string.video_end_ms), C.TIME_END_OF_SOURCE)
 
-                    // 4. Use ClippingMediaSource to "cut" the video to the desired segment.
-                    val startUs = startMs * 1000
-                    val endUs = if (endMs == C.TIME_END_OF_SOURCE) C.TIME_END_OF_SOURCE else endMs * 1000
-                    val clippedSource = ClippingMediaSource(mediaSource, startUs, endUs)
+                    // 2. Build a MediaItem with the clipping configuration. This is the modern
+                    //    and more robust way to handle trimming in ExoPlayer.
+                    val mediaItem = MediaItem.Builder()
+                        .setUri(mediaUri)
+                        .setClippingConfiguration(
+                            MediaItem.ClippingConfiguration.Builder()
+                                .setStartPositionMs(startMs)
+                                .setEndPositionMs(if (endMs == C.TIME_END_OF_SOURCE) C.TIME_END_OF_SOURCE else endMs)
+                                .build()
+                        )
+                        .build()
 
-                    // 5. NOW, wrap the already-clipped source in the LoopingMediaSource.
-                    val loopingMediaSource = LoopingMediaSource(clippedSource)
+                    // 3. Create the base MediaSource from the clipped MediaItem.
+                    val mediaSource = ProgressiveMediaSource.Factory(DefaultDataSource.Factory(baseContext))
+                        .createMediaSource(mediaItem)
 
-                    // 6. Set the final, composite source on the player.
+                    // 4. Wrap the source in a LoopingMediaSource to make the wallpaper loop.
+                    val loopingMediaSource = LoopingMediaSource(mediaSource)
+
+                    // 5. Set the final, composite source on the player.
                     setMediaSource(loopingMediaSource)
                     volume = if (isAudioEnabled) 1f else 0f
 
