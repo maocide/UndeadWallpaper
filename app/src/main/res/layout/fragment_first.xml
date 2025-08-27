@@ -100,8 +100,8 @@
                         android:id="@+id/etStartTime"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:hint="HH:MM:SS"
-                        android:inputType="time" />
+                        android:hint="HH:MM:SS.mmm"
+                        android:inputType="text" />
                 </com.google.android.material.textfield.TextInputLayout>
 
                 <!-- End Time -->
@@ -120,8 +120,8 @@
                         android:id="@+id/etEndTime"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:hint="HH:MM:SS"
-                        android:inputType="time" />
+                        android:hint="HH:MM:SS.mmm"
+                        android:inputType="text" />
                 </com.google.android.material.textfield.TextInputLayout>
 
                 <com.google.android.material.button.MaterialButton

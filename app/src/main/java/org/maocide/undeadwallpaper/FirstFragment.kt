@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -39,6 +40,7 @@ class FirstFragment : Fragment() {
     private lateinit var videoFileManager: VideoFileManager
     private lateinit var recentFilesAdapter: RecentFilesAdapter
     private val recentFiles = mutableListOf<RecentFile>()
+    private var currentVideoDurationMs: Long = 0L
 
     /**
      * Launcher for picking media from the file system.
@@ -48,6 +50,24 @@ class FirstFragment : Fragment() {
             result.data?.data?.let { uri ->
                 handleSelectedMedia(uri)
             }
+        }
+    }
+
+    /**
+     * Retrieves the duration of a video from its URI.
+     * @param uri The URI of the video.
+     * @return The duration in milliseconds, or 0L if it cannot be determined.
+     */
+    private fun getVideoDuration(uri: Uri): Long {
+        return try {
+            val retriever = MediaMetadataRetriever()
+            retriever.setDataSource(context, uri)
+            val durationString = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+            retriever.release()
+            durationString?.toLong() ?: 0L
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to get video duration for URI: $uri", e)
+            0L
         }
     }
 
@@ -128,6 +148,7 @@ class FirstFragment : Fragment() {
         if (videoUriString != null) {
             val videoUri = videoUriString.toUri()
             setupVideoPreview(videoUri)
+            currentVideoDurationMs = getVideoDuration(videoUri)
         }
 
         // Load and apply audio setting
@@ -135,9 +156,9 @@ class FirstFragment : Fragment() {
 
         // Load and apply clipping times
         val (startMs, endMs) = preferencesManager.getClippingTimes()
-        binding.etStartTime.setText(formatMillisecondsToHHMMSS(startMs))
+        binding.etStartTime.setText(formatMillisecondsToHHMMSSmmm(startMs))
         if (endMs != -1L) {
-            binding.etEndTime.setText(formatMillisecondsToHHMMSS(endMs))
+            binding.etEndTime.setText(formatMillisecondsToHHMMSSmmm(endMs))
         } else {
             binding.etEndTime.setText("") // Clear if not set
         }
@@ -159,24 +180,35 @@ class FirstFragment : Fragment() {
             val startTimeString = binding.etStartTime.text.toString()
             val endTimeString = binding.etEndTime.text.toString()
 
-            val startMs = parseHHMMSSToMilliseconds(startTimeString)
+            val startMs = parseHHMMSSmmmToMilliseconds(startTimeString)
             val endMs = if (endTimeString.isNotBlank()) {
-                parseHHMMSSToMilliseconds(endTimeString)
+                parseHHMMSSmmmToMilliseconds(endTimeString)
             } else {
                 -1L
             }
 
+            // --- Validation ---
             if (startMs == -1L) {
-                Toast.makeText(context, "Invalid start time format. Use HH:MM:SS.", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Invalid start time format. Use HH:MM:SS.mmm", Toast.LENGTH_LONG).show()
                 return@setOnClickListener
             }
             if (endTimeString.isNotBlank() && endMs == -1L) {
-                Toast.makeText(context, "Invalid end time format. Use HH:MM:SS.", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Invalid end time format. Use HH:MM:SS.mmm", Toast.LENGTH_LONG).show()
                 return@setOnClickListener
             }
             if (endMs != -1L && endMs <= startMs) {
                 Toast.makeText(context, "End time must be after start time.", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
+            }
+            if (currentVideoDurationMs > 0) {
+                if (startMs >= currentVideoDurationMs) {
+                    Toast.makeText(context, "Start time must be less than video duration (${formatMillisecondsToHHMMSSmmm(currentVideoDurationMs)}).", Toast.LENGTH_LONG).show()
+                    return@setOnClickListener
+                }
+                if (endMs != -1L && endMs > currentVideoDurationMs) {
+                    Toast.makeText(context, "End time cannot be greater than video duration (${formatMillisecondsToHHMMSSmmm(currentVideoDurationMs)}).", Toast.LENGTH_LONG).show()
+                    return@setOnClickListener
+                }
             }
 
             preferencesManager.saveClippingTimes(startMs, endMs)
@@ -242,6 +274,7 @@ class FirstFragment : Fragment() {
             if (copiedFile != null) {
                 val savedFileUri = Uri.fromFile(copiedFile)
                 Log.d(tag, "File copied to: $savedFileUri")
+                currentVideoDurationMs = getVideoDuration(savedFileUri)
                 preferencesManager.saveVideoUri(savedFileUri.toString())
                 setupVideoPreview(savedFileUri)
                 loadRecentFiles()
@@ -268,35 +301,48 @@ class FirstFragment : Fragment() {
     }
 
     /**
-     * Converts milliseconds to a HH:MM:SS formatted string.
+     * Converts milliseconds to a HH:MM:SS.mmm formatted string.
      * @param millis The time in milliseconds.
-     * @return A string in HH:MM:SS format.
+     * @return A string in HH:MM:SS.mmm format, or an empty string if input is negative.
      */
-    private fun formatMillisecondsToHHMMSS(millis: Long): String {
+    private fun formatMillisecondsToHHMMSSmmm(millis: Long): String {
+        if (millis < 0) return "" // Return empty for invalid or unset times
         val hours = millis / (1000 * 60 * 60)
         val minutes = (millis % (1000 * 60 * 60)) / (1000 * 60)
         val seconds = (millis % (1000 * 60)) / 1000
-        return String.format("%02d:%02d:%02d", hours, minutes, seconds)
+        val milliseconds = millis % 1000
+        return String.format("%02d:%02d:%02d.%03d", hours, minutes, seconds, milliseconds)
     }
 
     /**
-     * Parses a HH:MM:SS formatted string into milliseconds.
-     * @param timeString The time string in HH:MM:SS format.
+     * Parses a HH:MM:SS.mmm formatted string into milliseconds.
+     * @param timeString The time string in HH:MM:SS.mmm format.
      * @return The time in milliseconds, or -1 if the format is invalid.
      */
-    private fun parseHHMMSSToMilliseconds(timeString: String): Long {
+    private fun parseHHMMSSmmmToMilliseconds(timeString: String): Long {
+        if (timeString.isBlank()) return -1
         return try {
-            val parts = timeString.split(":")
-            if (parts.size != 3) return -1
+            val mainParts = timeString.split('.')
+            val hmsParts = mainParts[0].split(':')
 
-            val hours = parts[0].toLong()
-            val minutes = parts[1].toLong()
-            val seconds = parts[2].toLong()
+            if (hmsParts.size != 3) return -1
 
-            if (hours < 0 || minutes < 0 || minutes > 59 || seconds < 0 || seconds > 59) return -1
+            val hours = hmsParts[0].toLong()
+            val minutes = hmsParts[1].toLong()
+            val seconds = hmsParts[2].toLong()
 
-            (hours * 3600 + minutes * 60 + seconds) * 1000
-        } catch (e: NumberFormatException) {
+            val millis = if (mainParts.size == 2 && mainParts[1].isNotBlank()) {
+                val mmmString = mainParts[1].padEnd(3, '0').substring(0, 3)
+                if (mmmString.length != 3) return -1
+                mmmString.toLong()
+            } else {
+                0L
+            }
+
+            if (hours < 0 || minutes < 0 || minutes > 59 || seconds < 0 || seconds > 59 || millis < 0 || millis > 999) return -1
+
+            (hours * 3600 + minutes * 60 + seconds) * 1000 + millis
+        } catch (e: Exception) { // Catch broader exceptions
             -1
         }
     }
