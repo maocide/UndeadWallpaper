@@ -132,10 +132,8 @@ class FirstFragment : Fragment() {
         // Load and apply audio setting
         binding.switchAudio.isChecked = preferencesManager.isAudioEnabled()
 
-        // Load and apply scaling mode
-        val defaultScaleMode = R.id.radio_scale_crop
-        val selectedScaleMode = preferencesManager.getScalingMode(defaultScaleMode)
-        binding.radioGroupScaling.check(selectedScaleMode)
+        // The scaling mode has been removed from the user settings.
+        // The wallpaper service now uses a smart scaling logic by default.
     }
 
     /**
@@ -145,11 +143,6 @@ class FirstFragment : Fragment() {
         // Listener for audio switch
         binding.switchAudio.setOnCheckedChangeListener { _, isChecked ->
             preferencesManager.saveAudioEnabled(isChecked)
-        }
-
-        // Listener for scaling mode radio group
-        binding.radioGroupScaling.setOnCheckedChangeListener { _, checkedId ->
-            preferencesManager.saveScalingMode(checkedId)
         }
     }
 

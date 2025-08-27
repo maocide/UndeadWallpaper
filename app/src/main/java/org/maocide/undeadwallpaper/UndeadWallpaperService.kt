@@ -101,20 +101,6 @@ class UndeadWallpaperService : WallpaperService() {
                             }
                         }
 
-                        /* OLD LOGIC REMOVED
-                        override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
-                            super.onVideoSizeChanged(videoSize)
-                            Log.i(TAG, "Video size detected: ${videoSize.width}x${videoSize.height}")
-
-                            // Now that we know the video size, we can reliably set the scaling mode.
-                            val scalingModeId = sharedPrefs.getInt(getString(R.string.video_scaling_mode), R.id.radio_scale_crop)
-                            this@apply.videoScalingMode = when (scalingModeId) {
-                                R.id.radio_scale_fit -> VIDEO_SCALING_MODE_SCALE_TO_FIT
-                                else -> VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
-                            }
-                            Log.i(TAG, "Video scaling mode has been applied.")
-                        }
-                        */
                         override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
                             super.onVideoSizeChanged(videoSize)
                             Log.i(TAG, "Video size detected: ${videoSize.width}x${videoSize.height}")

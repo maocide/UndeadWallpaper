@@ -84,33 +84,6 @@
                     android:text="@string/setting_audio_enabled"
                     android:checked="false"/>
 
-                <!-- Scaling Options -->
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    android:text="@string/setting_scaling_mode"
-                    android:textAppearance="?attr/textAppearanceTitleMedium" />
-
-                <RadioGroup
-                    android:id="@+id/radio_group_scaling"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical">
-
-                    <RadioButton
-                        android:id="@+id/radio_scale_crop"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/scaling_mode_crop"
-                        android:checked="true"/>
-                    <RadioButton
-                        android:id="@+id/radio_scale_fit"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/scaling_mode_fit"/>
-                </RadioGroup>
-
                 <!-- Recent Files -->
                 <TextView
                     android:layout_width="wrap_content"

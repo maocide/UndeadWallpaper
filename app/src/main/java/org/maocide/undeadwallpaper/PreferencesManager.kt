@@ -20,7 +20,6 @@ class PreferencesManager(context: Context) {
         private const val PREFS_NAME = "DEFAULT"
         private const val KEY_VIDEO_URI = "video_uri"
         private const val KEY_VIDEO_AUDIO_ENABLED = "video_audio_enabled"
-        private const val KEY_VIDEO_SCALING_MODE = "video_scaling_mode"
     }
 
     /**
@@ -63,24 +62,4 @@ class PreferencesManager(context: Context) {
         return sharedPrefs.getBoolean(KEY_VIDEO_AUDIO_ENABLED, false)
     }
 
-    /**
-     * Saves the video scaling mode to SharedPreferences.
-     *
-     * @param mode The scaling mode to save.
-     */
-    fun saveScalingMode(mode: Int) {
-        sharedPrefs.edit {
-            putInt(KEY_VIDEO_SCALING_MODE, mode)
-        }
-    }
-
-    /**
-     * Retrieves the video scaling mode from SharedPreferences.
-     *
-     * @param defaultMode The default scaling mode to return if none is saved.
-     * @return The saved scaling mode, or the default value.
-     */
-    fun getScalingMode(defaultMode: Int): Int {
-        return sharedPrefs.getInt(KEY_VIDEO_SCALING_MODE, defaultMode)
-    }
 }
