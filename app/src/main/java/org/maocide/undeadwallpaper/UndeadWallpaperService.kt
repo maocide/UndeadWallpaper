@@ -119,13 +119,6 @@ class UndeadWallpaperService : WallpaperService() {
                     volume = if (isAudioEnabled) 1f else 0f
 
                     addListener(object : Player.Listener {
-                        override fun onPlaybackStateChanged(state: Int) {
-                            if (state == Player.STATE_ENDED) {
-                                this@apply.seekTo(0)
-                                this@apply.play()
-                            }
-                        }
-
                         override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
                             super.onVideoSizeChanged(videoSize)
 
