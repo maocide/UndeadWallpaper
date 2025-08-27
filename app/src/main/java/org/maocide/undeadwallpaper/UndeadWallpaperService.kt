@@ -79,8 +79,8 @@ class UndeadWallpaperService : WallpaperService() {
                             val clippedSource = ClippingMediaSource(mediaSource, startUs, endUs)
                             val loopingSource = LoopingMediaSource(clippedSource)
                             player.setMediaSource(loopingSource)
-                            player.seekTo(0) // Start from the beginning of the new clip
                             player.prepare() // Prepare the new source
+                            player.seekTo(0) // Start from the beginning of the new clip
                         }
                     }
                 }
