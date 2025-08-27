@@ -128,9 +128,14 @@ class UndeadWallpaperService : WallpaperService() {
 
                         override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
                             super.onVideoSizeChanged(videoSize)
-                            Log.i(TAG, "Video size detected: ${videoSize.width}x${videoSize.height}")
 
-                            // --- ABBY'S NEW LOGIC: The Smart Scaling Switch ---
+                            // Only proceed if we have a valid, non-zero video size.
+                            if (videoSize.width == 0 || videoSize.height == 0) {
+                                Log.w(TAG, "Ignoring invalid 0x0 video size change.")
+                                return // Abort if the size is invalid
+                            }
+
+                            Log.i(TAG, "Valid video size detected: ${videoSize.width}x${videoSize.height}")
 
                             // Calculate the aspect ratio of the video
                             val videoAspectRatio = videoSize.width.toFloat() / videoSize.height.toFloat()
@@ -138,12 +143,12 @@ class UndeadWallpaperService : WallpaperService() {
                             // Check if the video is horizontal (wider than it is tall)
                             val isHorizontalVideo = videoAspectRatio > 1.0
 
-                            // Apply a different scaling mode based on the video's orientation THEY ARE THE SAME NOW, THIS WORKS!!
+                            // Apply a different scaling mode based on the video's orientation
                             this@apply.videoScalingMode = if (isHorizontalVideo) {
-                                Log.i(TAG, "Horizontal video detected. Applying (letterbox).")
+                                Log.i(TAG, "Horizontal video detected. Applying SCALE_TO_FIT_WITH_CROPPING.")
                                 VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
                             } else {
-                                Log.i(TAG, "Vertical/Square video detected. Applying (standard).")
+                                Log.i(TAG, "Vertical/Square video detected. Applying SCALE_TO_FIT_WITH_CROPPING.")
                                 VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
                             }
                         }
