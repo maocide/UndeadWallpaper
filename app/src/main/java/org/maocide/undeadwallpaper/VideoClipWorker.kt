@@ -1,14 +1,17 @@
 package org.maocide.undeadwallpaper
 
 import android.content.Context
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.util.Log
 import androidx.media3.common.MediaItem
-import androidx.media3.common.MimeTypes
 import androidx.media3.transformer.Composition
+import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
 import androidx.media3.transformer.Transformer
+import androidx.media3.effect.ScaleAndRotateTransformation
+import androidx.media3.transformer.Effects
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
@@ -67,14 +70,29 @@ class VideoClipWorker(
         startMs: Long,
         endMs: Long
     ): ExportResult = suspendCancellableCoroutine { continuation ->
-        val mediaItem = MediaItem.fromUri(inputUri)
-        val clippedMediaItem = mediaItem.buildUpon()
+        val mediaItem = MediaItem.Builder()
+            .setUri(inputUri)
             .setClippingConfiguration(
                 MediaItem.ClippingConfiguration.Builder()
                     .setStartPositionMs(startMs)
                     .setEndPositionMs(endMs)
                     .build()
-            ).build()
+            )
+            .build()
+
+        val rotation = getVideoRotation(appContext, inputUri)
+        val editedMediaItem: EditedMediaItem
+
+        if (rotation == 90 || rotation == 270) {
+            Log.d(TAG, "Applying rotation: $rotation degrees")
+            val rotateEffect = ScaleAndRotateTransformation.Builder()
+                .setRotationDegrees(rotation.toFloat())
+                .build()
+            val effects = Effects(listOf(), listOf(rotateEffect))
+            editedMediaItem = EditedMediaItem.Builder(mediaItem).setEffects(effects).build()
+        } else {
+            editedMediaItem = EditedMediaItem.Builder(mediaItem).build()
+        }
 
         val listener = object : Transformer.Listener {
             override fun onCompleted(composition: Composition, exportResult: ExportResult) {
@@ -94,10 +112,24 @@ class VideoClipWorker(
             .addListener(listener)
             .build()
 
-        transformer.start(clippedMediaItem, outputPath)
+        transformer.start(editedMediaItem, outputPath)
 
         continuation.invokeOnCancellation {
             transformer.cancel()
+        }
+    }
+
+    private fun getVideoRotation(context: Context, uri: Uri): Int {
+        val retriever = MediaMetadataRetriever()
+        try {
+            retriever.setDataSource(context, uri)
+            val rotationString = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)
+            return rotationString?.toIntOrNull() ?: 0
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to retrieve rotation from URI: $uri", e)
+            return 0
+        } finally {
+            retriever.release()
         }
     }
 }
