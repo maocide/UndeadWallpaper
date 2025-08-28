@@ -84,13 +84,14 @@
                     android:text="@string/setting_audio_enabled"
                     android:checked="false"/>
 
-                <!-- Video Trim Controls -->
+                <!-- Video Trim Controls (Feature disabled) -->
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
                     android:text="@string/trim_video"
-                    android:textAppearance="?attr/textAppearanceTitleMedium" />
+                    android:textAppearance="?attr/textAppearanceTitleMedium"
+                    android:visibility="gone" />
 
                 <com.google.android.material.slider.RangeSlider
                     android:id="@+id/trim_slider"
@@ -99,12 +100,14 @@
                     android:layout_marginTop="8dp"
                     android:valueFrom="0.0"
                     android:valueTo="100.0"
+                    android:visibility="gone"
                     app:values="@array/initial_range_slider_values" />
 
                 <RelativeLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp">
+                    android:layout_marginTop="4dp"
+                    android:visibility="gone">
 
                     <TextView
                         android:id="@+id/tvStartTime"
@@ -130,7 +133,8 @@
                     android:layout_height="wrap_content"
                     android:layout_gravity="end"
                     android:layout_marginTop="8dp"
-                    android:text="@string/apply_trim" />
+                    android:text="@string/apply_trim"
+                    android:visibility="gone" />
 
                 <ProgressBar
                     android:id="@+id/progress_bar"

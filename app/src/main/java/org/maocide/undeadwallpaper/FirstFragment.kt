@@ -21,10 +21,6 @@ import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkInfo
-import androidx.work.WorkManager
-import androidx.work.workDataOf
 import com.google.android.material.slider.RangeSlider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -111,10 +107,6 @@ class FirstFragment : Fragment() {
             checkPermissionAndOpenFilePicker()
         }
 
-        binding.buttonApplyTrim.setOnClickListener {
-            applyVideoTrim()
-        }
-
         setupRecyclerView()
         loadRecentFiles()
     }
@@ -135,16 +127,9 @@ class FirstFragment : Fragment() {
 
         // 3. Get duration and update UI
         currentVideoDurationMs = getVideoDuration(uri)
-        if (currentVideoDurationMs > 0) {
-            binding.trimSlider.valueFrom = 0f
-            binding.trimSlider.valueTo = currentVideoDurationMs.toFloat()
-            binding.trimSlider.values = listOf(0f, currentVideoDurationMs.toFloat())
-            binding.tvStartTime.text = formatMillisecondsToHHMMSSmmm(0)
-            binding.tvEndTime.text = formatMillisecondsToHHMMSSmmm(currentVideoDurationMs)
-        } else {
+        if (currentVideoDurationMs == 0L) {
             // Handle case where duration is invalid or video is corrupt
-            binding.trimSlider.isEnabled = false
-            Toast.makeText(context, "Could not read video duration. Trimming disabled.", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, "Could not read video duration.", Toast.LENGTH_LONG).show()
         }
 
         // 4. Update the video preview
@@ -200,8 +185,6 @@ class FirstFragment : Fragment() {
         // Load video URI
         val videoUriString = preferencesManager.getVideoUri()
         if (videoUriString == null) {
-            // No video set, disable the slider
-            binding.trimSlider.isEnabled = false
             return
         }
 
@@ -209,36 +192,10 @@ class FirstFragment : Fragment() {
         currentVideoDurationMs = getVideoDuration(videoUri)
 
         if (currentVideoDurationMs <= 0) {
-            // Invalid video or duration, disable slider
-            binding.trimSlider.isEnabled = false
+            // Invalid video or duration
             setupVideoPreview(videoUri) // Still try to show preview
             return
         }
-
-        // Video is valid, enable and configure slider
-        binding.trimSlider.isEnabled = true
-        binding.trimSlider.valueFrom = 0f
-        binding.trimSlider.valueTo = currentVideoDurationMs.toFloat()
-
-        // Load saved clipping times
-        var (startMs, endMs) = preferencesManager.getClippingTimes()
-
-        // If endMs is default, set it to the full duration for the UI
-        if (endMs == -1L || endMs > currentVideoDurationMs) {
-            endMs = currentVideoDurationMs
-        }
-
-        // **Sanity Check:** Validate saved times against the video's duration.
-        if (startMs < 0 || startMs >= endMs || startMs > currentVideoDurationMs) {
-            // If times are invalid (e.g., from a different video), reset to full range.
-            startMs = 0L
-            endMs = currentVideoDurationMs
-        }
-
-        // Apply the validated values to the slider and text views
-        binding.trimSlider.values = listOf(startMs.toFloat(), endMs.toFloat())
-        binding.tvStartTime.text = formatMillisecondsToHHMMSSmmm(startMs)
-        binding.tvEndTime.text = formatMillisecondsToHHMMSSmmm(endMs)
 
         // Finally, set up the video preview
         setupVideoPreview(videoUri)
@@ -257,86 +214,11 @@ class FirstFragment : Fragment() {
             context?.sendBroadcast(intent)
         }
 
-        // Listener for trim slider value changes (updates text views in real-time)
-        binding.trimSlider.addOnChangeListener { slider, _, _ ->
-            val values = slider.values
-            val startMs = values[0].toLong()
-            val endMs = values[1].toLong()
-            binding.tvStartTime.text = formatMillisecondsToHHMMSSmmm(startMs)
-            binding.tvEndTime.text = formatMillisecondsToHHMMSSmmm(endMs)
-        }
-
-        // Listener for when the user lifts their finger from the slider
-        binding.trimSlider.addOnSliderTouchListener(object : RangeSlider.OnSliderTouchListener {
-            override fun onStartTrackingTouch(slider: RangeSlider) {
-                // No-op
-            }
-
-            override fun onStopTrackingTouch(slider: RangeSlider) {
-                // No-op. The user will now press the "Apply" button.
-            }
-        })
-    }
-
-    private fun applyVideoTrim() {
-        val videoUriString = preferencesManager.getVideoUri()
-        if (videoUriString == null) {
-            Toast.makeText(context, "No video selected.", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val values = binding.trimSlider.values
-        val startMs = values[0].toLong()
-        val endMs = values[1].toLong()
-
-        setUiEnabled(false)
-
-        val workRequest = OneTimeWorkRequestBuilder<VideoClipWorker>()
-            .setInputData(workDataOf(
-                VideoClipWorker.KEY_INPUT_URI to videoUriString,
-                VideoClipWorker.KEY_START_MS to startMs,
-                VideoClipWorker.KEY_END_MS to endMs
-            ))
-            .build()
-
-        val workManager = WorkManager.getInstance(requireContext())
-        workManager.enqueue(workRequest)
-
-        workManager.getWorkInfoByIdLiveData(workRequest.id)
-            .observe(viewLifecycleOwner) { workInfo ->
-                if (workInfo != null) {
-                    when (workInfo.state) {
-                        WorkInfo.State.SUCCEEDED -> {
-                            setUiEnabled(true)
-                            val outputPath = workInfo.outputData.getString(VideoClipWorker.KEY_OUTPUT_PATH)
-                            if (outputPath != null) {
-                                val outputFileUri = File(outputPath).toUri()
-                                updateVideoSource(outputFileUri)
-                                Toast.makeText(context, "Video clip saved and applied.", Toast.LENGTH_LONG).show()
-                            } else {
-                                Toast.makeText(context, "Error: Clipped video path not found.", Toast.LENGTH_LONG).show()
-                            }
-                        }
-                        WorkInfo.State.FAILED -> {
-                            setUiEnabled(true)
-                            Toast.makeText(context, "Failed to clip video.", Toast.LENGTH_LONG).show()
-                        }
-                        WorkInfo.State.RUNNING -> {
-                            // The UI is already in a "processing" state.
-                        }
-                        else -> {
-                            // Other states (ENQUEUED, CANCELLED, BLOCKED) can be handled here if needed.
-                        }
-                    }
-                }
-            }
     }
 
     private fun setUiEnabled(isEnabled: Boolean) {
         binding.buttonPickVideo.isEnabled = isEnabled
-        binding.buttonApplyTrim.isEnabled = isEnabled
         binding.switchAudio.isEnabled = isEnabled
-        binding.trimSlider.isEnabled = isEnabled
         binding.recyclerViewRecentFiles.isEnabled = isEnabled
         binding.progressBar.isVisible = !isEnabled
     }
