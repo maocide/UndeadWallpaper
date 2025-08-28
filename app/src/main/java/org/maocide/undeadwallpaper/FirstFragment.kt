@@ -30,6 +30,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.maocide.undeadwallpaper.databinding.FragmentFirstBinding
+import java.io.File
 
 /**
  * A simple [Fragment] subclass as the default destination in the navigation.
@@ -309,7 +310,7 @@ class FirstFragment : Fragment() {
                             setUiEnabled(true)
                             val outputPath = workInfo.outputData.getString(VideoClipWorker.KEY_OUTPUT_PATH)
                             if (outputPath != null) {
-                                val outputFileUri = Uri.fromFile(File(outputPath))
+                                val outputFileUri = File(outputPath).toUri()
                                 updateVideoSource(outputFileUri)
                                 Toast.makeText(context, "Video clip saved and applied.", Toast.LENGTH_LONG).show()
                             } else {
