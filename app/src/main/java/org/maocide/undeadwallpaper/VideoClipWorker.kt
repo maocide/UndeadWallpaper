@@ -109,6 +109,7 @@ class VideoClipWorker(
         }
 
         val transformer = Transformer.Builder(appContext)
+            .setVideoMimeType(MimeTypes.VIDEO_H264) // Force re-encoding
             .addListener(listener)
             .build()
 
