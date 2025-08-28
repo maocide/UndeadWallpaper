@@ -12,7 +12,9 @@ import androidx.media3.transformer.Transformer
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
@@ -45,7 +47,10 @@ class VideoClipWorker(
         val outputPath = outputFile.absolutePath
 
         return try {
-            val exportResult = transformVideo(inputUri, outputPath, startMs, endMs)
+            // Transformer must be created and used on the main thread.
+            val exportResult = withContext(Dispatchers.Main) {
+                transformVideo(inputUri, outputPath, startMs, endMs)
+            }
             Log.d(TAG, "Transformation completed. Output size: ${exportResult.fileSizeBytes} bytes")
             val outputData = workDataOf(KEY_OUTPUT_PATH to outputPath)
             Result.success(outputData)
