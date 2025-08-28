@@ -88,7 +88,7 @@ class VideoClipWorker(
         val transformer = Transformer.Builder(appContext)
             .setVideoMimeType(MimeTypes.VIDEO_H264)
             .setAudioMimeType(MimeTypes.AUDIO_AAC)
-            .setListener(listener)
+            .addListener(listener)
             .build()
 
         transformer.start(clippedMediaItem, outputPath)

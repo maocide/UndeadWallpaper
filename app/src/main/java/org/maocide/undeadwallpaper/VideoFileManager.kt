@@ -71,6 +71,17 @@ class VideoFileManager(private val context: Context) {
     }
 
     /**
+     * Creates a temporary video file in the app's specific storage.
+     * The file will have a unique name.
+     *
+     * @return The newly created File object.
+     */
+    fun createTempVideoFile(): File {
+        val outputDir = getAppSpecificAlbumStorageDir(context, "videos")
+        return File.createTempFile("clip_", ".mp4", outputDir)
+    }
+
+    /**
      * Loads the list of recent video files from the app's storage.
      *
      * @return A list of [RecentFile] objects.
