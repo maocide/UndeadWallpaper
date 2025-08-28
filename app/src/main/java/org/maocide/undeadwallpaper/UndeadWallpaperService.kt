@@ -49,7 +49,6 @@ class UndeadWallpaperService : WallpaperService() {
         private var playheadTime: Long = 0L
         private val TAG: String = javaClass.simpleName
         private lateinit var sharedPrefs: SharedPreferences
-        private var isScalingModeSet = false
 
 
 
@@ -108,18 +107,12 @@ class UndeadWallpaperService : WallpaperService() {
                     val mediaSource = ProgressiveMediaSource.Factory(DefaultDataSource.Factory(baseContext))
                         .createMediaSource(mediaItem)
 
-                    // 5. Set the clipped source directly. Manual looping is handled in the listener.
+                    // 5. Set the clipped source and configure proper looping.
                     setMediaSource(mediaSource)
                     volume = if (isAudioEnabled) 1f else 0f
+                    repeatMode = Player.REPEAT_MODE_ONE // Use built-in looping
 
                     addListener(object : Player.Listener {
-                        override fun onPlaybackStateChanged(state: Int) {
-                            if (state == Player.STATE_ENDED) {
-                                // Manual loop
-                                seekTo(0)
-                                play()
-                            }
-                        }
                         override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
                             super.onVideoSizeChanged(videoSize)
 
@@ -129,20 +122,19 @@ class UndeadWallpaperService : WallpaperService() {
                                 return
                             }
 
-                            // Only run this logic if we haven't already set the scaling mode for this video
-                            if (!isScalingModeSet) {
-                                Log.i(TAG, "Valid video size detected: ${videoSize.width}x${videoSize.height}. Setting scaling mode ONCE.")
+                            Log.d(TAG, "Video size detected: ${videoSize.width}x${videoSize.height}. Applying scaling.")
 
-                                val videoAspectRatio = videoSize.width.toFloat() / videoSize.height.toFloat()
-                                val isHorizontalVideo = videoAspectRatio > 1.0
+                            val screenAspectRatio = surfaceHolder?.surfaceFrame?.width()?.toFloat()?.div(surfaceHolder?.surfaceFrame?.height() ?: 1) ?: 1.0f
+                            val videoAspectRatio = videoSize.width.toFloat() / videoSize.height.toFloat()
 
-                                this@apply.videoScalingMode = if (isHorizontalVideo) {
-                                    VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
-                                } else {
-                                    VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
-                                }
-
-                                isScalingModeSet = true // SET THE FLAG SO THIS DOESN'T RUN AGAIN
+                            // We want to fill the screen width-wise for horizontal videos,
+                            // and fit the whole video for vertical videos.
+                            this@apply.videoScalingMode = if (videoAspectRatio > screenAspectRatio) {
+                                // Video is wider than the screen, scale to fit with cropping (usual for landscape video on portrait screen)
+                                VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
+                            } else {
+                                // Video is narrower than or same as screen, scale to fit (usual for vertical video)
+                                VIDEO_SCALING_MODE_SCALE_TO_FIT
                             }
                         }
                     })
@@ -164,7 +156,6 @@ class UndeadWallpaperService : WallpaperService() {
                 player.release()
             }
             mediaPlayer = null
-            isScalingModeSet = false
         }
 
         private fun getMediaUri(): Uri? {
