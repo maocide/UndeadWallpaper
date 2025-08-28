@@ -5,6 +5,8 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.util.Log
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
+import androidx.media3.effect.Presentation
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.ExportException
@@ -20,6 +22,8 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+
+private data class VideoMetadata(val rotation: Int, val width: Int, val height: Int)
 
 class VideoClipWorker(
     private val appContext: Context,
@@ -80,15 +84,18 @@ class VideoClipWorker(
             )
             .build()
 
-        val rotation = getVideoRotation(appContext, inputUri)
+        val metadata = getVideoMetadata(appContext, inputUri)
         val editedMediaItem: EditedMediaItem
 
-        if (rotation == 90 || rotation == 270) {
-            Log.d(TAG, "Applying rotation: $rotation degrees")
+        if (metadata.rotation == 90 || metadata.rotation == 270) {
+            Log.d(TAG, "Applying rotation (${metadata.rotation}°) and presentation effect.")
             val rotateEffect = ScaleAndRotateTransformation.Builder()
-                .setRotationDegrees(rotation.toFloat())
+                .setRotationDegrees(metadata.rotation.toFloat())
                 .build()
-            val effects = Effects(listOf(), listOf(rotateEffect))
+            // When rotating, the height becomes the new width. We scale to the original width.
+            val presentationEffect = Presentation.createForHeight(metadata.width)
+
+            val effects = Effects(listOf(), listOf(rotateEffect, presentationEffect))
             editedMediaItem = EditedMediaItem.Builder(mediaItem).setEffects(effects).build()
         } else {
             editedMediaItem = EditedMediaItem.Builder(mediaItem).build()
@@ -120,15 +127,17 @@ class VideoClipWorker(
         }
     }
 
-    private fun getVideoRotation(context: Context, uri: Uri): Int {
+    private fun getVideoMetadata(context: Context, uri: Uri): VideoMetadata {
         val retriever = MediaMetadataRetriever()
         try {
             retriever.setDataSource(context, uri)
-            val rotationString = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)
-            return rotationString?.toIntOrNull() ?: 0
+            val rotation = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() ?: 0
+            val width = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
+            val height = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 0
+            return VideoMetadata(rotation, width, height)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to retrieve rotation from URI: $uri", e)
-            return 0
+            Log.e(TAG, "Failed to retrieve metadata from URI: $uri", e)
+            return VideoMetadata(0, 0, 0)
         } finally {
             retriever.release()
         }
