@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">UndeadWallpaper</string>
+    <string name="app_name">Undead Wallpaper</string>
     <string name="action_settings">About</string>
 
     <!-- Strings used for fragments for navigation -->
@@ -22,6 +22,18 @@
     <string name="video_start_ms" translatable="false">video_start_ms</string>
     <string name="video_end_ms" translatable="false">video_end_ms</string>
 
-    <string name="about_text">Undead Wallpaper\n\nVersion 1.0\n\nThis app allows you to use your favorite videos as a live wallpaper on your Android device.\n\nDeveloped by maocide.</string>
+    <string name="profile_image_content_description">Developer profile picture</string>
+    <string name="github_profile_text"><a href="https://github.com/maocide/">GitHub: maocide</a></string>
+    <string name="github_profile_url" translatable="false">https://github.com/maocide/</string>
+    <string name="license_text"><a href="https://www.gnu.org/licenses/gpl-3.0.en.html">License: GNU GPL v3.0</a></string>
+    <string name="license_url" translatable="false">https://www.gnu.org/licenses/gpl-3.0.en.html</string>
+
+    <!-- About Page Strings -->
+    <string name="about_header_story">The Story Behind the Name</string>
+    <string name="about_story_content">This isn\'t just a clever pun on <b>live</b> wallpaper. The name <b>UndeadWallpaper</b> is personal. After a long, forced hiatus from coding, this project was the first sign of life—the moment a passion that was buried came clawing its way back to the surface. This app isn\'t just <b>live</b>; it\'s a symbol of a creator coming back from the dead. It\'s <b>undead</b>, because some things are just too stubborn to die.</string>
+    <string name="about_header_features">What it Does</string>
+    <string name="about_feature_loops">• Silky-Smooth Loops: Turns any video on your phone into a seamless, stutter-free live wallpaper.</string>
+    <string name="about_feature_freedom">• Total Freedom: No ads, no in-app purchases, no bullshit. Ever.</string>
+    <string name="about_feature_control">• You\'re in Control: Supports audio toggles and keeps track of your recent videos for quick swaps.</string>
 
 </resources>

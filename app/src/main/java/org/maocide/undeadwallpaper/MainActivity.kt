@@ -1,6 +1,5 @@
 package org.maocide.undeadwallpaper
 
-import android.Manifest
 import android.app.WallpaperManager
 import android.content.ComponentName
 import android.content.Intent
@@ -9,7 +8,6 @@ import android.view.Menu
 import android.view.MenuItem
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
 import androidx.navigation.findNavController
 import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.navigateUp
@@ -38,11 +36,11 @@ class MainActivity : AppCompatActivity() {
 
         preferencesManager = PreferencesManager(this)
 
-        binding.fab.setOnClickListener { view ->
+        binding.fabSetWallpaper.setOnClickListener { view ->
             val videoUri = preferencesManager.getVideoUri()
             if (videoUri != null) {
                 Snackbar.make(view, "Activating wallpaper...", Snackbar.LENGTH_SHORT)
-                    .setAnchorView(R.id.fab).show()
+                    .setAnchorView(R.id.fab_set_wallpaper).show()
                 val intent = Intent(
                     WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER
                 )

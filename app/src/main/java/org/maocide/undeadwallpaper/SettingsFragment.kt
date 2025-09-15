@@ -21,20 +21,18 @@ import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.google.android.material.slider.RangeSlider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.maocide.undeadwallpaper.databinding.FragmentFirstBinding
-import java.io.File
+import org.maocide.undeadwallpaper.databinding.FragmentSettingsBinding
 
 /**
  * A simple [Fragment] subclass as the default destination in the navigation.
  * This fragment allows the user to select a video and set it as a live wallpaper.
  */
-class FirstFragment : Fragment() {
+class SettingsFragment : Fragment() {
 
-    private var _binding: FragmentFirstBinding? = null
+    private var _binding: FragmentSettingsBinding? = null
     private val binding get() = _binding!!
     private val tag: String = javaClass.simpleName
 
@@ -91,7 +89,7 @@ class FirstFragment : Fragment() {
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        _binding = FragmentFirstBinding.inflate(inflater, container, false)
+        _binding = FragmentSettingsBinding.inflate(inflater, container, false)
         preferencesManager = PreferencesManager(requireContext())
         videoFileManager = VideoFileManager(requireContext())
         return binding.root
@@ -164,10 +162,11 @@ class FirstFragment : Fragment() {
      */
     private fun loadRecentFiles() {
         viewLifecycleOwner.lifecycleScope.launch {
-            val files = withContext(Dispatchers.IO) {
+            var files = withContext(Dispatchers.IO) {
                 videoFileManager.loadRecentFiles()
             }
             recentFiles.clear()
+            files = files.sortedWith(compareBy({ it.file.lastModified() }, { it.file.name })).reversed()
             recentFiles.addAll(files)
             recentFilesAdapter.notifyDataSetChanged()
         }

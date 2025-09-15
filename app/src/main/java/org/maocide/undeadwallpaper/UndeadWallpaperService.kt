@@ -29,7 +29,7 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource
 
 class UndeadWallpaperService : WallpaperService() {
 
-    // <<< ABBY'S ADDITION: Our secret passphrase >>>
+    // FILTERING: Our secret passphrase
     companion object {
         const val ACTION_VIDEO_URI_CHANGED = "org.maocide.undeadwallpaper.VIDEO_URI_CHANGED"
         const val ACTION_TRIM_TIMES_CHANGED = "org.maocide.undeadwallpaper.TRIM_TIMES_CHANGED"
@@ -53,7 +53,7 @@ class UndeadWallpaperService : WallpaperService() {
 
 
 
-        // <<< ABBY'S FIX: The radio receiver that listens for our signal >>>
+        // The receiver that listens for our signal
         private val videoChangeReceiver = object : BroadcastReceiver() {
             @OptIn(UnstableApi::class)
             override fun onReceive(context: Context?, intent: Intent?) {
@@ -212,7 +212,7 @@ class UndeadWallpaperService : WallpaperService() {
         override fun onCreate(surfaceHolder: SurfaceHolder) {
             super.onCreate(surfaceHolder)
             Log.i(TAG, "Engine onCreate")
-            // <<< ABBY'S FIX: Turn on the radio and start listening >>>
+            // ABBY'S FIX: Turn on filter to start listening
             val intentFilter = IntentFilter().apply {
                 addAction(ACTION_VIDEO_URI_CHANGED)
             }

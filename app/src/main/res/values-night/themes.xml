@@ -2,6 +2,7 @@
     <!-- Base application theme. -->
     <style name="Base.Theme.UndeadWallpaper" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- Customize your dark theme here. -->
-        <!-- <item name="colorPrimary">@color/my_dark_primary</item> -->
+        <item name="colorPrimary">@color/light_green</item>
+        <item name="colorSecondary">@color/zombie_green</item>
     </style>
 </resources>
