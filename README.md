@@ -39,7 +39,7 @@ This whole shebang is licensed under the **GNU General Public License v3.0**. Fr
 ## Download Now (Or, you know, soon-ish)
 
 *   **Google Play Store:** [Link is COMING SOON!]
-*   **GitHub Releases:** [Grab the bleeding-edge APKs here - SOON!]
+*   **GitHub Releases:** [Grab the bleeding-edge APKs here!](https://github.com/maocide/UndeadWallpaper/releases/)
 
 ---
 
