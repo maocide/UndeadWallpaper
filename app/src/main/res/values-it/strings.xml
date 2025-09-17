@@ -1,0 +1,30 @@
+<resources>
+    <string name="app_name">Undead Wallpaper</string>
+    <string name="action_settings">Informazioni</string>
+
+    <!-- Strings used for fragments for navigation -->
+    <string name="first_fragment_label">Impostazioni Sfondo</string>
+    <string name="second_fragment_label">Informazioni</string>
+    <string name="previous">Precedente</string>
+
+    <!-- UI Strings -->
+    <string name="pick_video">Scegli Video</string>
+    <string name="trim_video">Taglia Video</string>
+    <string name="setting_audio_enabled">Abilita Audio</string>
+    <string name="recent_files">File Recenti</string>
+    <string name="apply_trim">Applica</string>
+    <string name="wallpaper_description">Uno sfondo animato che riproduce video.</string>
+
+    <string name="profile_image_content_description">Immagine profilo sviluppatore</string>
+    <string name="github_profile_text"><![CDATA[<a href="https://github.com/maocide/">GitHub: maocide</a>]]></string>
+    <string name="license_text"><![CDATA[<a href="https://www.gnu.org/licenses/gpl-3.0.en.html">Licenza: GNU GPL v3.0</a>]]></string>
+
+    <!-- About Page Strings -->
+    <string name="about_header_story">La Storia Dietro il Nome</string>
+    <string name="about_story_content">Non è solo un gioco di parole con sfondo <b>live</b> (animato). Il nome <b>UndeadWallpaper</b> è personale. Dopo una lunga, forzata pausa dalla programmazione, questo progetto è stato il primo segno di vita—il momento in cui una passione che era sepolta è tornata a galla con forza. Quest\'app non è solo <b>live</b>; è il simbolo di un creatore che torna dal mondo dei morti. È <b>non morta</b> (undead), perché certe cose sono troppo ostinate per morire.</string>
+    <string name="about_header_features">Cosa Fa</string>
+    <string name="about_feature_loops">• Loop Perfetti: Trasforma qualsiasi video sul tuo telefono in uno sfondo animato fluido e senza interruzioni.</string>
+    <string name="about_feature_freedom">• Libertà Totale: Niente pubblicità, niente acquisti in-app, nessuna fregatura. Mai.</string>
+    <string name="about_feature_control">• Sei Tu al Comando: Supporta l\'attivazione/disattivazione dell\'audio e tiene traccia dei video recenti per cambi rapidi.</string>
+
+</resources>

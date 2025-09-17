@@ -1,0 +1,30 @@
+<resources>
+    <string name="app_name">Undead Wallpaper</string>
+    <string name="action_settings">情報</string>
+
+    <!-- Strings used for fragments for navigation -->
+    <string name="first_fragment_label">壁紙設定</string>
+    <string name="second_fragment_label">情報</string>
+    <string name="previous">前へ</string>
+
+    <!-- UI Strings -->
+    <string name="pick_video">ビデオを選択</string>
+    <string name="trim_video">ビデオをトリミング</string>
+    <string name="setting_audio_enabled">オーディオを有効にする</string>
+    <string name="recent_files">最近のファイル</string>
+    <string name="apply_trim">適用</string>
+    <string name="wallpaper_description">ビデオを再生するライブ壁紙です。</string>
+
+    <string name="profile_image_content_description">開発者のプロフィール画像</string>
+    <string name="github_profile_text"><a href="https://github.com/maocide/">GitHub: maocide</a></string>
+    <string name="license_text"><a href="https://www.gnu.org/licenses/gpl-3.0.en.html">ライセンス: GNU GPL v3.0</a></string>
+
+    <!-- About Page Strings -->
+    <string name="about_header_story">名前の由来</string>
+    <string name="about_story_content">これは単なる<b>ライブ</b>壁紙の駄洒落ではありません。<b>UndeadWallpaper</b>という名前には個人的な思いが込められています。長い間、強制的にコーディングから離れていた後、このプロジェクトが最初の生命の兆しでした。埋もれていた情熱が表面に這い上がってきた瞬間です。このアプリは単に<b>ライブ</b>なのではなく、死から蘇ったクリエイターの象徴なのです。あるものはあまりにも頑固で死なないため、<b>アンデッド</b>なのです。</string>
+    <string name="about_header_features">機能</string>
+    <string name="about_feature_loops">• スムーズなループ再生：お使いの携帯電話のどんなビデオも、シームレスで途切れないライブ壁紙に変えます。</string>
+    <string name="about_feature_freedom">• 完全な自由：広告なし、アプリ内購入なし、くだらないもの一切なし。永久に。</string>
+    <string name="about_feature_control">• あなたがコントロール：オーディオのオン/オフをサポートし、最近使用したビデオを記録して素早く切り替えられます。</string>
+
+</resources>
