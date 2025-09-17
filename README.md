@@ -2,9 +2,11 @@
 
 # UndeadWallpaper 🧟‍♀️📱
 
+![UndeadWallpaper Banner](banner.png)
+
 **Your phone screen is boring. Let's make it undead.**
 
-Tired of static backgrounds? UndeadWallpaper is a free, balls-to-the-wall Android app that brings your screen to life—or, well, *un-death*—by letting you slap any of your favorite videos on it as a seamless, stutter-free live wallpaper.
+Tired of static backgrounds? UndeadWallpaper is a free, balls-to-the-wall Android app that brings your screen to life... or, well, *un-death* by letting you slap any of your favorite videos on it as a seamless, stutter-free live wallpaper.
 
 ## The Story Behind the Name
 
