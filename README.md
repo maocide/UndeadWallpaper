@@ -36,9 +36,9 @@ Got ideas? Found a bug? Wanna make this thing even more badass? Contributions ar
 
 This whole shebang is licensed under the **GNU General Public License v3.0**. Freedom for all!
 
-## Download Now (Or, you know, soon-ish)
+## Download Now (Do it!)
 
-*   **Google Play Store:** [Link is COMING SOON!]
+*   **Google Play Store:** [From the Play Store](https://play.google.com/store/apps/details?id=org.maocide.undeadwallpaper)
 *   **GitHub Releases:** [Grab the bleeding-edge APKs here!](https://github.com/maocide/UndeadWallpaper/releases/)
 
 ---
