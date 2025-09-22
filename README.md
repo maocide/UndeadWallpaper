@@ -25,12 +25,16 @@ This isn't just a clever pun on "live" wallpaper. The name **UndeadWallpaper** i
 1.  **Pick Your Poison:** Tap the "Pick Video" button and choose your masterpiece.
 2.  **Smash the Button:** Like what you see in the preview? Hit that floating button and bring your screen to glorious un-life.
 
-## Join the Horde! (Contribute)
+## Join the Horde! (Contribute & Connect)
 
-Got ideas? Found a bug? Wanna make this thing even more badass? Contributions are not just welcome; they're celebrated!
+This project clawed its way back from the dead, but it was the **community** that truly gave it a soul. The launch on Reddit was a whirlwind of incredible feedback, brilliant ideas, and amazing support. It's where the next chapter of this story is being written.
 
-*   Spotted a glitch? Got a genius feature idea? **Open an issue** and let's talk about it.
-*   Wanna get your hands dirty with some code? **Fork the repo** and hit me with a pull request!
+* Want to see what the horde is saying? **[Dive into the main feedback thread right here!](https://www.reddit.com/r/androidapps/comments/your_thread_id_here)**
+
+Got your own ideas? Found a bug? Wanna make this thing even more badass? Contributions are not just welcome; they're celebrated!
+
+* Spotted a glitch? Got a genius feature idea? **Open an issue** and let's talk about it.
+* Wanna get your hands dirty with some code? **Fork the repo** and hit me with a pull request!
 
 ## License
 
