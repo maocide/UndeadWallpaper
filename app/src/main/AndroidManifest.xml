@@ -7,7 +7,16 @@
         android:required="true" >
     </uses-feature>
 
-    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"  />
+    <!-- For Android 13 (API 33) and above -->
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+
+    <!-- For Android 10 (API 29) to 12L (API 32) -->
+    <!-- maxSdkVersion to tell the system this is for older versions -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+
+    <!-- Legacy permission for Android 9 (API 28) and below -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
+
 
     <application
         android:allowBackup="true"
@@ -46,8 +55,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-
     </application>
 
 </manifest>
