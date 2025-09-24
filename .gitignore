@@ -14,3 +14,14 @@
 .cxx
 local.properties
 /_mat
+
+# Generated build files
+/build
+/app/build
+/app/release/
+
+# IDE files
+.idea/
+
+# Local configuration
+local.properties

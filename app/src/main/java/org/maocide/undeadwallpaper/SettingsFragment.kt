@@ -225,27 +225,43 @@ class SettingsFragment : Fragment() {
 
     /**
      * Checks for storage permissions and opens the file picker.
+     * This function is carefully designed to handle the different permission models
+     * across various Android versions.
      */
     private fun checkPermissionAndOpenFilePicker() {
-        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Manifest.permission.READ_MEDIA_VIDEO
-        } else {
-            Manifest.permission.READ_EXTERNAL_STORAGE
-        }
+        // We define the permission we need based on the Android version.
+        // Build.VERSION.SDK_INT is the API level of the device's OS.
+        val permission =
+            // For Android 13 (TIRAMISU, API 33) and higher, we need READ_MEDIA_VIDEO.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                Manifest.permission.READ_MEDIA_VIDEO
+            }
+            // For all older versions (Android 12L and below), we use the classic storage permission.
+            else {
+                Manifest.permission.READ_EXTERNAL_STORAGE
+            }
 
+        // Now, we check if we already have the permission.
         when {
+            // If the permission is already granted, we can proceed directly.
             ContextCompat.checkSelfPermission(requireContext(), permission) == PackageManager.PERMISSION_GRANTED -> {
+                Log.d(tag, "Permission '$permission' already granted. Opening picker.")
                 openFilePicker()
             }
+            // Optional: If we want to show a popup explaining *why* we need the permission.
+            // For now, we'll just request it directly.
             shouldShowRequestPermissionRationale(permission) -> {
-                // We can show a rationale here if needed in the future
+                Log.d(tag, "Showing rationale for permission request.")
                 requestPermissionLauncher.launch(permission)
             }
+            // If we don't have the permission, we launch the request.
             else -> {
+                Log.d(tag, "Requesting permission: $permission")
                 requestPermissionLauncher.launch(permission)
             }
         }
     }
+
 
     /**
      * Opens the file picker for selecting a video.
