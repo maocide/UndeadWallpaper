@@ -33,7 +33,7 @@ This project clawed its way back from the dead, but it was the **community** tha
 
 Got your own ideas? Found a bug? Wanna make this thing even more badass? Contributions are not just welcome; they're celebrated!
 
-* Spotted a glitch? Got a genius feature idea? **Open an issue** and let's talk about it.
+* Spotted a glitch? Got a genius feature idea? **[Open an issue](https://github.com/maocide/UndeadWallpaper/issues/new/choose)** and let's talk about it.
 * Wanna get your hands dirty with some code? **Fork the repo** and hit me with a pull request!
 
 ## License
