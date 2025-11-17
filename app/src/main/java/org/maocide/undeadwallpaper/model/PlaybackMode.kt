@@ -1,4 +1,6 @@
 package org.maocide.undeadwallpaper.model
 
-class PlaybackMode {
+enum class PlaybackMode {
+    LOOP,
+    ONE_SHOT
 }
