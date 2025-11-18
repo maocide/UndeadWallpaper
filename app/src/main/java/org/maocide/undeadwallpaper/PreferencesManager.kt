@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
 import androidx.core.net.toUri
+import org.maocide.undeadwallpaper.model.PlaybackMode
 
 /**
  * Manages SharedPreferences for the application.
@@ -22,6 +23,8 @@ class PreferencesManager(context: Context) {
         private const val KEY_VIDEO_AUDIO_ENABLED = "video_audio_enabled"
         private const val KEY_VIDEO_START_MS = "video_start_ms"
         private const val KEY_VIDEO_END_MS = "video_end_ms"
+
+        private const val KEY_PLAYBACK_MODE = "playback_mode"
     }
 
     /**
@@ -98,4 +101,25 @@ class PreferencesManager(context: Context) {
             remove(KEY_VIDEO_END_MS)
         }
     }
+
+    /**
+     * Gets the current playback mode from SharedPreferences.
+     * @return The current playback mode.
+     */
+    fun getPlaybackMode(): PlaybackMode {
+        val storedOrdinal = sharedPrefs.getInt(KEY_PLAYBACK_MODE, PlaybackMode.LOOP.ordinal)
+        return PlaybackMode.entries.getOrElse(storedOrdinal) { PlaybackMode.LOOP }
+    }
+
+    /**
+     * Sets the playback mode in SharedPreferences.
+     * @param mode The new playback mode.
+     */
+    fun setPlaybackMode(mode: PlaybackMode) {
+        sharedPrefs.edit {
+            putInt(KEY_PLAYBACK_MODE, mode.ordinal)
+        }
+    }
+
+
 }
