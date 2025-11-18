@@ -11,6 +11,7 @@
     <string name="pick_video">Pick Video</string>
     <string name="trim_video">Trim Video</string>
     <string name="setting_audio_enabled">Enable Audio</string>
+    <string name="playback_mode_setting">Playback Mode</string>
     <string name="recent_files">Recent Files</string>
     <string name="apply_trim">Apply</string>
     <string name="wallpaper_description">A live wallpaper that plays video.</string>
@@ -18,6 +19,7 @@
     <!-- SharedPreferences Keys. These are not meant for translation. -->
     <string name="video_uri" translatable="false">video_uri</string>
     <string name="video_audio_enabled" translatable="false">video_audio_enabled</string>
+    <string name="playback_mode" translatable="false">playback_mode</string>
     <string name="video_zoom_level" translatable="false">video_zoom_level</string>
     <string name="video_start_ms" translatable="false">video_start_ms</string>
     <string name="video_end_ms" translatable="false">video_end_ms</string>
@@ -35,5 +37,7 @@
     <string name="about_feature_loops">• Silky-Smooth Loops: Turns any video on your phone into a seamless, stutter-free live wallpaper.</string>
     <string name="about_feature_freedom">• Total Freedom: No ads, no in-app purchases, no bullshit. Ever.</string>
     <string name="about_feature_control">• You\'re in Control: Supports audio toggles and keeps track of your recent videos for quick swaps.</string>
+    <string name="playback_mode_loop">Loop</string>
+    <string name="playback_mode_oneshot">One Shot</string>
 
 </resources>

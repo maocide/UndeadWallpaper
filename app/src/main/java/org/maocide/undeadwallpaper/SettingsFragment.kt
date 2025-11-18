@@ -25,6 +25,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.maocide.undeadwallpaper.databinding.FragmentSettingsBinding
+import org.maocide.undeadwallpaper.model.PlaybackMode
 
 /**
  * A simple [Fragment] subclass as the default destination in the navigation.
@@ -100,6 +101,41 @@ class SettingsFragment : Fragment() {
 
         loadAndApplyPreferences()
         setupPreferenceListeners()
+
+
+        // NEW: Playback mode wiring
+        val playbackModeGroup = binding.playbackModeGroup
+        val playbackModeLoop = binding.playbackModeLoop
+        val playbackModeOneShot = binding.playbackModeOneshot
+
+        // Guard so we don't fire the listener while syncing UI state.
+        var isInitializingPlaybackMode = true
+
+        playbackModeGroup.setOnCheckedChangeListener { _, checkedId ->
+            if (isInitializingPlaybackMode || checkedId == View.NO_ID) return@setOnCheckedChangeListener
+
+            val newMode = when (checkedId) {
+                playbackModeLoop.id -> PlaybackMode.LOOP
+                playbackModeOneShot.id -> PlaybackMode.ONE_SHOT
+                else -> PlaybackMode.LOOP
+            }
+
+            preferencesManager.setPlaybackMode(newMode)
+
+            // Broadcast so the wallpaper engine re-configures itself later.
+            val intent = Intent(UndeadWallpaperService.ACTION_PLAYBACK_MODE_CHANGED)
+            context?.sendBroadcast(intent)
+        }
+
+        // Sync the radio selection with the stored preference.
+        when (preferencesManager.getPlaybackMode()) {
+            PlaybackMode.LOOP -> playbackModeGroup.check(playbackModeLoop.id)
+            PlaybackMode.ONE_SHOT -> playbackModeGroup.check(playbackModeOneShot.id)
+        }
+
+        isInitializingPlaybackMode = false
+
+
 
         binding.buttonPickVideo.setOnClickListener {
             checkPermissionAndOpenFilePicker()

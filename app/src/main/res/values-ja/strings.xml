@@ -11,6 +11,7 @@
     <string name="pick_video">ビデオを選択</string>
     <string name="trim_video">ビデオをトリミング</string>
     <string name="setting_audio_enabled">オーディオを有効にする</string>
+    <string name="playback_mode_setting">再生モード</string>
     <string name="recent_files">最近のファイル</string>
     <string name="apply_trim">適用</string>
     <string name="wallpaper_description">ビデオを再生するライブ壁紙です。</string>
@@ -26,5 +27,7 @@
     <string name="about_feature_loops">• スムーズなループ再生：お使いの携帯電話のどんなビデオも、シームレスで途切れないライブ壁紙に変えます。</string>
     <string name="about_feature_freedom">• 完全な自由：広告なし、アプリ内購入なし、くだらないもの一切なし。永久に。</string>
     <string name="about_feature_control">• あなたがコントロール：オーディオのオン/オフをサポートし、最近使用したビデオを記録して素早く切り替えられます。</string>
+    <string name="playback_mode_loop">ループ</string>
+    <string name="playback_mode_oneshot">ワンショット</string>
 
 </resources>
