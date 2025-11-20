@@ -171,7 +171,9 @@ class UndeadWallpaperService : WallpaperService() {
                                         hasPlaybackCompleted = true
                                         pause()
                                         val safeDuration = duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: 0L
-                                        seekTo(if (safeDuration > 0) safeDuration - 1 else 0)
+                                        Log.d(TAG, "safeDuration: $safeDuration")
+                                        //if(safeDuration > 0)
+                                        //    seekTo(if (safeDuration > 0) safeDuration - 1 else 0)
                                     }
                                     Player.STATE_READY -> {
                                         if (hasPlaybackCompleted) pause()
