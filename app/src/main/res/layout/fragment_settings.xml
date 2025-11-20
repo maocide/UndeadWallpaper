@@ -76,6 +76,37 @@
                 android:orientation="vertical"
                 android:padding="16dp">
 
+
+
+                <!-- Playback Mode -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="@string/playback_mode_setting"
+                    android:textAppearance="?attr/textAppearanceBody1"
+                    android:visibility="visible" />
+                <RadioGroup
+                    android:id="@+id/playback_mode_group"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:orientation="horizontal">
+
+                    <RadioButton
+                        android:id="@+id/playback_mode_loop"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:checked="true"
+                        android:text="@string/playback_mode_loop"/>
+
+                    <RadioButton
+                        android:id="@+id/playback_mode_oneshot"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/playback_mode_oneshot"/>
+                </RadioGroup>
+
                 <!-- Audio Toggle -->
                 <com.google.android.material.switchmaterial.SwitchMaterial
                     android:id="@+id/switch_audio"

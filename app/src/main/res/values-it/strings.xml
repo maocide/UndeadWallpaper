@@ -11,6 +11,7 @@
     <string name="pick_video">Scegli Video</string>
     <string name="trim_video">Taglia Video</string>
     <string name="setting_audio_enabled">Abilita Audio</string>
+    <string name="playback_mode_setting">Modalita Playback</string>
     <string name="recent_files">File Recenti</string>
     <string name="apply_trim">Applica</string>
     <string name="wallpaper_description">Uno sfondo animato che riproduce video.</string>
@@ -26,5 +27,7 @@
     <string name="about_feature_loops">• Loop Perfetti: Trasforma qualsiasi video sul tuo telefono in uno sfondo animato fluido e senza interruzioni.</string>
     <string name="about_feature_freedom">• Libertà Totale: Niente pubblicità, niente acquisti in-app, nessuna fregatura. Mai.</string>
     <string name="about_feature_control">• Sei Tu al Comando: Supporta l\'attivazione/disattivazione dell\'audio e tiene traccia dei video recenti per cambi rapidi.</string>
+    <string name="playback_mode_loop">Loop</string>
+    <string name="playback_mode_oneshot">Una Volta</string>
 
 </resources>
