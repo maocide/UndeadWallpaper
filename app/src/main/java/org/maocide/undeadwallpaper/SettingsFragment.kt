@@ -115,16 +115,17 @@ class SettingsFragment : Fragment() {
             if (isInitializingPlaybackMode || checkedId == View.NO_ID) return@setOnCheckedChangeListener
 
             val newMode = when (checkedId) {
-                playbackModeLoop.id -> PlaybackMode.LOOP
-                playbackModeOneShot.id -> PlaybackMode.ONE_SHOT
+                binding.playbackModeLoop.id -> PlaybackMode.LOOP
+                binding.playbackModeOneshot.id -> PlaybackMode.ONE_SHOT
                 else -> PlaybackMode.LOOP
             }
 
             preferencesManager.setPlaybackMode(newMode)
 
-            // Broadcast so the wallpaper engine re-configures itself later.
-            val intent = Intent(UndeadWallpaperService.ACTION_PLAYBACK_MODE_CHANGED)
-            context?.sendBroadcast(intent)
+            val intent = Intent(UndeadWallpaperService.ACTION_PLAYBACK_MODE_CHANGED).apply {
+                setPackage(requireContext().packageName)
+            }
+            requireContext().applicationContext.sendBroadcast(intent)
         }
 
         // Sync the radio selection with the stored preference.

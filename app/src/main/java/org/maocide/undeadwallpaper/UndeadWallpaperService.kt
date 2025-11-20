@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
-import android.media.MediaCodec
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -15,7 +14,6 @@ import android.view.SurfaceHolder
 import androidx.annotation.OptIn
 import androidx.core.net.toUri
 import androidx.media3.common.C
-import androidx.media3.common.C.VIDEO_SCALING_MODE_SCALE_TO_FIT
 import androidx.media3.common.C.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
@@ -24,8 +22,8 @@ import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.SeekParameters
-import androidx.media3.exoplayer.source.ClippingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import org.maocide.undeadwallpaper.model.PlaybackMode
 
 class UndeadWallpaperService : WallpaperService() {
 
@@ -52,6 +50,11 @@ class UndeadWallpaperService : WallpaperService() {
         private lateinit var sharedPrefs: SharedPreferences
         private var isScalingModeSet = false
 
+        private var currentPlaybackMode = PlaybackMode.LOOP
+        private var hasPlaybackCompleted = false
+
+
+
 
 
         // The receiver that listens for our signal
@@ -60,7 +63,13 @@ class UndeadWallpaperService : WallpaperService() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 when (intent?.action) {
                     ACTION_VIDEO_URI_CHANGED -> {
-                        Log.i(TAG, "Broadcast received: Full re-initialization requested.")
+                        Log.i(TAG, "Broadcast received: Video uri changed, full re-initialization requested.")
+                        playheadTime = 0L
+                        initializePlayer()
+                    }
+
+                    ACTION_PLAYBACK_MODE_CHANGED -> {
+                        Log.i(TAG, "Broadcast received: Playback mode change, full re-initialization requested.")
                         playheadTime = 0L
                         initializePlayer()
                     }
@@ -89,8 +98,12 @@ class UndeadWallpaperService : WallpaperService() {
             // We'll read the scaling mode inside the listener now.
 
             val loadControl = DefaultLoadControl.Builder()
-                // ... (your loadControl settings are fine) ...
                 .build()
+
+            val preferenceManager = PreferencesManager(baseContext)
+            currentPlaybackMode = preferenceManager.getPlaybackMode()
+
+            hasPlaybackCompleted = false
 
             val player = ExoPlayer.Builder(baseContext)
                 .setLoadControl(loadControl)
@@ -112,7 +125,14 @@ class UndeadWallpaperService : WallpaperService() {
                     // 5. Set the clipped source and configure proper looping.
                     setMediaSource(mediaSource)
                     volume = if (isAudioEnabled) 1f else 0f
-                    repeatMode = Player.REPEAT_MODE_ONE // Use built-in looping
+
+                    if(currentPlaybackMode == PlaybackMode.LOOP)
+                        repeatMode = Player.REPEAT_MODE_ONE // Use built-in looping
+                    else
+                        repeatMode = Player.REPEAT_MODE_OFF // Use one shot
+
+                    Log.d(TAG, "repeatMode: $repeatMode")
+
 
                     addListener(object : Player.Listener {
                         override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
@@ -135,9 +155,28 @@ class UndeadWallpaperService : WallpaperService() {
                                     VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
                                 } else {
                                     VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
-                                }
+                                } // The same gets applied because the other scaling modes resulted problematic in a surface
 
                                 isScalingModeSet = true // SET THE FLAG SO THIS DOESN'T RUN AGAIN
+                            }
+                        }
+
+                        override fun onPlaybackStateChanged(playbackState: Int) {
+                            super.onPlaybackStateChanged(playbackState)
+
+                            if (currentPlaybackMode == PlaybackMode.ONE_SHOT) {
+                                when (playbackState) {
+                                    Player.STATE_ENDED -> {
+                                        Log.i(TAG, "Playback ended!")
+                                        hasPlaybackCompleted = true
+                                        pause()
+                                        val safeDuration = duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: 0L
+                                        seekTo(if (safeDuration > 0) safeDuration - 1 else 0)
+                                    }
+                                    Player.STATE_READY -> {
+                                        if (hasPlaybackCompleted) pause()
+                                    }
+                                }
                             }
                         }
                     })
@@ -198,11 +237,17 @@ class UndeadWallpaperService : WallpaperService() {
 
         override fun onVisibilityChanged(visible: Boolean) {
             super.onVisibilityChanged(visible)
-            Log.i(TAG, "onVisibilityChanged: visible = $visible")
+            Log.i(TAG, "onVisibilityChanged: visible = $visible isPreview = $isPreview, playbackMode = $currentPlaybackMode")
+
             if (visible) {
                 if (mediaPlayer == null) {
                     initializePlayer()
                 } else {
+                    if (currentPlaybackMode == PlaybackMode.ONE_SHOT && hasPlaybackCompleted && !isPreview()) {
+                        Log.i(TAG, "Seeking back to 0 on change visibility for one shot")
+                        mediaPlayer?.seekTo(0)
+                        hasPlaybackCompleted = false
+                    }
                     mediaPlayer?.play()
                 }
             } else {
@@ -213,9 +258,10 @@ class UndeadWallpaperService : WallpaperService() {
         override fun onCreate(surfaceHolder: SurfaceHolder) {
             super.onCreate(surfaceHolder)
             Log.i(TAG, "Engine onCreate")
-            // ABBY'S FIX: Turn on filter to start listening
+            // Turn on filter to start listening
             val intentFilter = IntentFilter().apply {
                 addAction(ACTION_VIDEO_URI_CHANGED)
+                addAction(ACTION_PLAYBACK_MODE_CHANGED)
             }
             // Using `registerReceiver` with the `RECEIVER_NOT_EXPORTED` flag is the
             // modern, secure way for Android 13+
@@ -247,8 +293,10 @@ class UndeadWallpaperService : WallpaperService() {
             super.onCommand(action, x, y, z, extras, resultRequested)
             Log.d(TAG, "onCommand received: $action")
 
-            if (action == ACTION_VIDEO_URI_CHANGED || action == "android.wallpaper.reapply") {
-                Log.i(TAG, "Video URI changed command received! Re-initializing player.")
+            if (action == ACTION_PLAYBACK_MODE_CHANGED ||
+                action == ACTION_VIDEO_URI_CHANGED ||
+                action == "android.wallpaper.reapply") {
+                Log.i(TAG, "Command received -> Re-initializing player.")
                 // The most robust way to handle the change is a full reset.
                 // This ensures all old data is cleared and the new URI is loaded.
                 initializePlayer()
