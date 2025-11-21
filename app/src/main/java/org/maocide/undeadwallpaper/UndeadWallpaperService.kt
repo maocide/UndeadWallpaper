@@ -156,6 +156,7 @@ class UndeadWallpaperService : WallpaperService() {
                                 } else {
                                     VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
                                 } // The same gets applied because the other scaling modes resulted problematic in a surface
+                                // need to clean this app when implementing user defined scaling, but might be not completely possible in a surface
 
                                 isScalingModeSet = true // SET THE FLAG SO THIS DOESN'T RUN AGAIN
                             }
@@ -167,13 +168,15 @@ class UndeadWallpaperService : WallpaperService() {
                             if (currentPlaybackMode == PlaybackMode.ONE_SHOT) {
                                 when (playbackState) {
                                     Player.STATE_ENDED -> {
+
                                         Log.i(TAG, "Playback ended!")
                                         hasPlaybackCompleted = true
                                         pause()
+                                        /* this is not really needed, we just need to pause at the end
                                         val safeDuration = duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: 0L
                                         Log.d(TAG, "safeDuration: $safeDuration")
-                                        //if(safeDuration > 0)
-                                        //    seekTo(if (safeDuration > 0) safeDuration - 1 else 0)
+                                        // seekTo(if (safeDuration > 0) safeDuration - 1 else 0)
+                                        */
                                     }
                                     Player.STATE_READY -> {
                                         if (hasPlaybackCompleted) pause()
