@@ -8,6 +8,8 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.util.Log
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
@@ -21,6 +23,36 @@ import java.io.InputStream
 class VideoFileManager(private val context: Context) {
 
     private val tag: String = javaClass.simpleName
+
+
+    /**
+     * Copies a raw resource to the app's video storage if it doesn't exist.
+     * Used for the default Zombillie asset.
+     *
+     * @param resourceId The R.raw ID of the asset.
+     * @param fileName The desired filename (e.g., "zombillie_default.mp4").
+     * @return The File object of the created or existing video.
+     */
+    fun createDefaultFileFromResource(resourceId: Int, fileName: String): File? {
+        val outputDir = getAppSpecificAlbumStorageDir(context, "videos")
+        val outputFile = File(outputDir, fileName)
+
+        // Optimization: If the evidence is already in the locker, returns it immediately.
+        if (outputFile.exists()) {
+            return outputFile
+        }
+
+        return try {
+            context.resources.openRawResource(resourceId).use { inputStream ->
+                copyStreamToFile(inputStream, outputFile)
+            }
+            outputFile
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to copy default resource: $fileName", e)
+            null
+        }
+    }
+
 
     /**
      * Creates a file in the app's specific storage from a content URI.

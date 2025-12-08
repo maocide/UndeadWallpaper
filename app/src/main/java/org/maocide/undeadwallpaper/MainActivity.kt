@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import android.widget.Toast
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.navigation.findNavController
 import androidx.navigation.ui.AppBarConfiguration
@@ -16,11 +17,14 @@ import com.google.android.material.snackbar.Snackbar
 import org.maocide.undeadwallpaper.databinding.ActivityMainBinding
 
 
+
 class MainActivity : AppCompatActivity() {
 
     private lateinit var appBarConfiguration: AppBarConfiguration
     private lateinit var binding: ActivityMainBinding
     private lateinit var preferencesManager: PreferencesManager
+
+    private val sharedViewModel: SettingsViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -37,7 +41,11 @@ class MainActivity : AppCompatActivity() {
         preferencesManager = PreferencesManager(this)
 
         binding.fabSetWallpaper.setOnClickListener { view ->
-            val videoUri = preferencesManager.getVideoUri()
+            // Retrieve and save the uri for the wallpaper service to use
+            val videoUri = sharedViewModel.selectedVideoUri
+            preferencesManager.saveVideoUri(videoUri.toString())
+            //val videoUri = preferencesManager.getVideoUri()
+
             if (videoUri != null) {
                 Snackbar.make(view, "Activating wallpaper...", Snackbar.LENGTH_SHORT)
                     .setAnchorView(R.id.fab_set_wallpaper).show()

@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.MediaMetadataRetriever
+import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -17,8 +18,8 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
-import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import kotlinx.coroutines.Dispatchers
@@ -36,12 +37,15 @@ class SettingsFragment : Fragment() {
     private var _binding: FragmentSettingsBinding? = null
     private val binding get() = _binding!!
     private val tag: String = javaClass.simpleName
-
     private lateinit var preferencesManager: PreferencesManager
     private lateinit var videoFileManager: VideoFileManager
     private lateinit var recentFilesAdapter: RecentFilesAdapter
     private val recentFiles = mutableListOf<RecentFile>()
     private var currentVideoDurationMs: Long = 0L
+    private var previewMediaPlayer: MediaPlayer? = null
+
+    // Initialize the shared ViewModel
+    private val sharedViewModel: SettingsViewModel by activityViewModels()
 
     /**
      * Launcher for picking media from the file system.
@@ -101,47 +105,6 @@ class SettingsFragment : Fragment() {
 
         loadAndApplyPreferences()
         setupPreferenceListeners()
-
-
-        // NEW: Playback mode wiring
-        val playbackModeGroup = binding.playbackModeGroup
-        val playbackModeLoop = binding.playbackModeLoop
-        val playbackModeOneShot = binding.playbackModeOneshot
-
-        // Guard so we don't fire the listener while syncing UI state.
-        var isInitializingPlaybackMode = true
-
-        playbackModeGroup.setOnCheckedChangeListener { _, checkedId ->
-            if (isInitializingPlaybackMode || checkedId == View.NO_ID) return@setOnCheckedChangeListener
-
-            val newMode = when (checkedId) {
-                binding.playbackModeLoop.id -> PlaybackMode.LOOP
-                binding.playbackModeOneshot.id -> PlaybackMode.ONE_SHOT
-                else -> PlaybackMode.LOOP
-            }
-
-            preferencesManager.setPlaybackMode(newMode)
-
-            val intent = Intent(UndeadWallpaperService.ACTION_PLAYBACK_MODE_CHANGED).apply {
-                setPackage(requireContext().packageName)
-            }
-            requireContext().applicationContext.sendBroadcast(intent)
-        }
-
-        // Sync the radio selection with the stored preference.
-        when (preferencesManager.getPlaybackMode()) {
-            PlaybackMode.LOOP -> playbackModeGroup.check(playbackModeLoop.id)
-            PlaybackMode.ONE_SHOT -> playbackModeGroup.check(playbackModeOneShot.id)
-        }
-
-        isInitializingPlaybackMode = false
-
-
-
-        binding.buttonPickVideo.setOnClickListener {
-            checkPermissionAndOpenFilePicker()
-        }
-
         setupRecyclerView()
         loadRecentFiles()
     }
@@ -152,13 +115,14 @@ class SettingsFragment : Fragment() {
      * preferences are reset and updated correctly.
      *
      * @param uri The URI of the new video file.
+     * @param sendBroadcast Weather to send a broadcast to the service to cause a video reload.
      */
-    private fun updateVideoSource(uri: Uri) {
+    private fun updateVideoSource(uri: Uri, forceChange: Boolean) {
         // 1. Clear any previous trimming data
         preferencesManager.removeClippingTimes()
 
-        // 2. Save the new video URI
-        preferencesManager.saveVideoUri(uri.toString())
+        // 2. Store the new video URI as a shared value
+        sharedViewModel.selectedVideoUri = uri
 
         // 3. Get duration and update UI
         currentVideoDurationMs = getVideoDuration(uri)
@@ -170,12 +134,16 @@ class SettingsFragment : Fragment() {
         // 4. Update the video preview
         setupVideoPreview(uri)
 
-        // 5. Notify the service to reload the video
-        val intent = Intent(UndeadWallpaperService.ACTION_VIDEO_URI_CHANGED)
-        context?.sendBroadcast(intent)
+        // 5. Save the preference and notify the service to reload the video from that value
+        if(forceChange) {
+            preferencesManager.saveVideoUri(uri.toString())
+            val intent = Intent(UndeadWallpaperService.ACTION_VIDEO_URI_CHANGED)
+            context?.sendBroadcast(intent)
+        }
 
         // 6. Refresh the recent files list
         loadRecentFiles()
+
     }
 
 
@@ -187,7 +155,7 @@ class SettingsFragment : Fragment() {
             recentFiles,
             onItemClick = { recentFile ->
                 val fileUri = Uri.fromFile(recentFile.file)
-                updateVideoSource(fileUri)
+                updateVideoSource(fileUri, false)
             }
         )
         binding.recyclerViewRecentFiles.layoutManager = LinearLayoutManager(context)
@@ -215,6 +183,31 @@ class SettingsFragment : Fragment() {
      * video's actual duration to prevent crashes or weird behavior from stale data.
      */
     private fun loadAndApplyPreferences() {
+
+        // Default Video setup for Fresh Installs
+        if (preferencesManager.getVideoUri() == null) {
+            // 1. Materialize the asset to disk so it appears in Recents
+            // We use Dispatchers.IO just to be safe, though Main thread on onCreateView might block slightly
+            // simpler here is to rely on the file manager catching it fast.
+            // Since this runs once per lifetime of install, a tiny blip is okay,
+            // or wrap this entire init block in a lifecycleScope.launch { ... }
+
+            // For safety, let's assume we do this synchronously or inside a coroutine:
+            val defaultFile = videoFileManager.createDefaultFileFromResource(
+                R.raw.zombillie_default,
+                "zombillie_default.mp4"
+            )
+
+            if (defaultFile != null) {
+                val defaultUri = Uri.fromFile(defaultFile)
+                // 2. Set it as the source (updates variables, triggers preview)
+                updateVideoSource(defaultUri, false)
+
+                // 3. Mark it as saved so we persist this choice
+                preferencesManager.saveVideoUri(defaultUri.toString())
+            }
+        }
+
         // Load audio setting first
         binding.switchAudio.isChecked = preferencesManager.isAudioEnabled()
 
@@ -242,23 +235,64 @@ class SettingsFragment : Fragment() {
      * Sets up listeners for preference changes.
      */
     private fun setupPreferenceListeners() {
-        // Listener for audio switch
-        binding.switchAudio.setOnCheckedChangeListener { _, isChecked ->
-            preferencesManager.saveAudioEnabled(isChecked)
-            // Notify service immediately if audio preference changes
-            val intent = Intent(UndeadWallpaperService.ACTION_VIDEO_URI_CHANGED)
-            context?.sendBroadcast(intent)
+
+        // Playback mode wiring
+        val playbackModeGroup = binding.playbackModeGroup
+        val playbackModeLoop = binding.playbackModeLoop
+        val playbackModeOneShot = binding.playbackModeOneshot
+        val audioSwitch = binding.switchAudio
+
+        // Guard so we don't fire the listener while syncing UI state.
+        var isInitializingListeners = true
+
+        playbackModeGroup.setOnCheckedChangeListener { _, checkedId ->
+            if (isInitializingListeners || checkedId == View.NO_ID) return@setOnCheckedChangeListener
+
+            val newMode = when (checkedId) {
+                binding.playbackModeLoop.id -> PlaybackMode.LOOP
+                binding.playbackModeOneshot.id -> PlaybackMode.ONE_SHOT
+                else -> PlaybackMode.LOOP
+            }
+
+            preferencesManager.setPlaybackMode(newMode)
+
+            val intent = Intent(UndeadWallpaperService.ACTION_PLAYBACK_MODE_CHANGED).apply {
+                setPackage(requireContext().packageName)
+            }
+            requireContext().applicationContext.sendBroadcast(intent)
         }
 
-    }
+        // Sync the radio selection with the stored preference.
+        when (preferencesManager.getPlaybackMode()) {
+            PlaybackMode.LOOP -> playbackModeGroup.check(playbackModeLoop.id)
+            PlaybackMode.ONE_SHOT -> playbackModeGroup.check(playbackModeOneShot.id)
+        }
 
-    private fun setUiEnabled(isEnabled: Boolean) {
-        binding.buttonPickVideo.isEnabled = isEnabled
-        binding.switchAudio.isEnabled = isEnabled
-        binding.recyclerViewRecentFiles.isEnabled = isEnabled
-        binding.progressBar.isVisible = !isEnabled
-    }
+        binding.buttonPickVideo.setOnClickListener {
+            checkPermissionAndOpenFilePicker()
+        }
 
+        // Listener for audio switch
+        audioSwitch.setOnCheckedChangeListener { _, isChecked ->
+            preferencesManager.saveAudioEnabled(isChecked)
+            // Notify service immediately if audio preference changes
+            val intent = Intent(UndeadWallpaperService.ACTION_PLAYBACK_MODE_CHANGED).apply {
+                setPackage(requireContext().packageName)
+            }
+            requireContext().applicationContext.sendBroadcast(intent)
+
+            // Toggle preview audio
+            if (isChecked) {
+                // Enable Audio (Volume 100%)
+                previewMediaPlayer?.setVolume(1f, 1f)
+            } else {
+                // Disable Audio (Volume 0%)
+                previewMediaPlayer?.setVolume(0f, 0f)
+            }
+        }
+
+        isInitializingListeners = false
+    }
 
     /**
      * Checks for storage permissions and opens the file picker.
@@ -343,7 +377,7 @@ class SettingsFragment : Fragment() {
             if (copiedFile != null) {
                 val savedFileUri = Uri.fromFile(copiedFile)
                 Log.d(tag, "File copied to: $savedFileUri")
-                updateVideoSource(savedFileUri) // Centralized update logic
+                updateVideoSource(savedFileUri, false) // Centralized update logic
             } else {
                 Log.e(tag, "Failed to copy file from URI: $uri")
                 Toast.makeText(context, "Failed to copy video file.", Toast.LENGTH_LONG).show()
@@ -363,7 +397,10 @@ class SettingsFragment : Fragment() {
         binding.videoPreview.setMediaController(mediaController)
         binding.videoPreview.setOnPreparedListener {
             it.isLooping = true
+            previewMediaPlayer = it
             binding.videoPreview.start()
+            if(binding.switchAudio.isChecked) it.setVolume(1f, 1f)
+            else it.setVolume(0f, 0f)
         }
         binding.videoPreview.setOnErrorListener { _, _, _ ->
             Toast.makeText(context, "Cannot play this video file.", Toast.LENGTH_SHORT).show()
