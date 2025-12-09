@@ -37,7 +37,6 @@ class VideoFileManager(private val context: Context) {
         val outputDir = getAppSpecificAlbumStorageDir(context, "videos")
         val outputFile = File(outputDir, fileName)
 
-        // Optimization: If the evidence is already in the locker, returns it immediately.
         if (outputFile.exists()) {
             return outputFile
         }

@@ -47,7 +47,8 @@ class MainActivity : AppCompatActivity() {
             //val videoUri = preferencesManager.getVideoUri()
 
             if (videoUri != null) {
-                Snackbar.make(view, "Activating wallpaper...", Snackbar.LENGTH_SHORT)
+                // Changed from hardcoded string to string resource
+                Snackbar.make(view, getString(R.string.activating_wallpaper_message), Snackbar.LENGTH_SHORT)
                     .setAnchorView(R.id.fab_set_wallpaper).show()
                 val intent = Intent(
                     WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER
@@ -58,7 +59,8 @@ class MainActivity : AppCompatActivity() {
                 )
                 startActivity(intent)
             } else {
-                Toast.makeText(this, "Please select a video first", Toast.LENGTH_SHORT).show()
+                // Changed from hardcoded string to string resource
+                Toast.makeText(this, getString(R.string.select_video_first_message), Toast.LENGTH_SHORT).show()
             }
         }
     }

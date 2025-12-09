@@ -15,6 +15,8 @@
     <string name="recent_files">最近のファイル</string>
     <string name="apply_trim">適用</string>
     <string name="wallpaper_description">ビデオを再生するライブ壁紙です。</string>
+    <string name="activating_wallpaper_message">壁紙を有効にしています…</string>
+    <string name="select_video_first_message">まず動画を選択してください</string>
 
     <string name="profile_image_content_description">開発者のプロフィール画像</string>
     <string name="github_profile_text"><a href="https://github.com/maocide/">GitHub: maocide</a></string>
@@ -29,5 +31,6 @@
     <string name="about_feature_control">• あなたがコントロール：オーディオのオン/オフをサポートし、最近使用したビデオを記録して素早く切り替えられます。</string>
     <string name="playback_mode_loop">ループ</string>
     <string name="playback_mode_oneshot">ワンショット</string>
+
 
 </resources>

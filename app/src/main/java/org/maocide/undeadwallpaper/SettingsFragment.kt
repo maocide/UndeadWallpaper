@@ -118,30 +118,30 @@ class SettingsFragment : Fragment() {
      * @param sendBroadcast Weather to send a broadcast to the service to cause a video reload.
      */
     private fun updateVideoSource(uri: Uri, forceChange: Boolean) {
-        // 1. Clear any previous trimming data
+        // Clear any previous trimming data
         preferencesManager.removeClippingTimes()
 
-        // 2. Store the new video URI as a shared value
+        // Store the new video URI as a shared value
         sharedViewModel.selectedVideoUri = uri
 
-        // 3. Get duration and update UI
+        // Get duration and update UI
         currentVideoDurationMs = getVideoDuration(uri)
         if (currentVideoDurationMs == 0L) {
             // Handle case where duration is invalid or video is corrupt
             Toast.makeText(context, "Could not read video duration.", Toast.LENGTH_LONG).show()
         }
 
-        // 4. Update the video preview
+        // Update the video preview
         setupVideoPreview(uri)
 
-        // 5. Save the preference and notify the service to reload the video from that value
+        // Save the preference and notify the service to reload the video from that value
         if(forceChange) {
             preferencesManager.saveVideoUri(uri.toString())
             val intent = Intent(UndeadWallpaperService.ACTION_VIDEO_URI_CHANGED)
             context?.sendBroadcast(intent)
         }
 
-        // 6. Refresh the recent files list
+        // Refresh the recent files list
         loadRecentFiles()
 
     }
@@ -186,24 +186,20 @@ class SettingsFragment : Fragment() {
 
         // Default Video setup for Fresh Installs
         if (preferencesManager.getVideoUri() == null) {
-            // 1. Materialize the asset to disk so it appears in Recents
-            // We use Dispatchers.IO just to be safe, though Main thread on onCreateView might block slightly
-            // simpler here is to rely on the file manager catching it fast.
-            // Since this runs once per lifetime of install, a tiny blip is okay,
-            // or wrap this entire init block in a lifecycleScope.launch { ... }
+            // Save the asset to disk so it appears in Recents
 
-            // For safety, let's assume we do this synchronously or inside a coroutine:
+            // We do this synchronously or inside a coroutine:
             val defaultFile = videoFileManager.createDefaultFileFromResource(
                 R.raw.zombillie_default,
-                "zombillie_default.mp4"
+                getString(R.string.default_video_filename)
             )
 
             if (defaultFile != null) {
                 val defaultUri = Uri.fromFile(defaultFile)
-                // 2. Set it as the source (updates variables, triggers preview)
+                // Set it as the source (updates variables, triggers preview)
                 updateVideoSource(defaultUri, false)
 
-                // 3. Mark it as saved so we persist this choice
+                // Mark it as saved so we persist this choice
                 preferencesManager.saveVideoUri(defaultUri.toString())
             }
         }

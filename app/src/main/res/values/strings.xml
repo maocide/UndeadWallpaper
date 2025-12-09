@@ -15,6 +15,8 @@
     <string name="recent_files">Recent Files</string>
     <string name="apply_trim">Apply</string>
     <string name="wallpaper_description">A live wallpaper that plays video.</string>
+    <string name="activating_wallpaper_message">Activating wallpaper…</string>
+    <string name="select_video_first_message">Please select a video first</string>
 
     <!-- SharedPreferences Keys. These are not meant for translation. -->
     <string name="video_uri" translatable="false">video_uri</string>
@@ -24,6 +26,7 @@
     <string name="video_start_ms" translatable="false">video_start_ms</string>
     <string name="video_end_ms" translatable="false">video_end_ms</string>
 
+    <string name="default_video_filename" translatable="false">zombillie_default.mp4</string>
     <string name="profile_image_content_description">Developer profile picture</string>
     <string name="github_profile_text"><a href="https://github.com/maocide/">GitHub: maocide</a></string>
     <string name="github_profile_url" translatable="false">https://github.com/maocide/</string>

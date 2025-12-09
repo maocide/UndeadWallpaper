@@ -15,6 +15,8 @@
     <string name="recent_files">File Recenti</string>
     <string name="apply_trim">Applica</string>
     <string name="wallpaper_description">Uno sfondo animato che riproduce video.</string>
+    <string name="activating_wallpaper_message">Attivazione dello sfondo…</string>
+    <string name="select_video_first_message">Si prega di selezionare un video</string>
 
     <string name="profile_image_content_description">Immagine profilo sviluppatore</string>
     <string name="github_profile_text"><![CDATA[<a href="https://github.com/maocide/">GitHub: maocide</a>]]></string>
@@ -29,5 +31,6 @@
     <string name="about_feature_control">• Sei Tu al Comando: Supporta l\'attivazione/disattivazione dell\'audio e tiene traccia dei video recenti per cambi rapidi.</string>
     <string name="playback_mode_loop">Loop</string>
     <string name="playback_mode_oneshot">Una Volta</string>
+
 
 </resources>
