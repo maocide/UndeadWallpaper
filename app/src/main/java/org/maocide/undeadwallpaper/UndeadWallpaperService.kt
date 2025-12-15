@@ -23,6 +23,8 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.SeekParameters
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.maocide.undeadwallpaper.model.PlaybackMode
 
 class UndeadWallpaperService : WallpaperService() {
@@ -52,6 +54,8 @@ class UndeadWallpaperService : WallpaperService() {
 
         private var currentPlaybackMode = PlaybackMode.LOOP
         private var hasPlaybackCompleted = false
+
+        private var renderer: GLVideoRenderer? = null // <--- NEW RENDERER
 
 
 
@@ -138,6 +142,9 @@ class UndeadWallpaperService : WallpaperService() {
                         override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
                             super.onVideoSizeChanged(videoSize)
 
+                            // 4. Send video size to Renderer for Matrix Calculation
+                            renderer?.setVideoSize(videoSize.width, videoSize.height)
+
                             // Sanity check for 0x0 size
                             if (videoSize.width == 0 || videoSize.height == 0) {
                                 Log.w(TAG, "Ignoring invalid 0x0 video size change.")
@@ -164,18 +171,15 @@ class UndeadWallpaperService : WallpaperService() {
 
                         override fun onPlaybackStateChanged(playbackState: Int) {
                             super.onPlaybackStateChanged(playbackState)
-
+                            // detecting one shot playback and pausing
                             if (currentPlaybackMode == PlaybackMode.ONE_SHOT) {
                                 when (playbackState) {
                                     Player.STATE_ENDED -> {
-
                                         Log.i(TAG, "Playback ended!")
                                         hasPlaybackCompleted = true
                                         pause()
-                                        /* this is not really needed, we just need to pause at the end
-                                        val safeDuration = duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: 0L
+                                        /*
                                         Log.d(TAG, "safeDuration: $safeDuration")
-                                        // seekTo(if (safeDuration > 0) safeDuration - 1 else 0)
                                         */
                                     }
                                     Player.STATE_READY -> {
@@ -186,10 +190,25 @@ class UndeadWallpaperService : WallpaperService() {
                         }
                     })
 
+                    // WAIT for the GL Surface, then attach
+                    // We need a coroutine here because waitForVideoSurface is suspend
+                    val currentScope = kotlinx.coroutines.CoroutineScope(Dispatchers.Main)
+                    currentScope.launch {
+                        val glSurface = renderer?.waitForVideoSurface()
+                        if (glSurface != null) {
+                            seekTo(playheadTime)
+                            setVideoSurface(glSurface) // <--- glSurface is actually set and becomes effective
+                            prepare()
+                            play()
+                        }
+                    }
+                    /*
                     seekTo(playheadTime)
                     setVideoSurface(holder.surface)
                     prepare()
                     play()
+
+                     */
                 }
 
             mediaPlayer = player
@@ -203,6 +222,9 @@ class UndeadWallpaperService : WallpaperService() {
                 player.release()
             }
             mediaPlayer = null
+            Log.i(TAG, "Releasing GlRenderer...")
+            renderer?.release()
+            renderer = null
             isScalingModeSet = false
         }
 
@@ -223,6 +245,11 @@ class UndeadWallpaperService : WallpaperService() {
             super.onSurfaceCreated(holder)
             Log.i(TAG, "onSurfaceCreated")
             this.surfaceHolder = holder
+
+            // 1. Start the GL Renderer
+            renderer = GLVideoRenderer(applicationContext)
+            renderer?.onSurfaceCreated(holder)
+
             initializePlayer()
         }
 
@@ -230,13 +257,21 @@ class UndeadWallpaperService : WallpaperService() {
             super.onSurfaceChanged(holder, format, width, height)
             Log.i(TAG, "onSurfaceChanged: New dimensions ${width}x${height}")
             this.surfaceHolder = holder
-            initializePlayer()
+
+            // 2. Tell Renderer the screen size
+            renderer?.onSurfaceChanged(width, height)
+
+            // initializePlayer() // MIGHT BE OVERKILL! TRY WITHOUT
         }
 
         override fun onSurfaceDestroyed(holder: SurfaceHolder) {
             super.onSurfaceDestroyed(holder)
             Log.i(TAG, "onSurfaceDestroyed")
             releasePlayer()
+
+            // 3. Kill the GL Renderer
+            renderer?.onSurfaceDestroyed()
+            renderer = null
             this.surfaceHolder = null
         }
 
@@ -253,10 +288,13 @@ class UndeadWallpaperService : WallpaperService() {
                         mediaPlayer?.seekTo(0)
                         hasPlaybackCompleted = false
                     }
+                    mediaPlayer?.playWhenReady = true
                     mediaPlayer?.play()
                 }
             } else {
                 mediaPlayer?.pause()
+                mediaPlayer?.playWhenReady = false
+
             }
         }
 
