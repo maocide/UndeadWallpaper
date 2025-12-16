@@ -13,20 +13,28 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.MediaController
+import android.widget.RadioGroup
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.cardview.widget.CardView
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.transition.AutoTransition
+import androidx.transition.TransitionManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.maocide.undeadwallpaper.databinding.FragmentSettingsBinding
 import org.maocide.undeadwallpaper.model.PlaybackMode
+import org.maocide.undeadwallpaper.model.ScalingMode
+import androidx.core.view.isVisible
 
 /**
  * A simple [Fragment] subclass as the default destination in the navigation.
@@ -103,10 +111,19 @@ class SettingsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        loadAndApplyPreferences()
-        setupPreferenceListeners()
-        setupRecyclerView()
-        loadRecentFiles()
+        // Async to avoid freezing UI
+        lifecycleScope.launch {
+            ensureDefaultVideoExists()
+
+            syncUiState() // load settings
+
+            setupListeners()
+
+            setupRecyclerView() // recent list
+
+            loadRecentFiles()
+        }
+
     }
 
     /**
@@ -178,17 +195,11 @@ class SettingsFragment : Fragment() {
     }
 
     /**
-     * Loads and applies user preferences on startup.
-     * This function is "paranoid" and validates saved clipping times against the
-     * video's actual duration to prevent crashes or weird behavior from stale data.
+     * Checks if we need to copy the default video.
+     * specific to Dispatchers.IO to keep UI smooth.
      */
-    private fun loadAndApplyPreferences() {
-
-        // Default Video setup for Fresh Installs
+    private suspend fun ensureDefaultVideoExists() = withContext(Dispatchers.IO) {
         if (preferencesManager.getVideoUri() == null) {
-            // Save the asset to disk so it appears in Recents
-
-            // We do this synchronously or inside a coroutine:
             val defaultFile = videoFileManager.createDefaultFileFromResource(
                 R.raw.zombillie_default,
                 getString(R.string.default_video_filename)
@@ -196,98 +207,114 @@ class SettingsFragment : Fragment() {
 
             if (defaultFile != null) {
                 val defaultUri = Uri.fromFile(defaultFile)
-                // Set it as the source (updates variables, triggers preview)
-                updateVideoSource(defaultUri, false)
-
-                // Mark it as saved so we persist this choice
-                preferencesManager.saveVideoUri(defaultUri.toString())
+                // Switch back to Main thread to update Prefs safely
+                withContext(Dispatchers.Main) {
+                    preferencesManager.saveVideoUri(defaultUri.toString())
+                    // Update your variable/preview here if needed
+                    updateVideoSource(defaultUri, false)
+                }
             }
         }
-
-        // Load audio setting first
-        binding.switchAudio.isChecked = preferencesManager.isAudioEnabled()
-
-        // Load video URI
-        val videoUriString = preferencesManager.getVideoUri()
-        if (videoUriString == null) {
-            return
-        }
-
-        val videoUri = videoUriString.toUri()
-        currentVideoDurationMs = getVideoDuration(videoUri)
-
-        if (currentVideoDurationMs <= 0) {
-            // Invalid video or duration
-            setupVideoPreview(videoUri) // Still try to show preview
-            return
-        }
-
-        // Finally, set up the video preview
-        setupVideoPreview(videoUri)
     }
 
+    /**
+     * Update all Buttons/Switches to match Preferences.
+     * Calling this BEFORE listeners prevents accidental triggers.
+     */
+    private fun syncUiState() {
+        // Audio
+        binding.switchAudio.isChecked = preferencesManager.isAudioEnabled()
+
+        // Playback Mode
+        when (preferencesManager.getPlaybackMode()) {
+            PlaybackMode.LOOP -> binding.playbackModeGroup.check(binding.playbackModeLoop.id)
+            PlaybackMode.ONE_SHOT -> binding.playbackModeGroup.check(binding.playbackModeOneshot.id)
+        }
+
+        // Scaling Mode
+        when (preferencesManager.getScalingMode()) {
+            ScalingMode.FIT -> binding.scalingModeGroup.check(binding.scalingModeFit.id)
+            ScalingMode.FILL -> binding.scalingModeGroup.check(binding.scalingModeFill.id)
+            ScalingMode.STRETCH -> binding.scalingModeGroup.check(binding.scalingModeStretch.id)
+        }
+
+        // Load Video Preview
+        preferencesManager.getVideoUri()?.let { uriString ->
+            setupVideoPreview(uriString.toUri())
+        }
+    }
 
     /**
-     * Sets up listeners for preference changes.
+     * Pure logic for what happens on clicks.
      */
-    private fun setupPreferenceListeners() {
+    private fun setupListeners() {
 
-        // Playback mode wiring
-        val playbackModeGroup = binding.playbackModeGroup
-        val playbackModeLoop = binding.playbackModeLoop
-        val playbackModeOneShot = binding.playbackModeOneshot
-        val audioSwitch = binding.switchAudio
+        // Helper to broadcast changes
+        fun notifySettingsChanged() {
+            val intent = Intent(UndeadWallpaperService.ACTION_PLAYBACK_MODE_CHANGED).apply {
+                setPackage(requireContext().packageName)
+            }
+            requireContext().applicationContext.sendBroadcast(intent)
+        }
 
-        // Guard so we don't fire the listener while syncing UI state.
-        var isInitializingListeners = true
+        // Playback Mode
+        binding.playbackModeGroup.setOnCheckedStateChangeListener { _, checkedIds ->
+            // If nothing is selected, skip
+            if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
 
-        playbackModeGroup.setOnCheckedChangeListener { _, checkedId ->
-            if (isInitializingListeners || checkedId == View.NO_ID) return@setOnCheckedChangeListener
+            val checkedId = checkedIds[0] // Get the single selected ID
 
             val newMode = when (checkedId) {
-                binding.playbackModeLoop.id -> PlaybackMode.LOOP
                 binding.playbackModeOneshot.id -> PlaybackMode.ONE_SHOT
                 else -> PlaybackMode.LOOP
             }
 
             preferencesManager.setPlaybackMode(newMode)
+            notifySettingsChanged()
+        }
 
-            val intent = Intent(UndeadWallpaperService.ACTION_PLAYBACK_MODE_CHANGED).apply {
-                setPackage(requireContext().packageName)
+        // Audio Switch
+        binding.switchAudio.setOnCheckedChangeListener { _, isChecked ->
+            preferencesManager.saveAudioEnabled(isChecked)
+            // Update local preview immediately
+            previewMediaPlayer?.setVolume(if (isChecked) 1f else 0f, if (isChecked) 1f else 0f)
+            notifySettingsChanged()
+        }
+
+        // Scaling Mode
+        binding.scalingModeGroup.setOnCheckedStateChangeListener { group, checkedIds ->
+            if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
+
+            val checkedId = checkedIds[0] // Get the single selected ID
+
+            val newMode = when (checkedId) {
+                binding.scalingModeFill.id -> ScalingMode.FILL
+                binding.scalingModeStretch.id -> ScalingMode.STRETCH
+                else -> ScalingMode.FIT
             }
-            requireContext().applicationContext.sendBroadcast(intent)
+            preferencesManager.setScalingMode(newMode)
+            notifySettingsChanged()
         }
 
-        // Sync the radio selection with the stored preference.
-        when (preferencesManager.getPlaybackMode()) {
-            PlaybackMode.LOOP -> playbackModeGroup.check(playbackModeLoop.id)
-            PlaybackMode.ONE_SHOT -> playbackModeGroup.check(playbackModeOneShot.id)
+        // Accordion Logic
+        binding.layoutHeader.setOnClickListener {
+            val content = binding.scalingModeGroup
+            val label = binding.scalingModeLabel
+            val isVisible = content.isVisible
+
+            TransitionManager.beginDelayedTransition(binding.accordionCard as ViewGroup, AutoTransition())
+            content.visibility = if (isVisible) View.GONE else View.VISIBLE
+            label.visibility = content.visibility
+
+
+            val rotation = if (isVisible) 0f else 180f
+            binding.imageArrow.animate().rotation(rotation).setDuration(200).start()
         }
 
+        // Video Picker
         binding.buttonPickVideo.setOnClickListener {
             checkPermissionAndOpenFilePicker()
         }
-
-        // Listener for audio switch
-        audioSwitch.setOnCheckedChangeListener { _, isChecked ->
-            preferencesManager.saveAudioEnabled(isChecked)
-            // Notify service immediately if audio preference changes
-            val intent = Intent(UndeadWallpaperService.ACTION_PLAYBACK_MODE_CHANGED).apply {
-                setPackage(requireContext().packageName)
-            }
-            requireContext().applicationContext.sendBroadcast(intent)
-
-            // Toggle preview audio
-            if (isChecked) {
-                // Enable Audio (Volume 100%)
-                previewMediaPlayer?.setVolume(1f, 1f)
-            } else {
-                // Disable Audio (Volume 0%)
-                previewMediaPlayer?.setVolume(0f, 0f)
-            }
-        }
-
-        isInitializingListeners = false
     }
 
     /**

@@ -31,6 +31,11 @@
     <string name="about_feature_control">• Sei Tu al Comando: Supporta l\'attivazione/disattivazione dell\'audio e tiene traccia dei video recenti per cambi rapidi.</string>
     <string name="playback_mode_loop">Loop</string>
     <string name="playback_mode_oneshot">Una Volta</string>
+    <string name="scaling_mode">Modalità scaling</string>
+    <string name="scaling_mode_fit">Adatta</string>
+    <string name="scaling_mode_fill">Riempi</string>
+    <string name="scaling_mode_stretch">Stira</string>
+    <string name="advanced">Avanzate</string>
 
 
 </resources>

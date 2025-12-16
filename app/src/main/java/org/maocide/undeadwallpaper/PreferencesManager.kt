@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import androidx.core.content.edit
 import androidx.core.net.toUri
 import org.maocide.undeadwallpaper.model.PlaybackMode
+import org.maocide.undeadwallpaper.model.ScalingMode
 
 /**
  * Manages SharedPreferences for the application.
@@ -25,6 +26,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_VIDEO_END_MS = "video_end_ms"
 
         private const val KEY_PLAYBACK_MODE = "playback_mode"
+        private const val KEY_SCALING_MODE = "scaling_mode"
     }
 
     /**
@@ -120,6 +122,27 @@ class PreferencesManager(context: Context) {
             putInt(KEY_PLAYBACK_MODE, mode.ordinal)
         }
     }
+
+    /**
+     * Gets the current scaling mode from SharedPreferences.
+     * @return The current scaling mode.
+     */
+    fun getScalingMode(): ScalingMode {
+        val storedOrdinal = sharedPrefs.getInt(KEY_SCALING_MODE, ScalingMode.FIT.ordinal)
+        return ScalingMode.entries.getOrElse(storedOrdinal) { ScalingMode.FIT }
+    }
+
+    /**
+     * Sets the scaling mode in SharedPreferences.
+     * @param mode The new scaling mode.
+     */
+    fun setScalingMode(mode: ScalingMode) {
+        sharedPrefs.edit {
+            putInt(KEY_SCALING_MODE, mode.ordinal)
+        }
+    }
+
+
 
 
 }

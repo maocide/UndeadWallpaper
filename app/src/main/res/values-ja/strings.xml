@@ -31,6 +31,11 @@
     <string name="about_feature_control">• あなたがコントロール：オーディオのオン/オフをサポートし、最近使用したビデオを記録して素早く切り替えられます。</string>
     <string name="playback_mode_loop">ループ</string>
     <string name="playback_mode_oneshot">ワンショット</string>
+    <string name="scaling_mode">スケーリングモード</string>
+    <string name="scaling_mode_fit">フィット</string>
+    <string name="scaling_mode_fill">画面一杯</string>
+    <string name="scaling_mode_stretch">ストレッチ</string>
+    <string name="advanced">詳細</string>
 
 
 </resources>

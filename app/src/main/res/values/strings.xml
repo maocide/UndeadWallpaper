@@ -42,5 +42,10 @@
     <string name="about_feature_control">• You\'re in Control: Supports audio toggles and keeps track of your recent videos for quick swaps.</string>
     <string name="playback_mode_loop">Loop</string>
     <string name="playback_mode_oneshot">One Shot</string>
+    <string name="scaling_mode">Scaling Mode</string>
+    <string name="scaling_mode_fit">Fit</string>
+    <string name="scaling_mode_fill">Fill</string>
+    <string name="scaling_mode_stretch">Stretch</string>
+    <string name="advanced">Advanced</string>
 
 </resources>
