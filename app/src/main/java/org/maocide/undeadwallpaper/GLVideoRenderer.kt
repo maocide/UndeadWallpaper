@@ -150,9 +150,9 @@ class GLVideoRenderer(private val context: Context) {
     }
 
     suspend fun waitForVideoSurface(): Surface? {
-        var limit = 40 // Increased wait time slightly
+        var limit = 80 // Increased wait time slightly
         while (videoSurface == null && limit > 0) {
-            kotlinx.coroutines.delay(50)
+            kotlinx.coroutines.delay(100)
             limit--
         }
         return videoSurface

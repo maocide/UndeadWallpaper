@@ -214,6 +214,14 @@ class UndeadWallpaperService : WallpaperService() {
             mediaPlayer = player
         }
 
+        /**
+         * Releases the ExoPlayer instance.
+         *
+         * This function safely stops, clears, and releases the `mediaPlayer`. It stores the current
+         * playback position (`playheadTime`) so that playback can be resumed from the same spot later.
+         * It also resets the `isScalingModeSet` flag to ensure video scaling is recalculated when a
+         * new player is initialized. The `mediaPlayer` instance is set to null after release.
+         */
         private fun releasePlayer() {
             mediaPlayer?.let { player ->
                 Log.i(TAG, "Releasing ExoPlayer...")
@@ -222,10 +230,23 @@ class UndeadWallpaperService : WallpaperService() {
                 player.release()
             }
             mediaPlayer = null
-            Log.i(TAG, "Releasing GlRenderer...")
-            renderer?.release()
-            renderer = null
             isScalingModeSet = false
+        }
+
+        /**
+         * Helper method to keep it DRY (Don't Repeat Yourself)
+         * Releases the [GLVideoRenderer] and its associated resources.
+         * This should be called when the underlying surface is destroyed.
+         * It ensures that OpenGL contexts and other graphics-related
+         * resources are properly cleaned up to prevent memory leaks.
+         *
+         */
+        private fun releaseRenderer() {
+            if (renderer != null) {
+                Log.i(TAG, "Releasing GlRenderer...")
+                renderer?.release()
+                renderer = null
+            }
         }
 
         private fun getMediaUri(): Uri? {
@@ -268,11 +289,16 @@ class UndeadWallpaperService : WallpaperService() {
             super.onSurfaceDestroyed(holder)
             Log.i(TAG, "onSurfaceDestroyed")
             releasePlayer()
-
-            // 3. Kill the GL Renderer
-            renderer?.onSurfaceDestroyed()
-            renderer = null
+            releaseRenderer() // 3. Kill the GL Renderer
             this.surfaceHolder = null
+        }
+
+        override fun onDestroy() {
+            super.onDestroy()
+            Log.i(TAG, "Engine onDestroy")
+            releasePlayer()
+            releaseRenderer()
+            unregisterReceiver(videoChangeReceiver)
         }
 
         override fun onVisibilityChanged(visible: Boolean) {
@@ -314,13 +340,6 @@ class UndeadWallpaperService : WallpaperService() {
                 @Suppress("UnspecifiedRegisterReceiverFlag") // Flag not needed for older APIs
                 registerReceiver(videoChangeReceiver, intentFilter)
             }
-        }
-
-        override fun onDestroy() {
-            super.onDestroy()
-            Log.i(TAG, "Engine onDestroy")
-            releasePlayer()
-            unregisterReceiver(videoChangeReceiver)
         }
 
         @Deprecated("Deprecated in Java") // This is needed for older Android versions
