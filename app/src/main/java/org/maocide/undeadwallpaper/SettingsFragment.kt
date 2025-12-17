@@ -35,6 +35,7 @@ import org.maocide.undeadwallpaper.databinding.FragmentSettingsBinding
 import org.maocide.undeadwallpaper.model.PlaybackMode
 import org.maocide.undeadwallpaper.model.ScalingMode
 import androidx.core.view.isVisible
+import com.google.android.material.slider.Slider
 
 /**
  * A simple [Fragment] subclass as the default destination in the navigation.
@@ -54,6 +55,21 @@ class SettingsFragment : Fragment() {
 
     // Initialize the shared ViewModel
     private val sharedViewModel: SettingsViewModel by activityViewModels()
+
+    companion object { // key for bundle in restoring instance state
+        private const val KEY_ADVANCED_EXPANDED = "key_advanced_expanded"
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+
+        // Check if the binding is initialized and the view exists
+        if (_binding != null) {
+            val isVisible = binding.advancedOptionsContainer.isVisible
+            // Save the state of the accordion
+            outState.putBoolean(KEY_ADVANCED_EXPANDED, isVisible)
+        }
+    }
 
     /**
      * Launcher for picking media from the file system.
@@ -111,19 +127,37 @@ class SettingsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // Async to avoid freezing UI
+        // UI SETUP this first
+        savedInstanceState?.let { restoreState(it) }
+        setupRecyclerView()
+
+        // ASYNC TASKS (Data Loading)
         lifecycleScope.launch {
+            // This might take time on first run (copying file)
             ensureDefaultVideoExists()
 
-            syncUiState() // load settings
-
+            // load the data/settings
+            syncUiState()
             setupListeners()
-
-            setupRecyclerView() // recent list
-
             loadRecentFiles()
         }
 
+    }
+
+    private fun restoreState(savedInstanceState: Bundle) {
+        // RESTORE ACCORDION STATE
+        val isExpanded = savedInstanceState.getBoolean(KEY_ADVANCED_EXPANDED, false)
+
+        if (isExpanded) {
+            // 1. Show the container
+            binding.advancedOptionsContainer.visibility = View.VISIBLE
+
+
+            binding.imageArrow.rotation = 180f
+        } else {
+            binding.advancedOptionsContainer.visibility = View.GONE
+            binding.imageArrow.rotation = 0f
+        }
     }
 
     /**
@@ -184,11 +218,11 @@ class SettingsFragment : Fragment() {
      */
     private fun loadRecentFiles() {
         viewLifecycleOwner.lifecycleScope.launch {
-            var files = withContext(Dispatchers.IO) {
-                videoFileManager.loadRecentFiles()
+            val files = withContext(Dispatchers.IO) {
+                val rawFiles = videoFileManager.loadRecentFiles()
+                rawFiles.sortedWith(compareBy({ it.file.lastModified() }, { it.file.name })).reversed()
             }
             recentFiles.clear()
-            files = files.sortedWith(compareBy({ it.file.lastModified() }, { it.file.name })).reversed()
             recentFiles.addAll(files)
             recentFilesAdapter.notifyDataSetChanged()
         }
@@ -238,17 +272,23 @@ class SettingsFragment : Fragment() {
             ScalingMode.STRETCH -> binding.scalingModeGroup.check(binding.scalingModeStretch.id)
         }
 
+        // Load sliders for advanced
+        binding.positionXSlider.value = preferencesManager.getPositionX()
+        binding.positionYSlider.value = preferencesManager.getPositionY()
+        binding.zoomSlider.value = preferencesManager.getZoom()
+        binding.brightnessSlider.value = preferencesManager.getBrightness()
+
         // Load Video Preview
         preferencesManager.getVideoUri()?.let { uriString ->
             setupVideoPreview(uriString.toUri())
         }
+
     }
 
     /**
      * Pure logic for what happens on clicks.
      */
     private fun setupListeners() {
-
         // Helper to broadcast changes
         fun notifySettingsChanged() {
             val intent = Intent(UndeadWallpaperService.ACTION_PLAYBACK_MODE_CHANGED).apply {
@@ -256,6 +296,23 @@ class SettingsFragment : Fragment() {
             }
             requireContext().applicationContext.sendBroadcast(intent)
         }
+
+        // Helper to setup slider safe listeners, to avoid sending too many
+        fun setupSafeSlider(slider: Slider, saveAction: (Float) -> Unit) {
+            slider.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
+                override fun onStartTrackingTouch(slider: Slider) {
+                    // Do nothing when touch starts
+                }
+
+                override fun onStopTrackingTouch(slider: Slider) {
+                    // Only save and broadcast when the user lifts their finger
+                    saveAction(slider.value)
+                    notifySettingsChanged()
+                }
+            })
+        }
+
+
 
         // Playback Mode
         binding.playbackModeGroup.setOnCheckedStateChangeListener { _, checkedIds ->
@@ -288,32 +345,50 @@ class SettingsFragment : Fragment() {
             val checkedId = checkedIds[0] // Get the single selected ID
 
             val newMode = when (checkedId) {
-                binding.scalingModeFill.id -> ScalingMode.FILL
+                binding.scalingModeFit.id -> ScalingMode.FIT
                 binding.scalingModeStretch.id -> ScalingMode.STRETCH
-                else -> ScalingMode.FIT
+                else -> ScalingMode.FILL
             }
             preferencesManager.setScalingMode(newMode)
             notifySettingsChanged()
         }
 
-        // Accordion Logic
+        // Accordion Logic and animation
         binding.layoutHeader.setOnClickListener {
-            val content = binding.scalingModeGroup
-            val label = binding.scalingModeLabel
-            val isVisible = content.isVisible
+            val advancedOptionsContainer = binding.advancedOptionsContainer
+            val isVisible = advancedOptionsContainer.isVisible
 
             TransitionManager.beginDelayedTransition(binding.accordionCard as ViewGroup, AutoTransition())
-            content.visibility = if (isVisible) View.GONE else View.VISIBLE
-            label.visibility = content.visibility
+            advancedOptionsContainer.visibility = if (isVisible) View.GONE else View.VISIBLE
 
-
-            val rotation = if (isVisible) 0f else 180f
+            val rotation = if (!isVisible) 180f else 0f
             binding.imageArrow.animate().rotation(rotation).setDuration(200).start()
         }
 
         // Video Picker
         binding.buttonPickVideo.setOnClickListener {
             checkPermissionAndOpenFilePicker()
+        }
+
+        // Advanced Settings
+        // Brightness
+        setupSafeSlider(binding.brightnessSlider) { value ->
+            preferencesManager.saveBrightness(value)
+        }
+
+        // Horizontal Position (X)
+        setupSafeSlider(binding.positionXSlider) { value ->
+            preferencesManager.savePositionX(value)
+        }
+
+        // Vertical Position (Y)
+        setupSafeSlider(binding.positionYSlider) { value ->
+            preferencesManager.savePositionY(value)
+        }
+
+        // Zoom
+        setupSafeSlider(binding.zoomSlider) { value ->
+            preferencesManager.saveZoom(value)
         }
     }
 

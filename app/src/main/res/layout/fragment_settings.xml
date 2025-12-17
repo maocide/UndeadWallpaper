@@ -163,48 +163,129 @@
                                 app:tint="?attr/colorControlNormal" />
                         </LinearLayout>
 
-                        <TextView
-                            android:id="@+id/scaling_mode_label"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:paddingStart="16dp"
-                            android:paddingEnd="16dp"
-                            android:text="@string/scaling_mode"
-                            android:textAppearance="?attr/textAppearanceBody1"
-                            android:visibility="gone" />
-                        <com.google.android.material.chip.ChipGroup
-                            android:id="@+id/scaling_mode_group"
+                        <LinearLayout
+                            android:id="@+id/advanced_options_container"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:paddingStart="16dp"
-                            android:paddingEnd="16dp"
+                            android:orientation="vertical"
                             android:paddingBottom="16dp"
-                            app:selectionRequired="true"
-                            app:singleSelection="true"
                             android:visibility="gone">
 
-                            <com.google.android.material.chip.Chip
-                                android:id="@+id/scaling_mode_fit"
-                                style="@style/Widget.MaterialComponents.Chip.Choice"
+                            <TextView
+                                android:id="@+id/scaling_mode_label"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="@string/scaling_mode_fit" />
+                                android:paddingStart="16dp"
+                                android:paddingEnd="16dp"
+                                android:text="@string/scaling_mode"
+                                android:textAppearance="?attr/textAppearanceBody2"
+                                android:textColor="?android:attr/textColorSecondary"/>
 
-                            <com.google.android.material.chip.Chip
-                                android:id="@+id/scaling_mode_fill"
-                                style="@style/Widget.MaterialComponents.Chip.Choice"
+                            <com.google.android.material.chip.ChipGroup
+                                android:id="@+id/scaling_mode_group"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:paddingStart="16dp"
+                                android:paddingEnd="16dp"
+                                android:paddingBottom="8dp"
+                                app:selectionRequired="true"
+                                app:singleSelection="true">
+
+                                <com.google.android.material.chip.Chip
+                                    android:id="@+id/scaling_mode_fit"
+                                    style="@style/Widget.MaterialComponents.Chip.Choice"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/scaling_mode_fit" />
+
+                                <com.google.android.material.chip.Chip
+                                    android:id="@+id/scaling_mode_fill"
+                                    style="@style/Widget.MaterialComponents.Chip.Choice"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/scaling_mode_fill" />
+
+                                <com.google.android.material.chip.Chip
+                                    android:id="@+id/scaling_mode_stretch"
+                                    style="@style/Widget.MaterialComponents.Chip.Choice"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/scaling_mode_stretch" />
+                            </com.google.android.material.chip.ChipGroup>
+
+                            <TextView
+                                android:text="Vertical Position"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="@string/scaling_mode_fill" />
+                                android:paddingStart="16dp"
+                                android:paddingEnd="16dp"
+                                android:textAppearance="?attr/textAppearanceBody2"
+                                android:textColor="?android:attr/textColorSecondary"/>
 
-                            <com.google.android.material.chip.Chip
-                                android:id="@+id/scaling_mode_stretch"
-                                style="@style/Widget.MaterialComponents.Chip.Choice"
+                            <com.google.android.material.slider.Slider
+                                android:id="@+id/position_x_slider"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:valueFrom="-1.0"
+                                android:valueTo="1.0"
+                                android:value="0.0"
+                                android:stepSize="0.1" />
+
+                            <TextView
+                                android:text="Horizontal Position"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="@string/scaling_mode_stretch" />
+                                android:paddingStart="16dp"
+                                android:paddingEnd="16dp"
+                                android:textAppearance="?attr/textAppearanceBody2"
+                                android:textColor="?android:attr/textColorSecondary"/>
 
-                        </com.google.android.material.chip.ChipGroup>
+                            <com.google.android.material.slider.Slider
+                                android:id="@+id/position_y_slider"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:valueFrom="-1.0"
+                                android:valueTo="1.0"
+                                android:value="0.0"
+                                android:stepSize="0.1" />
+
+                            <TextView
+                                android:text="Zoom"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:paddingStart="16dp"
+                                android:paddingEnd="16dp"
+                                android:textAppearance="?attr/textAppearanceBody2"
+                                android:textColor="?android:attr/textColorSecondary"/>
+
+                            <com.google.android.material.slider.Slider
+                                android:id="@+id/zoom_slider"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:valueFrom="0.5"
+                                android:valueTo="5.0"
+                                android:value="1.0"
+                                android:stepSize="0.1" />
+
+                            <TextView
+                                android:text="Brightness"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:paddingStart="16dp"
+                                android:paddingEnd="16dp"
+                                android:textAppearance="?attr/textAppearanceBody2"
+                                android:textColor="?android:attr/textColorSecondary"/>
+
+                            <com.google.android.material.slider.Slider
+                                android:id="@+id/brightness_slider"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:valueFrom="0.0"
+                                android:valueTo="2.0"
+                                android:value="1.0"
+                                android:stepSize="0.1" />
+
+                        </LinearLayout>
 
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>

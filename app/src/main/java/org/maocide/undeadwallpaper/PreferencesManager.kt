@@ -24,9 +24,12 @@ class PreferencesManager(context: Context) {
         private const val KEY_VIDEO_AUDIO_ENABLED = "video_audio_enabled"
         private const val KEY_VIDEO_START_MS = "video_start_ms"
         private const val KEY_VIDEO_END_MS = "video_end_ms"
-
         private const val KEY_PLAYBACK_MODE = "playback_mode"
         private const val KEY_SCALING_MODE = "scaling_mode"
+        private const val KEY_POSITION_X = "video_position_x"
+        private const val KEY_POSITION_Y = "video_position_y"
+        private const val KEY_ZOOM = "video_zoom"
+        private const val KEY_BRIGHTNESS = "video_brightness"
     }
 
     /**
@@ -128,8 +131,8 @@ class PreferencesManager(context: Context) {
      * @return The current scaling mode.
      */
     fun getScalingMode(): ScalingMode {
-        val storedOrdinal = sharedPrefs.getInt(KEY_SCALING_MODE, ScalingMode.FIT.ordinal)
-        return ScalingMode.entries.getOrElse(storedOrdinal) { ScalingMode.FIT }
+        val storedOrdinal = sharedPrefs.getInt(KEY_SCALING_MODE, ScalingMode.FILL.ordinal)
+        return ScalingMode.entries.getOrElse(storedOrdinal) { ScalingMode.FILL }
     }
 
     /**
@@ -140,6 +143,52 @@ class PreferencesManager(context: Context) {
         sharedPrefs.edit {
             putInt(KEY_SCALING_MODE, mode.ordinal)
         }
+    }
+
+    /**
+     * Saves the horizontal/vertical position offsets.
+     * Default is 0.0f (Centered).
+     */
+    fun savePositionX(x: Float) {
+        sharedPrefs.edit { putFloat(KEY_POSITION_X, x) }
+    }
+
+    fun getPositionX(): Float {
+        return sharedPrefs.getFloat(KEY_POSITION_X, 0.0f)
+    }
+
+    fun savePositionY(y: Float) {
+        sharedPrefs.edit { putFloat(KEY_POSITION_Y, y) }
+    }
+
+    fun getPositionY(): Float {
+        return sharedPrefs.getFloat(KEY_POSITION_Y, 0.0f)
+    }
+
+    /**
+     * Saves the video zoom level.
+     * Default is 1.0f (No Zoom).
+     */
+    fun saveZoom(zoom: Float) {
+        sharedPrefs.edit { putFloat(KEY_ZOOM, zoom) }
+    }
+
+    fun getZoom(): Float {
+        // Default to 1.0 if not set
+        return sharedPrefs.getFloat(KEY_ZOOM, 1.0f)
+    }
+
+    /**
+     * Saves the brightness multiplier.
+     * Default is 1.0f (Normal Brightness).
+     */
+    fun saveBrightness(brightness: Float) {
+        sharedPrefs.edit { putFloat(KEY_BRIGHTNESS, brightness) }
+    }
+
+    fun getBrightness(): Float {
+        // Default to 1.0 if not set
+        return sharedPrefs.getFloat(KEY_BRIGHTNESS, 1.0f)
     }
 
 

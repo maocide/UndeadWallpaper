@@ -26,6 +26,7 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.maocide.undeadwallpaper.model.PlaybackMode
+import org.maocide.undeadwallpaper.model.ScalingMode
 
 class UndeadWallpaperService : WallpaperService() {
 
@@ -45,6 +46,8 @@ class UndeadWallpaperService : WallpaperService() {
 
     private inner class MyWallpaperEngine : Engine() {
 
+        private var isAudioEnabled: Boolean = false
+        private lateinit var currentScalingMode: ScalingMode
         private var mediaPlayer: ExoPlayer? = null
         private var surfaceHolder: SurfaceHolder? = null
         private var playheadTime: Long = 0L
@@ -95,17 +98,14 @@ class UndeadWallpaperService : WallpaperService() {
             }
 
             Log.i(TAG, "Initializing ExoPlayer...")
-            sharedPrefs = applicationContext.getSharedPreferences("DEFAULT", MODE_PRIVATE)
-
-            // --- Load Settings from SharedPreferences ---
-            val isAudioEnabled = sharedPrefs.getBoolean(getString(R.string.video_audio_enabled), false)
-            // We'll read the scaling mode inside the listener now.
 
             val loadControl = DefaultLoadControl.Builder()
                 .build()
 
             val preferenceManager = PreferencesManager(baseContext)
+            isAudioEnabled = preferenceManager.isAudioEnabled()
             currentPlaybackMode = preferenceManager.getPlaybackMode()
+            currentScalingMode = preferenceManager.getScalingMode()
 
             hasPlaybackCompleted = false
 
@@ -119,14 +119,14 @@ class UndeadWallpaperService : WallpaperService() {
                         return
                     }
 
-                    // 1. Build a NORMAL MediaItem WITHOUT the clipping config.
+                    // Build a MediaItem WITHOUT the clipping config.
                     val mediaItem = MediaItem.fromUri(mediaUri)
 
-                    // 2. Create the base MediaSource from that item.
+                    // Create the base MediaSource from that item.
                     val mediaSource = ProgressiveMediaSource.Factory(DefaultDataSource.Factory(baseContext))
                         .createMediaSource(mediaItem)
 
-                    // 5. Set the clipped source and configure proper looping.
+                    // Set the clipped source and configure proper looping.
                     setMediaSource(mediaSource)
                     volume = if (isAudioEnabled) 1f else 0f
 
@@ -137,13 +137,16 @@ class UndeadWallpaperService : WallpaperService() {
 
                     Log.d(TAG, "repeatMode: $repeatMode")
 
+                    renderer?.setScalingMode(currentScalingMode)
+
 
                     addListener(object : Player.Listener {
                         override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
                             super.onVideoSizeChanged(videoSize)
 
-                            // 4. Send video size to Renderer for Matrix Calculation
+                            // Send video size to Renderer for Matrix Calculation
                             renderer?.setVideoSize(videoSize.width, videoSize.height)
+                            renderer?.setScalingMode(currentScalingMode)
 
                             // Sanity check for 0x0 size
                             if (videoSize.width == 0 || videoSize.height == 0) {
@@ -152,6 +155,7 @@ class UndeadWallpaperService : WallpaperService() {
                             }
 
                             // Only run this logic if we haven't already set the scaling mode for this video
+                            /* should be only needed when using exoplayer surface
                             if (!isScalingModeSet) {
                                 Log.i(TAG, "Valid video size detected: ${videoSize.width}x${videoSize.height}. Setting scaling mode ONCE.")
 
@@ -167,6 +171,8 @@ class UndeadWallpaperService : WallpaperService() {
 
                                 isScalingModeSet = true // SET THE FLAG SO THIS DOESN'T RUN AGAIN
                             }
+
+                             */
                         }
 
                         override fun onPlaybackStateChanged(playbackState: Int) {

@@ -15,6 +15,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import org.maocide.undeadwallpaper.model.ScalingMode
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
@@ -94,11 +95,27 @@ class GLVideoRenderer(private val context: Context) {
     )
     private var triangleVertices: FloatBuffer
 
+    // 2. Add a tracker for the current mode (Default to FILL as per your preference)
+    private var currentScalingMode: ScalingMode = ScalingMode.FILL
+
+
     init {
         triangleVertices = ByteBuffer.allocateDirect(triangleVerticesData.size * 4)
             .order(ByteOrder.nativeOrder()).asFloatBuffer()
         triangleVertices.put(triangleVerticesData).position(0)
         Matrix.setIdentityM(stMatrix, 0)
+    }
+
+
+    /**
+     * Sets the current scaling mode and updates the matrix
+     */
+    fun setScalingMode(mode: ScalingMode) {
+        if (currentScalingMode != mode) {
+            Log.i(tag, "Scaling Mode changed to: $mode")
+            currentScalingMode = mode
+            updateMatrix() // Recalculate immediately
+        }
     }
 
     /**
@@ -213,17 +230,43 @@ class GLVideoRenderer(private val context: Context) {
 
         Matrix.setIdentityM(mvpMatrix, 0)
 
-        // HARDCODED "FILL" (Center Crop)
-        // Logic: Always ensure the video covers the screen dimension
-        if (videoRatio > screenRatio) {
-            // Video is wider -> Scale width to match height, then crop width
-            // Correct logic for scaling to FILL:
-            val scaleX = videoRatio / screenRatio
-            Matrix.scaleM(mvpMatrix, 0, scaleX, 1f, 1f)
-        } else {
-            // Video is taller -> Scale height to match width, then crop height
-            val scaleY = screenRatio / videoRatio
-            Matrix.scaleM(mvpMatrix, 0, 1f, scaleY, 1f)
+        when (currentScalingMode) {
+            ScalingMode.STRETCH -> {
+                // The default OpenGL quad goes from -1 to 1 on X and Y.
+                // The image gets deformed and stretched to fill as texture the quad
+            }
+
+            ScalingMode.FIT -> {
+                // Letterbox scaling
+                // Scale DOWN the axis that is too large.
+                if (videoRatio > screenRatio) {
+                    // Video is WIDER than screen, 16:9 video on portrait phone
+                    // Fit Width (Scale X = 1), Squish Height
+                    val scaleY = screenRatio / videoRatio
+                    Matrix.scaleM(mvpMatrix, 0, 1f, scaleY, 1f)
+                } else {
+                    // Video is TALLER than screen (or phone is wider)
+                    // Fit Height (Scale Y = 1), Squish Width
+                    val scaleX = videoRatio / screenRatio
+                    Matrix.scaleM(mvpMatrix, 0, scaleX, 1f, 1f)
+                }
+            }
+
+            ScalingMode.FILL -> {
+                // Zoom/Crop
+                // Scale UP the axis that is too small.
+                if (videoRatio > screenRatio) {
+                    // Video is WIDER than screen
+                    // We need to match Height, so we scale X UP to push edges offscreen.
+                    val scaleX = videoRatio / screenRatio
+                    Matrix.scaleM(mvpMatrix, 0, scaleX, 1f, 1f)
+                } else {
+                    // Video is TALLER than screen
+                    // We need to match Width, so we scale Y UP to push top/bottom offscreen.
+                    val scaleY = screenRatio / videoRatio
+                    Matrix.scaleM(mvpMatrix, 0, 1f, scaleY, 1f)
+                }
+            }
         }
     }
 
