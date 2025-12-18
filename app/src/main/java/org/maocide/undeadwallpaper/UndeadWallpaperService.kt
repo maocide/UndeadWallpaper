@@ -84,6 +84,19 @@ class UndeadWallpaperService : WallpaperService() {
             }
         }
 
+        private fun refreshRenderer() {
+            // Send the whole package to the renderer
+            val prefManager = PreferencesManager(baseContext)
+            currentScalingMode = prefManager.getScalingMode()
+            renderer?.setScalingMode(currentScalingMode)
+            renderer?.setTransforms(
+                x = prefManager.getPositionX(),
+                y = prefManager.getPositionY(),
+                zoom = prefManager.getZoom(),
+                rotation = prefManager.getRotation()
+            )
+            renderer?.setBrightness(prefManager.getBrightness())
+        }
 
         @OptIn(UnstableApi::class)
         private fun initializePlayer() {
@@ -105,7 +118,6 @@ class UndeadWallpaperService : WallpaperService() {
             val preferenceManager = PreferencesManager(baseContext)
             isAudioEnabled = preferenceManager.isAudioEnabled()
             currentPlaybackMode = preferenceManager.getPlaybackMode()
-            currentScalingMode = preferenceManager.getScalingMode()
 
             hasPlaybackCompleted = false
 
@@ -137,8 +149,8 @@ class UndeadWallpaperService : WallpaperService() {
 
                     Log.d(TAG, "repeatMode: $repeatMode")
 
-                    renderer?.setScalingMode(currentScalingMode)
-
+                    // Send all values to renderer
+                    refreshRenderer()
 
                     addListener(object : Player.Listener {
                         override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
@@ -146,7 +158,9 @@ class UndeadWallpaperService : WallpaperService() {
 
                             // Send video size to Renderer for Matrix Calculation
                             renderer?.setVideoSize(videoSize.width, videoSize.height)
-                            renderer?.setScalingMode(currentScalingMode)
+
+                            // refresh all user values to renderer
+                            refreshRenderer()
 
                             // Sanity check for 0x0 size
                             if (videoSize.width == 0 || videoSize.height == 0) {
@@ -273,7 +287,7 @@ class UndeadWallpaperService : WallpaperService() {
             Log.i(TAG, "onSurfaceCreated")
             this.surfaceHolder = holder
 
-            // 1. Start the GL Renderer
+            // Start the GL Renderer
             renderer = GLVideoRenderer(applicationContext)
             renderer?.onSurfaceCreated(holder)
 
@@ -285,7 +299,7 @@ class UndeadWallpaperService : WallpaperService() {
             Log.i(TAG, "onSurfaceChanged: New dimensions ${width}x${height}")
             this.surfaceHolder = holder
 
-            // 2. Tell Renderer the screen size
+            // Tell Renderer the screen size
             renderer?.onSurfaceChanged(width, height)
 
             // initializePlayer() // MIGHT BE OVERKILL! TRY WITHOUT

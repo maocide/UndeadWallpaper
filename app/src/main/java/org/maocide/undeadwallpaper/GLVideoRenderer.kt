@@ -2,7 +2,6 @@ package org.maocide.undeadwallpaper
 
 import android.content.Context
 import android.graphics.SurfaceTexture
-import android.opengl.EGL14
 import android.opengl.GLES20
 import android.opengl.Matrix
 import android.util.Log
@@ -11,9 +10,7 @@ import android.view.SurfaceHolder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.asCoroutineDispatcher
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.maocide.undeadwallpaper.model.ScalingMode
 import java.nio.ByteBuffer
@@ -25,9 +22,11 @@ import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.egl.EGLContext
 import javax.microedition.khronos.egl.EGLDisplay
 import javax.microedition.khronos.egl.EGLSurface
+import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.min
 
 class GLVideoRenderer(private val context: Context) {
-
 
     private val tag: String = javaClass.simpleName
 
@@ -50,8 +49,6 @@ class GLVideoRenderer(private val context: Context) {
     private val mvpMatrix = FloatArray(16)
     private val stMatrix = FloatArray(16)
 
-    // We use a single-threaded executor. This ensures every coroutine launch
-    // in this scope runs on the EXACT same OS thread.
     private val glExecutor = Executors.newSingleThreadExecutor()
     private val glDispatcher = glExecutor.asCoroutineDispatcher()
     private val renderScope = CoroutineScope(glDispatcher + Job())
@@ -76,8 +73,10 @@ class GLVideoRenderer(private val context: Context) {
         precision mediump float;
         varying vec2 vTextureCoord;
         uniform samplerExternalOES sTexture;
+        uniform float uBrightness;
         void main() {
-          gl_FragColor = texture2D(sTexture, vTextureCoord);
+          vec4 color = texture2D(sTexture, vTextureCoord);
+          gl_FragColor = vec4(color.rgb + (uBrightness - 1.0) * 0.5, color.a);
         }
     """
 
@@ -86,6 +85,7 @@ class GLVideoRenderer(private val context: Context) {
     private var maTextureHandle = 0
     private var muMVPMatrixHandle = 0
     private var muSTMatrixHandle = 0
+    private var muBrightnessHandle = 0
 
     private val triangleVerticesData = floatArrayOf(
         -1.0f, -1.0f, 0f, 0f, 0f,
@@ -95,9 +95,13 @@ class GLVideoRenderer(private val context: Context) {
     )
     private var triangleVertices: FloatBuffer
 
-    // 2. Add a tracker for the current mode (Default to FILL as per your preference)
+    // User Transform Variables
     private var currentScalingMode: ScalingMode = ScalingMode.FILL
-
+    private var userTranslateX = 0f
+    private var userTranslateY = 0f
+    private var userZoom = 1.0f
+    private var userRotation = 0f
+    private var userBrightness = 1.0f
 
     init {
         triangleVertices = ByteBuffer.allocateDirect(triangleVerticesData.size * 4)
@@ -106,52 +110,43 @@ class GLVideoRenderer(private val context: Context) {
         Matrix.setIdentityM(stMatrix, 0)
     }
 
-
-    /**
-     * Sets the current scaling mode and updates the matrix
-     */
     fun setScalingMode(mode: ScalingMode) {
         if (currentScalingMode != mode) {
             Log.i(tag, "Scaling Mode changed to: $mode")
             currentScalingMode = mode
-            updateMatrix() // Recalculate immediately
+            updateMatrix()
         }
     }
 
-    /**
-     * Start the GL Thread.
-     */
+    fun setTransforms(x: Float, y: Float, zoom: Float, rotation: Float) {
+        userTranslateX = x
+        userTranslateY = y
+        userZoom = zoom
+        userRotation = rotation
+        updateMatrix()
+    }
+
+    fun setBrightness(brightness: Float) {
+        userBrightness = brightness
+    }
+
     fun onSurfaceCreated(holder: SurfaceHolder) {
-        // We launch on the glDispatcher to ensure initGL happens on the right thread
         renderScope.launch {
             initGL(holder)
             renderLoop()
         }
     }
 
-    /**
-     * Stop the GL Thread and clean up.
-     */
-    // We will let release() handle everything.
     fun onSurfaceDestroyed() {
-        // We can leave this empty or use it to signal, but release() is safer.
+        // Handled by release()
     }
 
-    /**
-     * Call this to cleanly shutdown the executor when the service is truly done.
-     */
     fun release() {
         Log.i(tag, "Renderer Release Signal Received.")
-        // 1. Close the channel. This breaks the 'for' loop in renderLoop.
         renderSignal.close()
-
-        // 2. Shut down the executor.
-        // We wait a tiny bit? No, shutdown is fine.
-        // But the finally block inside renderLoop might need a moment.
-        // Actually, shutdown() allows the current task to finish. shutdownNow() interrupts.
-        // Let's use shutdown() to let the finally block run gracefully.
         glExecutor.shutdown()
-        Log.i(tag, "GLRenderer released and Executor shutdown")
+        // We do NOT call releaseGL here directly, we let the loop finish and clean up itself
+        // or we risk thread collision.
     }
 
     fun onSurfaceChanged(width: Int, height: Int) {
@@ -167,7 +162,7 @@ class GLVideoRenderer(private val context: Context) {
     }
 
     suspend fun waitForVideoSurface(): Surface? {
-        var limit = 80 // Increased wait time slightly
+        var limit = 80
         while (videoSurface == null && limit > 0) {
             kotlinx.coroutines.delay(100)
             limit--
@@ -176,27 +171,29 @@ class GLVideoRenderer(private val context: Context) {
     }
 
     private suspend fun renderLoop() {
-        // SAFE CHANNEL LOOP:
-        // This loop automatically breaks when the channel is closed!
-        // No more exceptions.
         try {
             for (signal in renderSignal) {
-                if (egl == null || eglDisplay == EGL10.EGL_NO_DISPLAY) continue
-
-                try {
-                    surfaceTexture?.updateTexImage()
-                    surfaceTexture?.getTransformMatrix(stMatrix)
-                } catch (e: Exception) {
-                    Log.e(tag, "Error updating texture: ${e.message}")
+                // SECURITY GUARD 🛡️: Prevent 0x502 Invalid Operation
+                if (egl == null || eglDisplay == EGL10.EGL_NO_DISPLAY || eglContext == EGL10.EGL_NO_CONTEXT) {
                     continue
                 }
 
-                // Draw
+                // If the surface texture is released, don't try to update it
+                if (surfaceTexture == null) continue
+
+                try {
+                    // Update texture MUST happen on the thread with the EGL Context
+                    surfaceTexture?.updateTexImage()
+                    surfaceTexture?.getTransformMatrix(stMatrix)
+                } catch (e: Exception) {
+                    Log.w(tag, "SurfaceTexture update failed (Context lost?): ${e.message}")
+                    continue
+                }
+
                 drawFrame()
                 egl?.eglSwapBuffers(eglDisplay, eglSurface)
             }
         } finally {
-            // THIS WILL RUN WHEN THE CHANNEL CLOSES OR SCOPE IS CANCELLED
             Log.i(tag, "Render loop finished. Cleaning up GL on renderer thread.")
             releaseGL()
         }
@@ -206,72 +203,86 @@ class GLVideoRenderer(private val context: Context) {
         GLES20.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
         GLES20.glClear(GLES20.GL_DEPTH_BUFFER_BIT or GLES20.GL_COLOR_BUFFER_BIT)
         GLES20.glUseProgram(programId)
+
         triangleVertices.position(0)
         GLES20.glVertexAttribPointer(maPositionHandle, 3, GLES20.GL_FLOAT, false, 20, triangleVertices)
         GLES20.glEnableVertexAttribArray(maPositionHandle)
+
         triangleVertices.position(3)
         GLES20.glVertexAttribPointer(maTextureHandle, 2, GLES20.GL_FLOAT, false, 20, triangleVertices)
         GLES20.glEnableVertexAttribArray(maTextureHandle)
+
         GLES20.glUniformMatrix4fv(muMVPMatrixHandle, 1, false, mvpMatrix, 0)
         GLES20.glUniformMatrix4fv(muSTMatrixHandle, 1, false, stMatrix, 0)
+        GLES20.glUniform1f(muBrightnessHandle, userBrightness)
+
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
-        GLES20.glBindTexture(36197, textureId)
-        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
+        if (textureId != 0) {
+            GLES20.glBindTexture(36197, textureId) // GL_TEXTURE_EXTERNAL_OES
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
+        }
     }
 
     private fun updateMatrix() {
+        // If we have zero-dimensions, don't do math.
         if (screenWidth == 0 || screenHeight == 0 || videoWidth == 0 || videoHeight == 0) {
             Matrix.setIdentityM(mvpMatrix, 0)
             return
         }
 
-        val screenRatio = screenWidth.toFloat() / screenHeight.toFloat()
+        // Calculate Ratios
         val videoRatio = videoWidth.toFloat() / videoHeight.toFloat()
+        val screenRatio = screenWidth.toFloat() / screenHeight.toFloat()
 
         Matrix.setIdentityM(mvpMatrix, 0)
 
-        when (currentScalingMode) {
-            ScalingMode.STRETCH -> {
-                // The default OpenGL quad goes from -1 to 1 on X and Y.
-                // The image gets deformed and stretched to fill as texture the quad
-            }
+        // Pan (Translation)
+        // We apply this first so "moving right" moves the image right on the screen
+        Matrix.translateM(mvpMatrix, 0, userTranslateX, userTranslateY, 0f)
 
-            ScalingMode.FIT -> {
-                // Letterbox scaling
-                // Scale DOWN the axis that is too large.
-                if (videoRatio > screenRatio) {
-                    // Video is WIDER than screen, 16:9 video on portrait phone
-                    // Fit Width (Scale X = 1), Squish Height
-                    val scaleY = screenRatio / videoRatio
-                    Matrix.scaleM(mvpMatrix, 0, 1f, scaleY, 1f)
-                } else {
-                    // Video is TALLER than screen (or phone is wider)
-                    // Fit Height (Scale Y = 1), Squish Width
-                    val scaleX = videoRatio / screenRatio
-                    Matrix.scaleM(mvpMatrix, 0, scaleX, 1f, 1f)
-                }
-            }
+        // Zoom
+        // Simple scaling around the center
+        Matrix.scaleM(mvpMatrix, 0, userZoom, userZoom, 1f)
 
-            ScalingMode.FILL -> {
-                // Zoom/Crop
-                // Scale UP the axis that is too small.
-                if (videoRatio > screenRatio) {
-                    // Video is WIDER than screen
-                    // We need to match Height, so we scale X UP to push edges offscreen.
-                    val scaleX = videoRatio / screenRatio
-                    Matrix.scaleM(mvpMatrix, 0, scaleX, 1f, 1f)
-                } else {
-                    // Video is TALLER than screen
-                    // We need to match Width, so we scale Y UP to push top/bottom offscreen.
-                    val scaleY = screenRatio / videoRatio
-                    Matrix.scaleM(mvpMatrix, 0, 1f, scaleY, 1f)
-                }
-            }
+        if (currentScalingMode == ScalingMode.STRETCH) {
+            // STRETCH means "Map video corners to screen corners."
+            // Since our base geometry acts as -1 to 1, and the screen is -1 to 1,
+            Log.d(tag, "Matrix Update: Mode=$currentScalingMode, VideoRatio=$videoRatio, ScreenRatio=$screenRatio")
+            return
         }
+
+        // Aspect Ratio Correction (The "De-Squush" Phase)
+        // Give the video its correct physical width relative to height (1.0)
+        Matrix.scaleM(mvpMatrix, 0, videoRatio, 1f, 1f)
+
+        // Normalize against the screen's aspect ratio
+        // This ensures a square object actually looks square on the device screen
+        Matrix.scaleM(mvpMatrix, 0, 1f/screenRatio, 1f, 1f)
+
+        // Automatic Scaling (Fit/Fill)
+        // We calculate how much we need to scale X and Y to match the screen boundaries.
+        // Our "Object" width is videoRatio. Screen width is screenRatio.
+        val scaleX = screenRatio / videoRatio
+        val scaleY = 1.0f // Vertical is already normalized to 1.0 vs 1.0
+
+        var autoScale = 1.0f
+
+        if (currentScalingMode == ScalingMode.FILL) {
+            // FILL: maximizing scale so the image COVERS the screen (Crop)
+            autoScale = max(scaleX, scaleY)
+        } else {
+            // FIT: minimizing scale so the image FITS INSIDE the screen (Letterbox)
+            autoScale = min(scaleX, scaleY)
+        }
+
+        // Apply the auto-fit factor
+        Matrix.scaleM(mvpMatrix, 0, autoScale, autoScale, 1f)
+
+        Log.d(tag, "Matrix Update: Mode=$currentScalingMode, VideoRatio=$videoRatio, ScreenRatio=$screenRatio, FinalScale=$autoScale")
     }
 
-    private fun initGL(holder: SurfaceHolder) {
 
+    private fun initGL(holder: SurfaceHolder) {
         egl = EGLContext.getEGL() as EGL10
         eglDisplay = egl!!.eglGetDisplay(EGL10.EGL_DEFAULT_DISPLAY)
 
@@ -307,7 +318,6 @@ class GLVideoRenderer(private val context: Context) {
 
         surfaceTexture = SurfaceTexture(textureId)
         surfaceTexture!!.setOnFrameAvailableListener {
-            // Signal dispatch
             renderSignal.trySend(Unit)
         }
         videoSurface = Surface(surfaceTexture)
@@ -323,8 +333,32 @@ class GLVideoRenderer(private val context: Context) {
         maTextureHandle = GLES20.glGetAttribLocation(programId, "aTextureCoord")
         muMVPMatrixHandle = GLES20.glGetUniformLocation(programId, "uMVPMatrix")
         muSTMatrixHandle = GLES20.glGetUniformLocation(programId, "uSTMatrix")
+        muBrightnessHandle = GLES20.glGetUniformLocation(programId, "uBrightness")
 
-        Log.i(tag, "GL Initialized!")
+        // Check compile status
+        val compileStatus = IntArray(1)
+        GLES20.glGetShaderiv(fragmentShader, GLES20.GL_COMPILE_STATUS, compileStatus, 0)
+        var failed = false
+
+        if (compileStatus[0] == 0) {
+            // Retrieve the error message
+            val errorMsg = GLES20.glGetShaderInfoLog(fragmentShader)
+            failed = true
+            Log.e(tag,"Fragment Shader compile error: $errorMsg")
+        }
+
+        GLES20.glGetShaderiv(vertexShader, GLES20.GL_COMPILE_STATUS, compileStatus, 0)
+        if (compileStatus[0] == 0) {
+            // Retrieve the error message
+            val errorMsg = GLES20.glGetShaderInfoLog(fragmentShader)
+            failed = true
+            Log.e(tag,"Vertex Shader compile error: $errorMsg")
+        }
+        if(!failed)
+            Log.i(tag, "GL Initialized!")
+        else
+            Log.e(tag, "GL Error! ^^^")
+
     }
 
     private fun releaseGL() {
@@ -338,7 +372,7 @@ class GLVideoRenderer(private val context: Context) {
         eglContext = EGL10.EGL_NO_CONTEXT
         eglSurface = EGL10.EGL_NO_SURFACE
         videoSurface?.release()
-        surfaceTexture?.release()
+        surfaceTexture?.release() // Release texture explicitly
         videoSurface = null
         surfaceTexture = null
     }

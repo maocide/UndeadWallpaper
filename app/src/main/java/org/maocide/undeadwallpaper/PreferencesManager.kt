@@ -30,6 +30,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_POSITION_Y = "video_position_y"
         private const val KEY_ZOOM = "video_zoom"
         private const val KEY_BRIGHTNESS = "video_brightness"
+        private const val KEY_ROTATION = "video_rotation"
     }
 
     /**
@@ -176,6 +177,19 @@ class PreferencesManager(context: Context) {
     fun getZoom(): Float {
         // Default to 1.0 if not set
         return sharedPrefs.getFloat(KEY_ZOOM, 1.0f)
+    }
+
+    /**
+     * Saves the video rotation.
+     * Default is 0.0f (flat).
+     */
+    fun saveRotation(rotation: Float) {
+        sharedPrefs.edit { putFloat(KEY_ROTATION, rotation) }
+    }
+
+    fun getRotation(): Float {
+        // Default to 0.0 if not set
+        return sharedPrefs.getFloat(KEY_ROTATION, 0.0f)
     }
 
     /**

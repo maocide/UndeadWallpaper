@@ -276,11 +276,13 @@ class SettingsFragment : Fragment() {
         binding.positionXSlider.value = preferencesManager.getPositionX()
         binding.positionYSlider.value = preferencesManager.getPositionY()
         binding.zoomSlider.value = preferencesManager.getZoom()
+        //binding.rotationSlider.value = preferencesManager.getRotation()
         binding.brightnessSlider.value = preferencesManager.getBrightness()
 
-        // Load Video Preview
+        // Load Video Preview and set the video as selected
         preferencesManager.getVideoUri()?.let { uriString ->
-            setupVideoPreview(uriString.toUri())
+            //setupVideoPreview(uriString.toUri())
+            updateVideoSource(uriString.toUri(), false)
         }
 
     }
@@ -313,7 +315,6 @@ class SettingsFragment : Fragment() {
         }
 
 
-
         // Playback Mode
         binding.playbackModeGroup.setOnCheckedStateChangeListener { _, checkedIds ->
             // If nothing is selected, skip
@@ -338,6 +339,18 @@ class SettingsFragment : Fragment() {
             notifySettingsChanged()
         }
 
+        // Accordion Logic and animation
+        binding.layoutHeader.setOnClickListener {
+            val advancedOptionsContainer = binding.advancedOptionsContainer
+            val isVisible = advancedOptionsContainer.isVisible
+
+            TransitionManager.beginDelayedTransition(binding.accordionCard as ViewGroup, AutoTransition())
+            advancedOptionsContainer.visibility = if (isVisible) View.GONE else View.VISIBLE
+
+            val rotation = if (!isVisible) 180f else 0f
+            binding.imageArrow.animate().rotation(rotation).setDuration(200).start()
+        }
+
         // Scaling Mode
         binding.scalingModeGroup.setOnCheckedStateChangeListener { group, checkedIds ->
             if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
@@ -351,18 +364,6 @@ class SettingsFragment : Fragment() {
             }
             preferencesManager.setScalingMode(newMode)
             notifySettingsChanged()
-        }
-
-        // Accordion Logic and animation
-        binding.layoutHeader.setOnClickListener {
-            val advancedOptionsContainer = binding.advancedOptionsContainer
-            val isVisible = advancedOptionsContainer.isVisible
-
-            TransitionManager.beginDelayedTransition(binding.accordionCard as ViewGroup, AutoTransition())
-            advancedOptionsContainer.visibility = if (isVisible) View.GONE else View.VISIBLE
-
-            val rotation = if (!isVisible) 180f else 0f
-            binding.imageArrow.animate().rotation(rotation).setDuration(200).start()
         }
 
         // Video Picker
@@ -389,6 +390,34 @@ class SettingsFragment : Fragment() {
         // Zoom
         setupSafeSlider(binding.zoomSlider) { value ->
             preferencesManager.saveZoom(value)
+        }
+
+        // Rotation
+        /*
+        setupSafeSlider(binding.rotationSlider) { value ->
+            preferencesManager.saveRotation(value)
+        }
+
+         */
+
+        // Reset Values in UI (The listeners will trigger the save automatically!)
+        binding.buttonResetAdvanced.setOnClickListener {
+            // RESET UI
+            binding.scalingModeGroup.check(binding.scalingModeFill.id)
+            binding.positionXSlider.value = 0.0f
+            binding.positionYSlider.value = 0.0f
+            binding.zoomSlider.value = 1.0f
+            binding.brightnessSlider.value = 1.0f
+
+            // SAVE TO PREFS
+            preferencesManager.setScalingMode(ScalingMode.FILL)
+            preferencesManager.savePositionX(0.0f)
+            preferencesManager.savePositionY(0.0f)
+            preferencesManager.saveZoom(1.0f)
+            preferencesManager.saveBrightness(1.0f)
+
+            // NOTIFY SERVICE
+            notifySettingsChanged()
         }
     }
 

@@ -47,5 +47,10 @@
     <string name="scaling_mode_fill">Fill</string>
     <string name="scaling_mode_stretch">Stretch</string>
     <string name="advanced">Advanced</string>
+    <string name="horizontal_position">Horizontal Position</string>
+    <string name="vertical_position">Vertical Position</string>
+    <string name="zoom">Zoom</string>
+    <string name="brightness">Brightness</string>
+    <string name="reset">Reset</string>
 
 </resources>

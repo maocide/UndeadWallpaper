@@ -214,7 +214,7 @@
                             </com.google.android.material.chip.ChipGroup>
 
                             <TextView
-                                android:text="Vertical Position"
+                                android:text="@string/horizontal_position"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:paddingStart="16dp"
@@ -232,7 +232,7 @@
                                 android:stepSize="0.1" />
 
                             <TextView
-                                android:text="Horizontal Position"
+                                android:text="@string/vertical_position"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:paddingStart="16dp"
@@ -250,7 +250,7 @@
                                 android:stepSize="0.1" />
 
                             <TextView
-                                android:text="Zoom"
+                                android:text="@string/zoom"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:paddingStart="16dp"
@@ -263,12 +263,12 @@
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:valueFrom="0.5"
-                                android:valueTo="5.0"
+                                android:valueTo="2.0"
                                 android:value="1.0"
-                                android:stepSize="0.1" />
+                                android:stepSize="0.05" />
 
                             <TextView
-                                android:text="Brightness"
+                                android:text="@string/brightness"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:paddingStart="16dp"
@@ -284,6 +284,17 @@
                                 android:valueTo="2.0"
                                 android:value="1.0"
                                 android:stepSize="0.1" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/button_reset_advanced"
+                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_gravity="end"
+                                android:layout_marginTop="8dp"
+                                android:layout_marginEnd="8dp"
+                                android:text="@string/reset"
+                                android:textColor="?attr/colorPrimary" />
 
                         </LinearLayout>
 

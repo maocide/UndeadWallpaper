@@ -36,6 +36,12 @@
     <string name="scaling_mode_fill">Riempi</string>
     <string name="scaling_mode_stretch">Stira</string>
     <string name="advanced">Avanzate</string>
+    <string name="horizontal_position">Posizione Orizzontale</string>
+    <string name="vertical_position">Posizione Verticale</string>
+    <string name="zoom">Zoom</string>
+    <string name="brightness">Luminosità</string>
+    <string name="reset">Ripristina</string>
+
 
 
 </resources>

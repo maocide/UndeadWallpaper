@@ -36,6 +36,11 @@
     <string name="scaling_mode_fill">画面一杯</string>
     <string name="scaling_mode_stretch">ストレッチ</string>
     <string name="advanced">詳細</string>
+    <string name="horizontal_position">水平位置</string>
+    <string name="vertical_position">垂直位置</string>
+    <string name="zoom">ズーム</string>
+    <string name="brightness">明るさ</string>
+    <string name="reset">リセット</string>
 
 
 </resources>
