@@ -36,6 +36,7 @@ import org.maocide.undeadwallpaper.model.PlaybackMode
 import org.maocide.undeadwallpaper.model.ScalingMode
 import androidx.core.view.isVisible
 import com.google.android.material.slider.Slider
+import kotlin.math.roundToInt
 
 /**
  * A simple [Fragment] subclass as the default destination in the navigation.
@@ -144,6 +145,12 @@ class SettingsFragment : Fragment() {
 
     }
 
+    /**
+     * Restores the state of the UI after a configuration change (e.g., screen rotation).
+     * Specifically, this handles the expanded/collapsed state of the "Advanced Options" accordion.
+     *
+     * @param savedInstanceState The bundle containing the saved state, typically from `onSaveInstanceState`.
+     */
     private fun restoreState(savedInstanceState: Bundle) {
         // RESTORE ACCORDION STATE
         val isExpanded = savedInstanceState.getBoolean(KEY_ADVANCED_EXPANDED, false)
@@ -254,6 +261,7 @@ class SettingsFragment : Fragment() {
     /**
      * Update all Buttons/Switches to match Preferences.
      * Calling this BEFORE listeners prevents accidental triggers.
+     * Also called by reset button listener after resetting values
      */
     private fun syncUiState() {
         // Audio
@@ -272,12 +280,12 @@ class SettingsFragment : Fragment() {
             ScalingMode.STRETCH -> binding.scalingModeGroup.check(binding.scalingModeStretch.id)
         }
 
-        // Load sliders for advanced
-        binding.positionXSlider.value = preferencesManager.getPositionX()
-        binding.positionYSlider.value = preferencesManager.getPositionY()
-        binding.zoomSlider.value = preferencesManager.getZoom()
-        //binding.rotationSlider.value = preferencesManager.getRotation()
-        binding.brightnessSlider.value = preferencesManager.getBrightness()
+        // Load sliders for advanced (using safe loading)
+        binding.positionXSlider.setValueSafe(preferencesManager.getPositionX())
+        binding.positionYSlider.setValueSafe(preferencesManager.getPositionY())
+        binding.zoomSlider.setValueSafe(preferencesManager.getZoom())
+        binding.rotationSlider.setValueSafe(preferencesManager.getRotation())
+        binding.brightnessSlider.setValueSafe(preferencesManager.getBrightness())
 
         // Load Video Preview and set the video as selected
         preferencesManager.getVideoUri()?.let { uriString ->
@@ -286,6 +294,18 @@ class SettingsFragment : Fragment() {
         }
 
     }
+
+    private fun resetPreferencesToDefaults() {
+        preferencesManager.apply {
+            setScalingMode(ScalingMode.FILL)
+            savePositionX(0.0f)
+            savePositionY(0.0f)
+            saveZoom(1.0f)
+            saveRotation(0f)
+            saveBrightness(1.0f)
+        }
+    }
+
 
     /**
      * Pure logic for what happens on clicks.
@@ -313,6 +333,8 @@ class SettingsFragment : Fragment() {
                 }
             })
         }
+
+
 
 
         // Playback Mode
@@ -393,30 +415,19 @@ class SettingsFragment : Fragment() {
         }
 
         // Rotation
-        /*
         setupSafeSlider(binding.rotationSlider) { value ->
             preferencesManager.saveRotation(value)
         }
 
-         */
-
-        // Reset Values in UI (The listeners will trigger the save automatically!)
+        // Reset Values in UI
         binding.buttonResetAdvanced.setOnClickListener {
-            // RESET UI
-            binding.scalingModeGroup.check(binding.scalingModeFill.id)
-            binding.positionXSlider.value = 0.0f
-            binding.positionYSlider.value = 0.0f
-            binding.zoomSlider.value = 1.0f
-            binding.brightnessSlider.value = 1.0f
+            // Reset and save values
+            resetPreferencesToDefaults()
 
-            // SAVE TO PREFS
-            preferencesManager.setScalingMode(ScalingMode.FILL)
-            preferencesManager.savePositionX(0.0f)
-            preferencesManager.savePositionY(0.0f)
-            preferencesManager.saveZoom(1.0f)
-            preferencesManager.saveBrightness(1.0f)
+            // Reload UI (Warning!! might refire listeners of controls! Should be ok...)
+            syncUiState()
 
-            // NOTIFY SERVICE
+            // Notify wallpaper service
             notifySettingsChanged()
         }
     }
@@ -547,6 +558,36 @@ class SettingsFragment : Fragment() {
         val seconds = (millis % (1000 * 60)) / 1000
         val milliseconds = millis % 1000
         return String.format("%02d:%02d:%02d.%03d", hours, minutes, seconds, milliseconds)
+    }
+
+    /**
+     * Safely sets the value of a Material Slider, preventing crashes from out-of-range/step values.
+     *
+     * This extension function ensures that any value assigned to the slider is first clamped
+     * to be within the slider's `valueFrom` and `valueTo` range. If the slider has a `stepSize`
+     * defined, the function will also snap the clamped value to the nearest valid step.
+     *
+     * This is useful for programmatically setting slider values that might come from external
+     * sources (like saved preferences) without causing an `IllegalArgumentException`.
+     *
+     * @param newValue The desired new value for the slider.
+     */
+    fun com.google.android.material.slider.Slider.setValueSafe(newValue: Float) {
+        // 1. Clamp: Ensure value is strictly between valueFrom and valueTo
+        val clampedValue = newValue.coerceIn(valueFrom, valueTo)
+
+        // 2. Snap: If a stepSize is defined, ensure the value fits the step
+        val finalValue = if (stepSize > 0) {
+            // Calculate how many "steps" we are from the start
+            val steps = ((clampedValue - valueFrom) / stepSize).roundToInt()
+            // Reconstruct the value based on exact steps
+            valueFrom + (steps * stepSize)
+        } else {
+            clampedValue
+        }
+
+        // 3. Apply: Only now is it safe to set the value
+        this.value = finalValue
     }
 
     override fun onDestroyView() {

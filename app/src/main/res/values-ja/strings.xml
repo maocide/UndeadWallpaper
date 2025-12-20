@@ -41,6 +41,7 @@
     <string name="zoom">ズーム</string>
     <string name="brightness">明るさ</string>
     <string name="reset">リセット</string>
+    <string name="rotation">回転</string>
 
 
 </resources>

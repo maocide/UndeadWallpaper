@@ -56,9 +56,13 @@ class UndeadWallpaperService : WallpaperService() {
         private var isScalingModeSet = false
 
         private var currentPlaybackMode = PlaybackMode.LOOP
+
+        private var loadedVideoUriString = ""
         private var hasPlaybackCompleted = false
 
         private var renderer: GLVideoRenderer? = null // <--- NEW RENDERER
+
+
 
 
 
@@ -126,6 +130,8 @@ class UndeadWallpaperService : WallpaperService() {
                 .setSeekParameters(SeekParameters.CLOSEST_SYNC)
                 .build().apply {
                     val mediaUri = getMediaUri()
+                    loadedVideoUriString = mediaUri.toString()
+
                     if (mediaUri == null) {
                         Log.e(TAG, "Media URI is null, cannot play video.")
                         return
@@ -321,11 +327,21 @@ class UndeadWallpaperService : WallpaperService() {
             unregisterReceiver(videoChangeReceiver)
         }
 
+
         override fun onVisibilityChanged(visible: Boolean) {
             super.onVisibilityChanged(visible)
             Log.i(TAG, "onVisibilityChanged: visible = $visible isPreview = $isPreview, playbackMode = $currentPlaybackMode")
 
             if (visible) {
+                // Check if the URI in memory matches the one on disk/prefs
+                val currentUriOnDisk = getMediaUri().toString()
+
+                // If they don't match, force a reload!
+                if (currentUriOnDisk != loadedVideoUriString) {
+                    Log.i(TAG, "WakeUp Check: URI changed while sleeping! Reloading.")
+                    initializePlayer()
+                }
+
                 if (mediaPlayer == null) {
                     initializePlayer()
                 } else {

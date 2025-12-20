@@ -7,6 +7,7 @@ import android.opengl.Matrix
 import android.util.Log
 import android.view.Surface
 import android.view.SurfaceHolder
+import android.view.WindowManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -23,8 +24,10 @@ import javax.microedition.khronos.egl.EGLContext
 import javax.microedition.khronos.egl.EGLDisplay
 import javax.microedition.khronos.egl.EGLSurface
 import kotlin.math.abs
+import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sin
 
 class GLVideoRenderer(private val context: Context) {
 
@@ -41,9 +44,6 @@ class GLVideoRenderer(private val context: Context) {
     private var videoSurface: Surface? = null
     private var textureId: Int = 0
 
-    // Scaling Logic
-    private var screenWidth = 0
-    private var screenHeight = 0
     private var videoWidth = 0
     private var videoHeight = 0
     private val mvpMatrix = FloatArray(16)
@@ -55,6 +55,18 @@ class GLVideoRenderer(private val context: Context) {
 
     // Trigger signal
     private val renderSignal = Channel<Unit>(Channel.CONFLATED)
+
+    @Volatile private var viewportWidth = 0
+    @Volatile private var viewportHeight = 0
+    @Volatile private var screenWidth = 0
+    @Volatile private var screenHeight = 0
+    @Volatile private var viewportChanged = false
+
+
+    // Add Projection/View Matrices for Ortho Math
+    private val projectionMatrix = FloatArray(16)
+    private val viewMatrix = FloatArray(16)
+
 
     private val vertexShaderCode = """
         attribute vec4 aPosition;
@@ -150,9 +162,39 @@ class GLVideoRenderer(private val context: Context) {
     }
 
     fun onSurfaceChanged(width: Int, height: Int) {
-        screenWidth = width
-        screenHeight = height
-        updateMatrix()
+        // 1. Store Viewport (The Source of Truth for Orientation)
+        viewportWidth = width
+        viewportHeight = height
+
+        // 2. Get Physical Metrics
+        val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        val display = windowManager.defaultDisplay
+        val metrics = android.util.DisplayMetrics()
+        display.getRealMetrics(metrics)
+
+        // 3. ORIENTATION CORRECTION 🛡️
+        // Sometimes 'metrics' reports Portrait dimensions even if the Surface is Landscape
+        // (common on Tablets or locked Launchers).
+        // We trust the Viewport's shape. If they disagree, we SWAP the metrics.
+
+        val isViewportLandscape = width > height
+        val isMetricsLandscape = metrics.widthPixels > metrics.heightPixels
+
+        if (isViewportLandscape != isMetricsLandscape) {
+            // Mismatch detected! Swap dimensions to match Viewport.
+            screenWidth = metrics.heightPixels
+            screenHeight = metrics.widthPixels
+            Log.w(tag, "Orientation Mismatch! Swapped metrics to: ${screenWidth}x${screenHeight}")
+        } else {
+            screenWidth = metrics.widthPixels
+            screenHeight = metrics.heightPixels
+        }
+
+        // 4. Signal Render Thread
+        viewportChanged = true
+        renderSignal.trySend(Unit)
+
+        Log.i(tag, "Surface Changed: Viewport=${width}x${height}, LogicalScreen=${screenWidth}x${screenHeight}")
     }
 
     fun setVideoSize(width: Int, height: Int) {
@@ -173,28 +215,27 @@ class GLVideoRenderer(private val context: Context) {
     private suspend fun renderLoop() {
         try {
             for (signal in renderSignal) {
-                // SECURITY GUARD 🛡️: Prevent 0x502 Invalid Operation
-                if (egl == null || eglDisplay == EGL10.EGL_NO_DISPLAY || eglContext == EGL10.EGL_NO_CONTEXT) {
-                    continue
-                }
-
-                // If the surface texture is released, don't try to update it
+                if (egl == null || eglDisplay == EGL10.EGL_NO_DISPLAY || eglContext == EGL10.EGL_NO_CONTEXT) continue
                 if (surfaceTexture == null) continue
 
                 try {
-                    // Update texture MUST happen on the thread with the EGL Context
                     surfaceTexture?.updateTexImage()
                     surfaceTexture?.getTransformMatrix(stMatrix)
                 } catch (e: Exception) {
-                    Log.w(tag, "SurfaceTexture update failed (Context lost?): ${e.message}")
                     continue
+                }
+
+                // CHECK FOR UPDATES HERE (On the GL Thread)
+                if (viewportChanged) {
+                    GLES20.glViewport(0, 0, viewportWidth, viewportHeight)
+                    updateMatrix() // Now safe to calculate!
+                    viewportChanged = false
                 }
 
                 drawFrame()
                 egl?.eglSwapBuffers(eglDisplay, eglSurface)
             }
         } finally {
-            Log.i(tag, "Render loop finished. Cleaning up GL on renderer thread.")
             releaseGL()
         }
     }
@@ -223,64 +264,86 @@ class GLVideoRenderer(private val context: Context) {
         }
     }
 
+    // The "Pixel Perfect" Math
+    // Since we now run this on the correct thread, glViewport actually works,
+    // so the logic will finally align correctly.
     private fun updateMatrix() {
-        // If we have zero-dimensions, don't do math.
-        if (screenWidth == 0 || screenHeight == 0 || videoWidth == 0 || videoHeight == 0) {
+        if (screenWidth == 0 || screenHeight == 0 || viewportWidth == 0 || viewportHeight == 0) {
             Matrix.setIdentityM(mvpMatrix, 0)
             return
         }
 
-        // Calculate Ratios
-        val videoRatio = videoWidth.toFloat() / videoHeight.toFloat()
-        val screenRatio = screenWidth.toFloat() / screenHeight.toFloat()
+        // 1. SETUP PIXEL SPACE (Ortho)
+        val left = -viewportWidth / 2f
+        val right = viewportWidth / 2f
+        val bottom = -viewportHeight / 2f
+        val top = viewportHeight / 2f
+        Matrix.orthoM(projectionMatrix, 0, left, right, bottom, top, -1f, 1f)
 
-        Matrix.setIdentityM(mvpMatrix, 0)
+        // 2. CALCULATE GEOMETRY (Rotated Bounding Box)
+        val rotation = userRotation * -1f
+        val angleRad = Math.toRadians(rotation.toDouble())
+        val sinVal = abs(sin(angleRad)).toFloat()
+        val cosVal = abs(cos(angleRad)).toFloat()
 
-        // Pan (Translation)
-        // We apply this first so "moving right" moves the image right on the screen
-        Matrix.translateM(mvpMatrix, 0, userTranslateX, userTranslateY, 0f)
+        // Size of the Rotated Video Box (in Pixels)
+        val currentWidthPx = (videoWidth * cosVal) + (videoHeight * sinVal)
+        val currentHeightPx = (videoWidth * sinVal) + (videoHeight * cosVal)
 
-        // Zoom
-        // Simple scaling around the center
-        Matrix.scaleM(mvpMatrix, 0, userZoom, userZoom, 1f)
+        // Ratios to match the LOGICAL SCREEN (Now guaranteed to match Viewport orientation)
+        val scaleRatioX = screenWidth.toFloat() / currentWidthPx
+        val scaleRatioY = screenHeight.toFloat() / currentHeightPx
 
-        if (currentScalingMode == ScalingMode.STRETCH) {
-            // STRETCH means "Map video corners to screen corners."
-            // Since our base geometry acts as -1 to 1, and the screen is -1 to 1,
-            Log.d(tag, "Matrix Update: Mode=$currentScalingMode, VideoRatio=$videoRatio, ScreenRatio=$screenRatio")
-            return
+        // 3. DETERMINE SCALING FACTORS
+        var globalScaleX = 1.0f
+        var globalScaleY = 1.0f
+
+        when (currentScalingMode) {
+            ScalingMode.STRETCH -> {
+                // Stretch: Force fit the rotated box to the screen
+                globalScaleX = scaleRatioX
+                globalScaleY = scaleRatioY
+            }
+            ScalingMode.FILL -> {
+                // Fill: Zoom to cover (Max)
+                val maxScale = max(scaleRatioX, scaleRatioY)
+                globalScaleX = maxScale
+                globalScaleY = maxScale
+            }
+            ScalingMode.FIT -> {
+                // Fit: Zoom to fit inside (Min)
+                val minScale = min(scaleRatioX, scaleRatioY)
+                globalScaleX = minScale
+                globalScaleY = minScale
+            }
         }
 
-        // Aspect Ratio Correction (The "De-Squush" Phase)
-        // Give the video its correct physical width relative to height (1.0)
-        Matrix.scaleM(mvpMatrix, 0, videoRatio, 1f, 1f)
+        // Apply User Zoom
+        globalScaleX *= userZoom
+        globalScaleY *= userZoom
 
-        // Normalize against the screen's aspect ratio
-        // This ensures a square object actually looks square on the device screen
-        Matrix.scaleM(mvpMatrix, 0, 1f/screenRatio, 1f, 1f)
+        // 4. BUILD MODEL MATRIX
+        Matrix.setIdentityM(viewMatrix, 0)
 
-        // Automatic Scaling (Fit/Fill)
-        // We calculate how much we need to scale X and Y to match the screen boundaries.
-        // Our "Object" width is videoRatio. Screen width is screenRatio.
-        val scaleX = screenRatio / videoRatio
-        val scaleY = 1.0f // Vertical is already normalized to 1.0 vs 1.0
+        // Translate
+        val transX = userTranslateX * (screenWidth / 2f)
+        val transY = userTranslateY * (screenHeight / 2f)
+        Matrix.translateM(viewMatrix, 0, transX, transY, 0f)
 
-        var autoScale = 1.0f
+        // Scale Global (Fit/Stretch)
+        Matrix.scaleM(viewMatrix, 0, globalScaleX, globalScaleY, 1f)
 
-        if (currentScalingMode == ScalingMode.FILL) {
-            // FILL: maximizing scale so the image COVERS the screen (Crop)
-            autoScale = max(scaleX, scaleY)
-        } else {
-            // FIT: minimizing scale so the image FITS INSIDE the screen (Letterbox)
-            autoScale = min(scaleX, scaleY)
-        }
+        // Rotate
+        Matrix.rotateM(viewMatrix, 0, rotation, 0f, 0f, 1f)
 
-        // Apply the auto-fit factor
-        Matrix.scaleM(mvpMatrix, 0, autoScale, autoScale, 1f)
+        // Scale Base (Video Size)
+        val baseScaleX = videoWidth / 2f
+        val baseScaleY = videoHeight / 2f
+        Matrix.scaleM(viewMatrix, 0, baseScaleX, baseScaleY, 1f)
 
-        Log.d(tag, "Matrix Update: Mode=$currentScalingMode, VideoRatio=$videoRatio, ScreenRatio=$screenRatio, FinalScale=$autoScale")
+        // 5. COMBINE
+        Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, viewMatrix, 0)
     }
-
 
     private fun initGL(holder: SurfaceHolder) {
         egl = EGLContext.getEGL() as EGL10

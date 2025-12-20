@@ -52,5 +52,8 @@
     <string name="zoom">Zoom</string>
     <string name="brightness">Brightness</string>
     <string name="reset">Reset</string>
+    <string name="rotation">Rotation</string>
+
+
 
 </resources>
