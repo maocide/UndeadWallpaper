@@ -334,9 +334,6 @@ class SettingsFragment : Fragment() {
             })
         }
 
-
-
-
         // Playback Mode
         binding.playbackModeGroup.setOnCheckedStateChangeListener { _, checkedIds ->
             // If nothing is selected, skip
@@ -457,7 +454,7 @@ class SettingsFragment : Fragment() {
                 Log.d(tag, "Permission '$permission' already granted. Opening picker.")
                 openFilePicker()
             }
-            // Optional: If we want to show a popup explaining *why* we need the permission.
+            // If we want to show a popup explaining why we need the permission.
             // For now, we'll just request it directly.
             shouldShowRequestPermissionRationale(permission) -> {
                 Log.d(tag, "Showing rationale for permission request.")
@@ -502,8 +499,23 @@ class SettingsFragment : Fragment() {
             contentResolver.takePersistableUriPermission(uri, takeFlags)
         } catch (e: SecurityException) {
             Log.e(tag, "Failed to take persistable URI permission for $uri", e)
-            Toast.makeText(context, "Failed to get permission for the selected file.", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, getString(R.string.error_permission_failed), Toast.LENGTH_LONG).show()
             return
+        }
+
+        try {
+            // Warn for very large videos, might exceed video card VRAM
+            val retriever = MediaMetadataRetriever()
+            retriever.setDataSource(context, uri)
+            val width = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
+            val height = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 0
+
+            // Safety Check: 4K Video (roughly 3840x2160 = 8.2 million pixels)
+            if (width * height > 4000 * 2000) {
+                Toast.makeText(context, getString(R.string.warning_4k_video), Toast.LENGTH_LONG).show()
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to get video dimensions for $uri", e)
         }
 
 
@@ -518,7 +530,7 @@ class SettingsFragment : Fragment() {
                 updateVideoSource(savedFileUri, false) // Centralized update logic
             } else {
                 Log.e(tag, "Failed to copy file from URI: $uri")
-                Toast.makeText(context, "Failed to copy video file.", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, getString(R.string.error_copy_failed), Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -541,7 +553,7 @@ class SettingsFragment : Fragment() {
             else it.setVolume(0f, 0f)
         }
         binding.videoPreview.setOnErrorListener { _, _, _ ->
-            Toast.makeText(context, "Cannot play this video file.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, getString(R.string.error_cannot_play_video), Toast.LENGTH_SHORT).show()
             true
         }
     }
@@ -592,6 +604,16 @@ class SettingsFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        // Ensure we don't leak the preview player
+        binding.videoPreview.stopPlayback()
         _binding = null
     }
+
+    override fun onPause() {
+        super.onPause()
+        // Aggressively release resources when the settings screen is not active
+        // This frees up the decoder for the actual wallpaper service
+        binding.videoPreview.suspend()
+    }
+
 }

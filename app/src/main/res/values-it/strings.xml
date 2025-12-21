@@ -43,5 +43,11 @@
     <string name="reset">Ripristina</string>
     <string name="rotation">Rotazione</string>
 
+    <!-- Error and Warning Messages -->
+    <string name="error_permission_failed">Impossibile ottenere l\'autorizzazione per il file selezionato.</string>
+    <string name="warning_4k_video">Attenzione: i video 4K potrebbero causare crash o lag su alcuni dispositivi.</string>
+    <string name="error_copy_failed">Impossibile copiare il file video.</string>
+    <string name="error_cannot_play_video">Impossibile riprodurre questo file video.</string>
+
 
 </resources>

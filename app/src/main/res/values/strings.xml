@@ -54,6 +54,12 @@
     <string name="reset">Reset</string>
     <string name="rotation">Rotation</string>
 
+    <!-- Error and Warning Messages -->
+    <string name="error_permission_failed">Failed to get permission for the selected file.</string>
+    <string name="warning_4k_video">Warning: 4K videos may crash or lag on some devices.</string>
+    <string name="error_copy_failed">Failed to copy video file.</string>
+    <string name="error_cannot_play_video">Cannot play this video file.</string>
+
 
 
 </resources>

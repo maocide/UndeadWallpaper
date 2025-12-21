@@ -43,5 +43,10 @@
     <string name="reset">リセット</string>
     <string name="rotation">回転</string>
 
+    <!-- Error and Warning Messages -->
+    <string name="error_permission_failed">選択したファイルの権限を取得できませんでした。</string>
+    <string name="warning_4k_video">警告: 4K動画は一部のデバイスでクラッシュまたは遅延する可能性があります。</string>
+    <string name="error_copy_failed">ビデオファイルのコピーに失敗しました。</string>
+    <string name="error_cannot_play_video">このビデオファイルは再生できません。</string>
 
 </resources>

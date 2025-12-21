@@ -19,6 +19,7 @@ import java.nio.ByteOrder
 import java.nio.FloatBuffer
 import java.util.concurrent.Executors
 import javax.microedition.khronos.egl.EGL10
+import javax.microedition.khronos.egl.EGL11
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.egl.EGLContext
 import javax.microedition.khronos.egl.EGLDisplay
@@ -149,10 +150,6 @@ class GLVideoRenderer(private val context: Context) {
         }
     }
 
-    fun onSurfaceDestroyed() {
-        // Handled by release()
-    }
-
     fun release() {
         Log.i(tag, "Renderer Release Signal Received.")
         renderSignal.close()
@@ -213,29 +210,69 @@ class GLVideoRenderer(private val context: Context) {
     }
 
     private suspend fun renderLoop() {
+        // Tracks the need to reset render state
+        var needsReinit = false
+
         try {
             for (signal in renderSignal) {
-                if (egl == null || eglDisplay == EGL10.EGL_NO_DISPLAY || eglContext == EGL10.EGL_NO_CONTEXT) continue
-                if (surfaceTexture == null) continue
-
-                try {
-                    surfaceTexture?.updateTexImage()
-                    surfaceTexture?.getTransformMatrix(stMatrix)
-                } catch (e: Exception) {
+                // Null Checks
+                if (egl == null || eglDisplay == EGL10.EGL_NO_DISPLAY || eglContext == EGL10.EGL_NO_CONTEXT) {
                     continue
                 }
 
-                // CHECK FOR UPDATES HERE (On the GL Thread)
+                if (surfaceTexture == null) continue
+
+                // Re-initialization Check... Recover from error
+                if (needsReinit) {
+                    Log.w(tag, "Attempting to recover GL Context...")
+                    // Might need to call initGL logic here or just
+                    // continue and hope the surface is valid.
+                    // Usually, just skipping the frame can be safe...
+                    needsReinit = false
+                }
+
+                try {
+                    // Update texture MUST happen on the thread with the EGL Context
+                    surfaceTexture?.updateTexImage()
+                    surfaceTexture?.getTransformMatrix(stMatrix)
+                } catch (e: Exception) {
+                    // This often happens when the video player is stopped/released
+                    // but a frame signal was already in the pipe. Safe to ignore.
+                    Log.w(tag, "SurfaceTexture update failed (Context lost?): ${e.message}")
+                    continue
+                }
+
+                // CHECK FOR VIEWPORT UPDATES
                 if (viewportChanged) {
                     GLES20.glViewport(0, 0, viewportWidth, viewportHeight)
-                    updateMatrix() // Now safe to calculate!
+                    updateMatrix()
                     viewportChanged = false
                 }
 
-                drawFrame()
-                egl?.eglSwapBuffers(eglDisplay, eglSurface)
+                // The Draw Call
+                try {
+                    drawFrame()
+                    val swapResult = egl?.eglSwapBuffers(eglDisplay, eglSurface)
+
+                    // Check if Swap failed (Context Lost)
+                    if (swapResult == false) {
+                        val error = egl?.eglGetError()
+                        if (error == EGL11.EGL_CONTEXT_LOST) {
+                            Log.e(tag, "GL Context Lost! triggering re-init.")
+                            needsReinit = true
+                            // You could trigger a full releaseGL() -> initGL() here if you want to be fancy
+                        } else {
+                            Log.w(tag, "eglSwapBuffers failed: $error")
+                        }
+                    }
+                } catch (t: Throwable) {
+                    // CATCH EVERYTHING here.
+                    // Prevents a render error from crashing the whole service
+                    Log.e(tag, "Critical Render Error: ${t.message}")
+                }
             }
         } finally {
+            Log.i(tag, "Render loop finished. Cleaning up GL on renderer thread.")
             releaseGL()
         }
     }
