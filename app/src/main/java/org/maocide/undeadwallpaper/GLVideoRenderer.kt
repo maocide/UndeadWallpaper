@@ -393,10 +393,13 @@ class GLVideoRenderer(private val context: Context) {
             EGL10.EGL_RED_SIZE, 8,
             EGL10.EGL_GREEN_SIZE, 8,
             EGL10.EGL_BLUE_SIZE, 8,
-            EGL10.EGL_ALPHA_SIZE, 8,
-            EGL10.EGL_RENDERABLE_TYPE, 4,
+            EGL10.EGL_ALPHA_SIZE, 0, // No Alpha (Opaque)
+            EGL10.EGL_DEPTH_SIZE, 0, // No Depth Buffer (Saves VRAM)
+            EGL10.EGL_STENCIL_SIZE, 0, // No Stencil
+            EGL10.EGL_RENDERABLE_TYPE, 4, // EGL_OPENGL_ES2_BIT
             EGL10.EGL_NONE
         )
+
         val configs = arrayOfNulls<EGLConfig>(1)
         val numConfig = IntArray(1)
         egl!!.eglChooseConfig(eglDisplay, configSpec, configs, 1, numConfig)
