@@ -14,6 +14,10 @@ This isn't just a clever pun on "live" wallpaper. The name **UndeadWallpaper** i
 
 ## Features ✨
 
+*   **The New Engine (OpenGL Power):** We ripped out the old guts and replaced them with a custom OpenGL pipeline. It's smoother, faster, and lets you do things standard Android wallpapers can't.
+*   **God-Mode Controls:** Don't just set a video; *own* it. Scale, stretch, zoom, rotate, and position your wallpaper exactly how you want it. Too dark? Crank the brightness. It's your screen, do what you want.
+*   **One-Shot Mode:** Want a "Live Photo" vibe? Set your video to play once and freeze on the final frame. Perfect for cinematic intros.
+*   **Zombillie is Here:** Fresh install? We got you covered with a default Zombillie animation so your screen isn't naked while you look for your own clips.
 *   **Buttery-Smooth Looping:** Powered by ExoPlayer, your video loops will be so seamless, you'll forget where they even begin (o˘◡˘o).
 *   **Unleash Your Own Videos:** No pre-packaged crap. Grab any video straight from your phone's storage and make it your backdrop.
 *   **Quick-Draw Recents:** A handy list of your last-used videos, so you can swap vibes on the fly.
@@ -23,7 +27,8 @@ This isn't just a clever pun on "live" wallpaper. The name **UndeadWallpaper** i
 ## Getting Started (It's scary simple)
 
 1.  **Pick Your Poison:** Tap the "Pick Video" button and choose your masterpiece.
-2.  **Smash the Button:** Like what you see in the preview? Hit that floating button and bring your screen to glorious un-life.
+2.  **Tweak It:** Use the new advanced settings to fit, fill, or stretch your video. Zoom in, move it around, make it perfect.
+3.  **Smash the Button:** Like what you see in the preview? Hit that floating button and bring your screen to glorious un-life.
 
 ## Join the Horde! (Contribute & Connect)
 
