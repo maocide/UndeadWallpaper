@@ -2,6 +2,7 @@ package org.maocide.undeadwallpaper
 
 import android.content.Context
 import android.graphics.SurfaceTexture
+import android.opengl.EGLExt.EGL_RECORDABLE_ANDROID
 import android.opengl.GLES20
 import android.opengl.Matrix
 import android.util.Log
@@ -159,20 +160,20 @@ class GLVideoRenderer(private val context: Context) {
     }
 
     fun onSurfaceChanged(width: Int, height: Int) {
-        // 1. Store Viewport (The Source of Truth for Orientation)
+        // Store Viewport (The Source of Truth for Orientation)
         viewportWidth = width
         viewportHeight = height
 
-        // 2. Get Physical Metrics
+        // Get Physical Metrics
         val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val display = windowManager.defaultDisplay
         val metrics = android.util.DisplayMetrics()
         display.getRealMetrics(metrics)
 
-        // 3. ORIENTATION CORRECTION 🛡️
+        // ORIENTATION CORRECTION
         // Sometimes 'metrics' reports Portrait dimensions even if the Surface is Landscape
         // (common on Tablets or locked Launchers).
-        // We trust the Viewport's shape. If they disagree, we SWAP the metrics.
+        // Trust the Viewport's shape. If they disagree, swap the metrics.
 
         val isViewportLandscape = width > height
         val isMetricsLandscape = metrics.widthPixels > metrics.heightPixels
@@ -187,7 +188,7 @@ class GLVideoRenderer(private val context: Context) {
             screenHeight = metrics.heightPixels
         }
 
-        // 4. Signal Render Thread
+        // Signal Render Thread
         viewportChanged = true
         renderSignal.trySend(Unit)
 
@@ -225,9 +226,9 @@ class GLVideoRenderer(private val context: Context) {
                 // Re-initialization Check... Recover from error
                 if (needsReinit) {
                     Log.w(tag, "Attempting to recover GL Context...")
-                    // Might need to call initGL logic here or just
-                    // continue and hope the surface is valid.
-                    // Usually, just skipping the frame can be safe...
+                    /* Might need to call initGL logic here or just
+                    continue and hope the surface is valid.
+                    usually, just skipping the frame can be safe... */
                     needsReinit = false
                 }
 
@@ -260,7 +261,7 @@ class GLVideoRenderer(private val context: Context) {
                         if (error == EGL11.EGL_CONTEXT_LOST) {
                             Log.e(tag, "GL Context Lost! triggering re-init.")
                             needsReinit = true
-                            // You could trigger a full releaseGL() -> initGL() here if you want to be fancy
+                            // Possibly releaseGL() -> initGL() here to make a full restart
                         } else {
                             Log.w(tag, "eglSwapBuffers failed: $error")
                         }
@@ -301,23 +302,21 @@ class GLVideoRenderer(private val context: Context) {
         }
     }
 
-    // The "Pixel Perfect" Math
-    // Since we now run this on the correct thread, glViewport actually works,
-    // so the logic will finally align correctly.
+    // The Matrix calculation
     private fun updateMatrix() {
         if (screenWidth == 0 || screenHeight == 0 || viewportWidth == 0 || viewportHeight == 0) {
             Matrix.setIdentityM(mvpMatrix, 0)
             return
         }
 
-        // 1. SETUP PIXEL SPACE (Ortho)
+        // SETUP PIXEL SPACE (Ortho matrix)
         val left = -viewportWidth / 2f
         val right = viewportWidth / 2f
         val bottom = -viewportHeight / 2f
         val top = viewportHeight / 2f
         Matrix.orthoM(projectionMatrix, 0, left, right, bottom, top, -1f, 1f)
 
-        // 2. CALCULATE GEOMETRY (Rotated Bounding Box)
+        // CALCULATE GEOMETRY (Rotated Bounding Box)
         val rotation = userRotation * -1f
         val angleRad = Math.toRadians(rotation.toDouble())
         val sinVal = abs(sin(angleRad)).toFloat()
@@ -331,7 +330,7 @@ class GLVideoRenderer(private val context: Context) {
         val scaleRatioX = screenWidth.toFloat() / currentWidthPx
         val scaleRatioY = screenHeight.toFloat() / currentHeightPx
 
-        // 3. DETERMINE SCALING FACTORS
+        // DETERMINE SCALING FACTORS
         var globalScaleX = 1.0f
         var globalScaleY = 1.0f
 
@@ -355,11 +354,11 @@ class GLVideoRenderer(private val context: Context) {
             }
         }
 
-        // Apply User Zoom
+        // Apply Zoom
         globalScaleX *= userZoom
         globalScaleY *= userZoom
 
-        // 4. BUILD MODEL MATRIX
+        // BUILD MODEL MATRIX
         Matrix.setIdentityM(viewMatrix, 0)
 
         // Translate
@@ -378,7 +377,7 @@ class GLVideoRenderer(private val context: Context) {
         val baseScaleY = videoHeight / 2f
         Matrix.scaleM(viewMatrix, 0, baseScaleX, baseScaleY, 1f)
 
-        // 5. COMBINE
+        // COMBINE
         Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, viewMatrix, 0)
     }
 
@@ -393,10 +392,11 @@ class GLVideoRenderer(private val context: Context) {
             EGL10.EGL_RED_SIZE, 8,
             EGL10.EGL_GREEN_SIZE, 8,
             EGL10.EGL_BLUE_SIZE, 8,
-            EGL10.EGL_ALPHA_SIZE, 0, // No Alpha (Opaque)
+            EGL10.EGL_ALPHA_SIZE, 8, // MUST stay 8, because screen record function will freeze on android with 0
             EGL10.EGL_DEPTH_SIZE, 0, // No Depth Buffer (Saves VRAM)
             EGL10.EGL_STENCIL_SIZE, 0, // No Stencil
             EGL10.EGL_RENDERABLE_TYPE, 4, // EGL_OPENGL_ES2_BIT
+            EGL_RECORDABLE_ANDROID, 1, // Required to let system record the surface
             EGL10.EGL_NONE
         )
 
