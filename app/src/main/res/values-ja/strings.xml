@@ -49,4 +49,9 @@
     <string name="error_copy_failed">ビデオファイルのコピーに失敗しました。</string>
     <string name="error_cannot_play_video">このビデオファイルは再生できません。</string>
 
+    <!-- Status Bar Icon Color Settings -->
+    <string name="status_bar_icons_label">ステータスバーのアイコン</string>
+    <string name="status_bar_auto">自動</string>
+    <string name="status_bar_white_icons">白</string>
+    <string name="status_bar_black_icons">黒</string>
 </resources>

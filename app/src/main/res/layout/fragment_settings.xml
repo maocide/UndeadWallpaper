@@ -113,6 +113,47 @@
 
                 </com.google.android.material.chip.ChipGroup>
 
+                <!-- Status Bar color -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="@string/status_bar_icons_label"
+                    android:textAppearance="?attr/textAppearanceBody1" />
+
+                <com.google.android.material.chip.ChipGroup
+                    android:id="@+id/status_bar_color_group"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    app:singleSelection="true"
+                    app:selectionRequired="true"
+                    app:chipSpacingHorizontal="8dp">
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/status_bar_auto"
+                        style="@style/Widget.MaterialComponents.Chip.Choice"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:checked="true"
+                        android:text="@string/status_bar_auto" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/status_bar_light"
+                        style="@style/Widget.MaterialComponents.Chip.Choice"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/status_bar_white_icons" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/status_bar_dark"
+                        style="@style/Widget.MaterialComponents.Chip.Choice"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/status_bar_black_icons" />
+
+                </com.google.android.material.chip.ChipGroup>
+
                 <!-- Audio Toggle -->
                 <com.google.android.material.switchmaterial.SwitchMaterial
                     android:id="@+id/switch_audio"

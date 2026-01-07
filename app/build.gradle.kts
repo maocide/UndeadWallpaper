@@ -5,14 +5,14 @@ plugins {
 
 android {
     namespace = "org.maocide.undeadwallpaper"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "org.maocide.undeadwallpaper"
         minSdk = 28
-        targetSdk = 35
-        versionCode = 7
-        versionName = "1.1.0"
+        targetSdk = 36
+        versionCode = 8
+        versionName = "1.1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

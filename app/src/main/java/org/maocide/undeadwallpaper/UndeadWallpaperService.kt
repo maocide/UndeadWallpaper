@@ -1,10 +1,12 @@
 package org.maocide.undeadwallpaper
 
+import android.app.WallpaperColors
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
+import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -12,6 +14,7 @@ import android.service.wallpaper.WallpaperService
 import android.util.Log
 import android.view.SurfaceHolder
 import androidx.annotation.OptIn
+import androidx.annotation.RequiresApi
 import androidx.core.net.toUri
 import androidx.media3.common.C
 import androidx.media3.common.C.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
@@ -27,6 +30,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.maocide.undeadwallpaper.model.PlaybackMode
 import org.maocide.undeadwallpaper.model.ScalingMode
+import org.maocide.undeadwallpaper.model.StatusBarColor
+import kotlin.math.log
 
 class UndeadWallpaperService : WallpaperService() {
 
@@ -34,7 +39,9 @@ class UndeadWallpaperService : WallpaperService() {
     companion object {
         const val ACTION_VIDEO_URI_CHANGED = "org.maocide.undeadwallpaper.VIDEO_URI_CHANGED"
         const val ACTION_PLAYBACK_MODE_CHANGED = "org.maocide.undeadwallpaper.ACTION_PLAYBACK_MODE_CHANGED"
+        // for testing trimming
         const val ACTION_TRIM_TIMES_CHANGED = "org.maocide.undeadwallpaper.TRIM_TIMES_CHANGED"
+        const val ACTION_STATUS_BAR_COLOR_CHANGED = "org.maocide.undeadwallpaper.STATUS_BAR_COLOR_CHANGED"
     }
 
     override fun onCreateEngine(): Engine {
@@ -60,12 +67,7 @@ class UndeadWallpaperService : WallpaperService() {
         private var loadedVideoUriString = ""
         private var hasPlaybackCompleted = false
 
-        private var renderer: GLVideoRenderer? = null // <--- NEW RENDERER
-
-
-
-
-
+        private var renderer: GLVideoRenderer? = null
 
 
         // The receiver that listens for our signal
@@ -73,18 +75,29 @@ class UndeadWallpaperService : WallpaperService() {
             @OptIn(UnstableApi::class)
             override fun onReceive(context: Context?, intent: Intent?) {
                 when (intent?.action) {
+                    // Will be called by changing video
                     ACTION_VIDEO_URI_CHANGED -> {
                         Log.i(TAG, "Broadcast received: Video uri changed, full re-initialization requested.")
                         playheadTime = 0L
-                        initializePlayer()
+                        initializePlayer() // force Reinit
                     }
 
+                    // Will be called by changing scaling, playback mode, all things requiring a reinit
                     ACTION_PLAYBACK_MODE_CHANGED -> {
                         Log.i(TAG, "Broadcast received: Playback mode change, full re-initialization requested.")
                         playheadTime = 0L
-                        initializePlayer()
+                        initializePlayer() // force Reinit
+                    }
+
+                    ACTION_STATUS_BAR_COLOR_CHANGED -> {
+                        Log.i(TAG, "Broadcast received: Color changed -> Update just sys colors.")
+                        // Only notify the system, DO NOT restart the player
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            notifyColorsChanged()
+                        }
                     }
                 }
+
             }
         }
 
@@ -108,6 +121,7 @@ class UndeadWallpaperService : WallpaperService() {
                 releasePlayer()
             }
 
+            // Get a surface
             val holder = surfaceHolder
             if (holder == null) {
                 Log.w(TAG, "Cannot initialize player: surface is not ready.")
@@ -119,11 +133,17 @@ class UndeadWallpaperService : WallpaperService() {
             val loadControl = DefaultLoadControl.Builder()
                 .build()
 
+            // Load prefs
             val preferenceManager = PreferencesManager(baseContext)
             isAudioEnabled = preferenceManager.isAudioEnabled()
             currentPlaybackMode = preferenceManager.getPlaybackMode()
 
             hasPlaybackCompleted = false
+
+            // Status bar color refresh
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                notifyColorsChanged()
+            }
 
             val player = ExoPlayer.Builder(baseContext)
                 .setLoadControl(loadControl)
@@ -144,10 +164,12 @@ class UndeadWallpaperService : WallpaperService() {
                     val mediaSource = ProgressiveMediaSource.Factory(DefaultDataSource.Factory(baseContext))
                         .createMediaSource(mediaItem)
 
-                    // Set the clipped source and configure proper looping.
+                    // Set source and configure proper looping.
                     setMediaSource(mediaSource)
+
                     volume = if (isAudioEnabled) 1f else 0f
 
+                    // Looping or One shot mode
                     if(currentPlaybackMode == PlaybackMode.LOOP)
                         repeatMode = Player.REPEAT_MODE_ONE // Use built-in looping
                     else
@@ -155,9 +177,10 @@ class UndeadWallpaperService : WallpaperService() {
 
                     Log.d(TAG, "repeatMode: $repeatMode")
 
-                    // Send all values to renderer
+                    // Send all values to renderer updating it, will be used for matrix calc.
                     refreshRenderer()
 
+                    // Listen for size changes
                     addListener(object : Player.Listener {
                         override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
                             super.onVideoSizeChanged(videoSize)
@@ -168,13 +191,13 @@ class UndeadWallpaperService : WallpaperService() {
                             // refresh all user values to renderer
                             refreshRenderer()
 
-                            // Sanity check for 0x0 size
+                            // Check for 0x0 size
                             if (videoSize.width == 0 || videoSize.height == 0) {
                                 Log.w(TAG, "Ignoring invalid 0x0 video size change.")
                                 return
                             }
 
-                            // Only run this logic if we haven't already set the scaling mode for this video
+                            // Old code for exoplayer surface
                             /* should be only needed when using exoplayer surface
                             if (!isScalingModeSet) {
                                 Log.i(TAG, "Valid video size detected: ${videoSize.width}x${videoSize.height}. Setting scaling mode ONCE.")
@@ -191,10 +214,10 @@ class UndeadWallpaperService : WallpaperService() {
 
                                 isScalingModeSet = true // SET THE FLAG SO THIS DOESN'T RUN AGAIN
                             }
-
                              */
                         }
 
+                        // Listener for status change
                         override fun onPlaybackStateChanged(playbackState: Int) {
                             super.onPlaybackStateChanged(playbackState)
                             // detecting one shot playback and pausing
@@ -356,7 +379,6 @@ class UndeadWallpaperService : WallpaperService() {
             } else {
                 mediaPlayer?.pause()
                 mediaPlayer?.playWhenReady = false
-
             }
         }
 
@@ -367,15 +389,59 @@ class UndeadWallpaperService : WallpaperService() {
             val intentFilter = IntentFilter().apply {
                 addAction(ACTION_VIDEO_URI_CHANGED)
                 addAction(ACTION_PLAYBACK_MODE_CHANGED)
+                addAction(ACTION_STATUS_BAR_COLOR_CHANGED)
             }
-            // Using `registerReceiver` with the `RECEIVER_NOT_EXPORTED` flag is the
-            // modern, secure way for Android 13+
+            // Using registerReceiver with the RECEIVER_NOT_EXPORTED flag is the way...
+            // more modern, secure for Android 13+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 registerReceiver(videoChangeReceiver, intentFilter, RECEIVER_NOT_EXPORTED)
             } else {
                 @Suppress("UnspecifiedRegisterReceiverFlag") // Flag not needed for older APIs
                 registerReceiver(videoChangeReceiver, intentFilter)
             }
+        }
+
+
+        override fun onComputeColors(): WallpaperColors? {
+            val preferenceManager = PreferencesManager(baseContext)
+            val mode = preferenceManager.getStatusBarColor()
+
+            //Log.d(TAG, "onComputeColors: $mode")
+
+            // If Auto or unknown, let system decide
+            if (mode == StatusBarColor.AUTO) return null
+
+            // Android 12+ (API 31): Use the official "Dark Text" Hint
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                return when (mode) {
+                    StatusBarColor.LIGHT -> {
+                        // Required WHITE Icons (Light Text).
+                        // Trick the system by saying the wallpaper is BLACK.
+                        WallpaperColors(Color.valueOf(Color.BLACK), null, null, 0)
+                    }
+                    StatusBarColor.DARK -> {
+                        // Required BLACK Icons (Dark Text).
+                        // Trick the system by saying the wallpaper is WHITE.
+                        WallpaperColors(
+                            Color.valueOf(Color.WHITE),
+                            null,
+                            null,
+                            WallpaperColors.HINT_SUPPORTS_DARK_TEXT // HINT_SUPPORTS_DARK_TEXT is the key flag here.
+                        )
+                    }
+                    else -> {
+                        // Auto: Return null to let the system decide
+                        null
+                    }
+                }
+            }
+
+            // Android 8.1 to 11 (API 27-30): Contrast Trick
+            // Older Androids look at the primary color
+            // If we return White, it sets Dark Icons. If we return Black, it sets Light Icons
+            // The 3-argument constructor is safe for API 27+
+            val color = if (mode == StatusBarColor.LIGHT) Color.BLACK else Color.WHITE
+            return WallpaperColors(Color.valueOf(color), null, null)
         }
 
         @Deprecated("Deprecated in Java") // This is needed for older Android versions

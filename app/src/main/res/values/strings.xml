@@ -60,6 +60,12 @@
     <string name="error_copy_failed">Failed to copy video file.</string>
     <string name="error_cannot_play_video">Cannot play this video file.</string>
 
+    <!-- Status Bar Icon Color Settings -->
+    <string name="status_bar_icons_label">Status Bar Icons</string>
+    <string name="status_bar_auto">Auto</string>
+    <string name="status_bar_white_icons">White</string>
+    <string name="status_bar_black_icons">Black</string>
+
 
 
 </resources>

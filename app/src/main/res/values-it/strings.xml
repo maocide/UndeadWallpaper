@@ -49,5 +49,10 @@
     <string name="error_copy_failed">Impossibile copiare il file video.</string>
     <string name="error_cannot_play_video">Impossibile riprodurre questo file video.</string>
 
+    <!-- Status Bar Icon Color Settings -->
+    <string name="status_bar_icons_label">Icone Barra di Stato</string>
+    <string name="status_bar_auto">Automatico</string>
+    <string name="status_bar_white_icons">Bianche</string>
+    <string name="status_bar_black_icons">Nere</string>
 
 </resources>

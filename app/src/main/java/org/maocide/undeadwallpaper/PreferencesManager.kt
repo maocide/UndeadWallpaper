@@ -3,9 +3,9 @@ package org.maocide.undeadwallpaper
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
-import androidx.core.net.toUri
 import org.maocide.undeadwallpaper.model.PlaybackMode
 import org.maocide.undeadwallpaper.model.ScalingMode
+import org.maocide.undeadwallpaper.model.StatusBarColor
 
 /**
  * Manages SharedPreferences for the application.
@@ -31,6 +31,8 @@ class PreferencesManager(context: Context) {
         private const val KEY_ZOOM = "video_zoom"
         private const val KEY_BRIGHTNESS = "video_brightness"
         private const val KEY_ROTATION = "video_rotation"
+
+        private const val KEY_STATUSBAR_COLOR = "statusbar_color"
     }
 
     /**
@@ -175,7 +177,6 @@ class PreferencesManager(context: Context) {
     }
 
     fun getZoom(): Float {
-        // Default to 1.0 if not set
         return sharedPrefs.getFloat(KEY_ZOOM, 1.0f)
     }
 
@@ -188,12 +189,11 @@ class PreferencesManager(context: Context) {
     }
 
     fun getRotation(): Float {
-        // Default to 0.0 if not set
         return sharedPrefs.getFloat(KEY_ROTATION, 0.0f)
     }
 
     /**
-     * Saves the brightness multiplier.
+     * Saves the brightness level.
      * Default is 1.0f (Normal Brightness).
      */
     fun saveBrightness(brightness: Float) {
@@ -203,6 +203,19 @@ class PreferencesManager(context: Context) {
     fun getBrightness(): Float {
         // Default to 1.0 if not set
         return sharedPrefs.getFloat(KEY_BRIGHTNESS, 1.0f)
+    }
+
+    /**
+     * Saves the status bar color.
+     * Default is 0, Light is 1, Dark is 2
+     */
+    fun saveStatusBarColor(color: StatusBarColor) {
+        sharedPrefs.edit { putInt(KEY_STATUSBAR_COLOR, color.ordinal) }
+    }
+
+    fun getStatusBarColor(): StatusBarColor {
+        val storedOrdinal = sharedPrefs.getInt(KEY_STATUSBAR_COLOR, StatusBarColor.AUTO.ordinal)
+        return StatusBarColor.entries.getOrElse(storedOrdinal) { StatusBarColor.AUTO }
     }
 
 

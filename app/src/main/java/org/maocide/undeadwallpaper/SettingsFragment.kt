@@ -13,13 +13,9 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ImageView
-import android.widget.LinearLayout
 import android.widget.MediaController
-import android.widget.RadioGroup
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.cardview.widget.CardView
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.fragment.app.Fragment
@@ -36,6 +32,7 @@ import org.maocide.undeadwallpaper.model.PlaybackMode
 import org.maocide.undeadwallpaper.model.ScalingMode
 import androidx.core.view.isVisible
 import com.google.android.material.slider.Slider
+import org.maocide.undeadwallpaper.model.StatusBarColor
 import kotlin.math.roundToInt
 
 /**
@@ -280,6 +277,13 @@ class SettingsFragment : Fragment() {
             ScalingMode.STRETCH -> binding.scalingModeGroup.check(binding.scalingModeStretch.id)
         }
 
+        // StatusBar Color
+        when (preferencesManager.getStatusBarColor()) {
+            StatusBarColor.AUTO -> binding.statusBarColorGroup.check(binding.statusBarAuto.id)
+            StatusBarColor.DARK -> binding.statusBarColorGroup.check(binding.statusBarDark.id)
+            StatusBarColor.LIGHT -> binding.statusBarColorGroup.check(binding.statusBarLight.id)
+        }
+
         // Load sliders for advanced (using safe loading)
         binding.positionXSlider.setValueSafe(preferencesManager.getPositionX())
         binding.positionYSlider.setValueSafe(preferencesManager.getPositionY())
@@ -308,7 +312,7 @@ class SettingsFragment : Fragment() {
 
 
     /**
-     * Pure logic for what happens on clicks.
+     * Sets up all the listeners for controls.
      */
     private fun setupListeners() {
         // Helper to broadcast changes
@@ -348,6 +352,26 @@ class SettingsFragment : Fragment() {
 
             preferencesManager.setPlaybackMode(newMode)
             notifySettingsChanged()
+        }
+
+        // StatusBar Color
+        binding.statusBarColorGroup.setOnCheckedStateChangeListener { group, checkedIds ->
+            if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
+
+            val checkedId = checkedIds[0] // Get the single selected ID
+
+            val newMode = when (checkedId) {
+                binding.statusBarDark.id -> StatusBarColor.DARK
+                binding.statusBarLight.id -> StatusBarColor.LIGHT
+                else -> StatusBarColor.AUTO
+            }
+            preferencesManager.saveStatusBarColor(newMode)
+
+            // Specific intent sent to not reload video
+            val intent = Intent(UndeadWallpaperService.ACTION_STATUS_BAR_COLOR_CHANGED).apply {
+                setPackage(requireContext().packageName)
+            }
+            requireContext().applicationContext.sendBroadcast(intent)
         }
 
         // Audio Switch
