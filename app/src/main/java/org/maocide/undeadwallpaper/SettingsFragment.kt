@@ -51,6 +51,8 @@ class SettingsFragment : Fragment() {
     private var currentVideoDurationMs: Long = 0L
     private var previewMediaPlayer: MediaPlayer? = null
 
+    private var isUpdatingUi = false
+
     // Initialize the shared ViewModel
     private val sharedViewModel: SettingsViewModel by activityViewModels()
 
@@ -128,6 +130,14 @@ class SettingsFragment : Fragment() {
         // UI SETUP this first
         savedInstanceState?.let { restoreState(it) }
         setupRecyclerView()
+
+
+        // DISABLE VIEW STATE SAVING FOR SLIDERS, it might overwrite syncUiState
+        binding.positionXSlider.isSaveEnabled = false
+        binding.positionYSlider.isSaveEnabled = false
+        binding.zoomSlider.isSaveEnabled = false
+        binding.rotationSlider.isSaveEnabled = false
+        binding.brightnessSlider.isSaveEnabled = false
 
         // ASYNC TASKS (Data Loading)
         lifecycleScope.launch {
@@ -261,40 +271,49 @@ class SettingsFragment : Fragment() {
      * Also called by reset button listener after resetting values
      */
     private fun syncUiState() {
-        // Audio
-        binding.switchAudio.isChecked = preferencesManager.isAudioEnabled()
 
-        // Playback Mode
-        when (preferencesManager.getPlaybackMode()) {
-            PlaybackMode.LOOP -> binding.playbackModeGroup.check(binding.playbackModeLoop.id)
-            PlaybackMode.ONE_SHOT -> binding.playbackModeGroup.check(binding.playbackModeOneshot.id)
-        }
+        // SET to avoid overriding
+        isUpdatingUi = true
 
-        // Scaling Mode
-        when (preferencesManager.getScalingMode()) {
-            ScalingMode.FIT -> binding.scalingModeGroup.check(binding.scalingModeFit.id)
-            ScalingMode.FILL -> binding.scalingModeGroup.check(binding.scalingModeFill.id)
-            ScalingMode.STRETCH -> binding.scalingModeGroup.check(binding.scalingModeStretch.id)
-        }
+        try {
 
-        // StatusBar Color
-        when (preferencesManager.getStatusBarColor()) {
-            StatusBarColor.AUTO -> binding.statusBarColorGroup.check(binding.statusBarAuto.id)
-            StatusBarColor.DARK -> binding.statusBarColorGroup.check(binding.statusBarDark.id)
-            StatusBarColor.LIGHT -> binding.statusBarColorGroup.check(binding.statusBarLight.id)
-        }
+            // Audio
+            binding.switchAudio.isChecked = preferencesManager.isAudioEnabled()
 
-        // Load sliders for advanced (using safe loading)
-        binding.positionXSlider.setValueSafe(preferencesManager.getPositionX())
-        binding.positionYSlider.setValueSafe(preferencesManager.getPositionY())
-        binding.zoomSlider.setValueSafe(preferencesManager.getZoom())
-        binding.rotationSlider.setValueSafe(preferencesManager.getRotation())
-        binding.brightnessSlider.setValueSafe(preferencesManager.getBrightness())
+            // Playback Mode
+            when (preferencesManager.getPlaybackMode()) {
+                PlaybackMode.LOOP -> binding.playbackModeGroup.check(binding.playbackModeLoop.id)
+                PlaybackMode.ONE_SHOT -> binding.playbackModeGroup.check(binding.playbackModeOneshot.id)
+            }
 
-        // Load Video Preview and set the video as selected
-        preferencesManager.getVideoUri()?.let { uriString ->
-            //setupVideoPreview(uriString.toUri())
-            updateVideoSource(uriString.toUri(), false)
+            // Scaling Mode
+            when (preferencesManager.getScalingMode()) {
+                ScalingMode.FIT -> binding.scalingModeGroup.check(binding.scalingModeFit.id)
+                ScalingMode.FILL -> binding.scalingModeGroup.check(binding.scalingModeFill.id)
+                ScalingMode.STRETCH -> binding.scalingModeGroup.check(binding.scalingModeStretch.id)
+            }
+
+            // StatusBar Color
+            when (preferencesManager.getStatusBarColor()) {
+                StatusBarColor.AUTO -> binding.statusBarColorGroup.check(binding.statusBarAuto.id)
+                StatusBarColor.DARK -> binding.statusBarColorGroup.check(binding.statusBarDark.id)
+                StatusBarColor.LIGHT -> binding.statusBarColorGroup.check(binding.statusBarLight.id)
+            }
+
+            // Load sliders for advanced (using safe loading)
+            binding.positionXSlider.setValueSafe(preferencesManager.getPositionX())
+            binding.positionYSlider.setValueSafe(preferencesManager.getPositionY())
+            binding.zoomSlider.setValueSafe(preferencesManager.getZoom())
+            binding.rotationSlider.setValueSafe(preferencesManager.getRotation())
+            binding.brightnessSlider.setValueSafe(preferencesManager.getBrightness())
+
+            // Load Video Preview and set the video as selected
+            preferencesManager.getVideoUri()?.let { uriString ->
+                //setupVideoPreview(uriString.toUri())
+                updateVideoSource(uriString.toUri(), false)
+            }
+        } finally {
+            isUpdatingUi = false
         }
 
     }
@@ -331,6 +350,9 @@ class SettingsFragment : Fragment() {
                 }
 
                 override fun onStopTrackingTouch(slider: Slider) {
+                    // If is updating skip this event to not override
+                    if (isUpdatingUi) return
+
                     // Only save and broadcast when the user lifts their finger
                     saveAction(slider.value)
                     notifySettingsChanged()
