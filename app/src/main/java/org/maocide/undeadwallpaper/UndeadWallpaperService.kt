@@ -26,6 +26,7 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.SeekParameters
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import androidx.media3.exoplayer.upstream.DefaultAllocator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.maocide.undeadwallpaper.model.PlaybackMode
@@ -130,8 +131,6 @@ class UndeadWallpaperService : WallpaperService() {
 
             Log.i(TAG, "Initializing ExoPlayer...")
 
-            val loadControl = DefaultLoadControl.Builder()
-                .build()
 
             // Load prefs
             val preferenceManager = PreferencesManager(baseContext)
@@ -145,10 +144,28 @@ class UndeadWallpaperService : WallpaperService() {
                 notifyColorsChanged()
             }
 
+            // Define a 32MB Memory Cap
+            val targetBufferBytes = 32 * 1024 * 1024
+
+            // Configure the LoadControl
+            // Force the buffer duration defaults (50 is default for network streams)
+            val loadControl = DefaultLoadControl.Builder()
+                .setAllocator(DefaultAllocator(true, C.DEFAULT_BUFFER_SEGMENT_SIZE))
+                .setBufferDurationsMs(
+                    15_000, // Min buffer 15 // lowered from default 50
+                    30_000, // Max buffer 30
+                    2_500,  // Buffer to start playback
+                    5_000   // Buffer for rebuffer
+                )
+                .setTargetBufferBytes(targetBufferBytes)
+                .setPrioritizeTimeOverSizeThresholds(false) // !! Enforce the 32MB cap strictly, otherwise size is priority
+                .build()
+
             val player = ExoPlayer.Builder(baseContext)
                 .setLoadControl(loadControl)
                 .setSeekParameters(SeekParameters.CLOSEST_SYNC)
-                .build().apply {
+                .build()
+                .apply {
                     val mediaUri = getMediaUri()
                     loadedVideoUriString = mediaUri.toString()
 
