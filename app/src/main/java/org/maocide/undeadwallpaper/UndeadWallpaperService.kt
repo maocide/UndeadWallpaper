@@ -199,6 +199,31 @@ class UndeadWallpaperService : WallpaperService() {
 
                     // Listen for size changes
                     addListener(object : Player.Listener {
+
+                        // Listener for error recovery
+                        override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                            Log.e(TAG, "ExoPlayer Error: ${error.errorCodeName} - ${error.message}")
+
+                            // Check for Decoder Init Failures (Hardware Busy/Stolen)
+                            if (error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_DECODER_INIT_FAILED ||
+                                error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_DECODER_QUERY_FAILED) {
+
+                                Log.w(TAG, "Hardware Decoder lost! Attempting auto-recovery...")
+
+                                // Release the dead player
+                                releasePlayer()
+
+                                // Wait a moment for the hardware to free up, then restart
+                                kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
+                                    kotlinx.coroutines.delay(1000) // Wait 1 second
+                                    if (isVisible) {
+                                        Log.i(TAG, "Auto-recovering player now...")
+                                        initializePlayer()
+                                    }
+                                }
+                            }
+                        }
+
                         override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
                             super.onVideoSizeChanged(videoSize)
 
@@ -215,7 +240,7 @@ class UndeadWallpaperService : WallpaperService() {
                             }
 
                             // Old code for exoplayer surface
-                            /* should be only needed when using exoplayer surface
+                            /* Should be only needed when using exoplayer surface
                             if (!isScalingModeSet) {
                                 Log.i(TAG, "Valid video size detected: ${videoSize.width}x${videoSize.height}. Setting scaling mode ONCE.")
 
@@ -268,7 +293,7 @@ class UndeadWallpaperService : WallpaperService() {
                             play()
                         }
                     }
-                    /*
+                    /* Old ExoPlayer surface code
                     seekTo(playheadTime)
                     setVideoSurface(holder.surface)
                     prepare()
@@ -423,42 +448,30 @@ class UndeadWallpaperService : WallpaperService() {
             val preferenceManager = PreferencesManager(baseContext)
             val mode = preferenceManager.getStatusBarColor()
 
-            //Log.d(TAG, "onComputeColors: $mode")
-
-            // If Auto or unknown, let system decide
+            // If Auto, let system decide
             if (mode == StatusBarColor.AUTO) return null
 
-            // Android 12+ (API 31): Use the official "Dark Text" Hint
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                return when (mode) {
-                    StatusBarColor.LIGHT -> {
-                        // Required WHITE Icons (Light Text).
-                        // Trick the system by saying the wallpaper is BLACK.
-                        WallpaperColors(Color.valueOf(Color.BLACK), null, null, 0)
-                    }
-                    StatusBarColor.DARK -> {
-                        // Required BLACK Icons (Dark Text).
-                        // Trick the system by saying the wallpaper is WHITE.
-                        WallpaperColors(
-                            Color.valueOf(Color.WHITE),
-                            null,
-                            null,
-                            WallpaperColors.HINT_SUPPORTS_DARK_TEXT // HINT_SUPPORTS_DARK_TEXT is the key flag here.
-                        )
-                    }
-                    else -> {
-                        // Auto: Return null to let the system decide
-                        null
-                    }
-                }
-            }
+            val isLightText = (mode == StatusBarColor.LIGHT)
 
-            // Android 8.1 to 11 (API 27-30): Contrast Trick
-            // Older Androids look at the primary color
-            // If we return White, it sets Dark Icons. If we return Black, it sets Light Icons
-            // The 3-argument constructor is safe for API 27+
-            val color = if (mode == StatusBarColor.LIGHT) Color.BLACK else Color.WHITE
-            return WallpaperColors(Color.valueOf(color), null, null)
+            // Light Text (White icons) Wallpaper is BLACK
+            // Dark Text (Black icons) Wallpaper is WHITE
+            val baseColor = if (isLightText) Color.BLACK else Color.WHITE
+            val colorObj = Color.valueOf(baseColor)
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                // API 31+: We MUST provide the Hint
+                var hints = 0
+                if (!isLightText) {
+                    hints = WallpaperColors.HINT_SUPPORTS_DARK_TEXT
+                }
+
+                // TRICK: Pass the same color for Primary, Secondary, and Tertiary.
+                // This prevents Samsung/OneUI from "mixing" colors and ignoring the contrast.
+                return WallpaperColors(colorObj, colorObj, colorObj, hints)
+            } else {
+                // API 27-30: Use the old constructor (No hints available, relies on contrast)
+                return WallpaperColors(colorObj, colorObj, colorObj)
+            }
         }
 
         @Deprecated("Deprecated in Java") // This is needed for older Android versions
