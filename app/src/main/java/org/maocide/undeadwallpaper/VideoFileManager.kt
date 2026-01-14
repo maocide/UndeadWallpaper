@@ -55,21 +55,31 @@ class VideoFileManager(private val context: Context) {
 
     /**
      * Creates a file in the app's specific storage from a content URI.
-     * It uses the original file name to avoid duplicates.
+     * It uses the original file name to avoid duplicates or generates a timestamp name.
      *
      * @param fileUri The URI of the file to be copied.
      * @return The newly created File object, or null if the operation fails.
      */
     fun createFileFromContentUri(fileUri: Uri): File? {
         var originalFileName = ""
-        context.contentResolver.query(fileUri, null, null, null, null)?.use { cursor ->
-            val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-            cursor.moveToFirst()
-            originalFileName = cursor.getString(nameIndex)
+
+        // Try to query the display name
+        try {
+            context.contentResolver.query(fileUri, null, null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (nameIndex >= 0) {
+                        originalFileName = cursor.getString(nameIndex)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(tag, "Could not query file name, generating fallback.", e)
         }
 
+        // If name query failed or returned blank, generate a timestamp name
         if (originalFileName.isBlank()) {
-            return null
+            originalFileName = "imported_video_${System.currentTimeMillis()}.mp4"
         }
 
         val outputDir = getAppSpecificAlbumStorageDir(context, "videos")
@@ -86,6 +96,7 @@ class VideoFileManager(private val context: Context) {
 
         return outputFile
     }
+
 
     /**
      * Copies a file to the app's specific storage.

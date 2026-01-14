@@ -11,8 +11,8 @@ android {
         applicationId = "org.maocide.undeadwallpaper"
         minSdk = 28
         targetSdk = 36
-        versionCode = 8
-        versionName = "1.1.1"
+        versionCode = 9
+        versionName = "1.1.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

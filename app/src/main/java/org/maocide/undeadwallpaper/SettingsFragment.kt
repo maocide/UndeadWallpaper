@@ -538,15 +538,15 @@ class SettingsFragment : Fragment() {
     private fun handleSelectedMedia(uri: Uri) {
         Log.d(tag, "Handling selected media URI: $uri")
 
-        // Ensure we have persistable permission for this URI
+        // Try to take persistable permission (Nice to have, but NOT required for copying)
         val contentResolver = requireActivity().contentResolver
         val takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION
         try {
             contentResolver.takePersistableUriPermission(uri, takeFlags)
         } catch (e: SecurityException) {
-            Log.e(tag, "Failed to take persistable URI permission for $uri", e)
-            Toast.makeText(context, getString(R.string.error_permission_failed), Toast.LENGTH_LONG).show()
-            return
+            // Log it as a warning, but DO NOT STOP.
+            // We have temporary access right now, which is enough to copy the file.
+            Log.w(tag, "Failed to take persistable URI permission. Proceeding with copy anyway.", e)
         }
 
         try {
