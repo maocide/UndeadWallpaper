@@ -174,6 +174,26 @@ class SettingsFragment : Fragment() {
         }
     }
 
+    private suspend fun setPreviewVideo(uri: Uri) {
+        // Clear any previous trimming data
+        preferencesManager.removeClippingTimes()
+
+        // 1. Update ViewModel (Holds the state for the FAB)
+        sharedViewModel.selectedVideoUri = uri
+
+        // 2. Get duration and update UI
+        currentVideoDurationMs = getVideoDuration(uri)
+        if (currentVideoDurationMs == 0L) {
+            Toast.makeText(context, "Could not read video duration.", Toast.LENGTH_LONG).show()
+        }
+
+        // 3. Update the video preview player
+        setupVideoPreview(uri)
+
+        // 4. Refresh recent files (since we likely just added one)
+        loadRecentFiles()
+    }
+
     /**
      * Centralized function to handle setting or changing the video source.
      * This function ensures that whenever a new video is selected, the UI and
@@ -548,24 +568,42 @@ class SettingsFragment : Fragment() {
         try {
             contentResolver.takePersistableUriPermission(uri, takeFlags)
         } catch (e: SecurityException) {
-            // Log it as a warning, but DO NOT STOP.
-            // We have temporary access right now, which is enough to copy the file.
             Log.w(tag, "Failed to take persistable URI permission. Proceeding with copy anyway.", e)
         }
 
+        // SAFETY CHECK
         try {
-            // Warn for very large videos, might exceed video card VRAM
             val retriever = MediaMetadataRetriever()
             retriever.setDataSource(context, uri)
-            val width = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
-            val height = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 0
 
-            // Safety Check: 4K Video (roughly 3840x2160 = 8.2 million pixels)
-            if (width * height > 4000 * 2000) {
-                Toast.makeText(context, getString(R.string.warning_4k_video), Toast.LENGTH_LONG).show()
+            // Extract dimensions
+            val widthStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
+            val heightStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
+            val rotationStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)
+
+            val width = widthStr?.toIntOrNull() ?: 0
+            val height = heightStr?.toIntOrNull() ?: 0
+
+            // Calculate total pixels
+            val pixelCount = width * height
+
+            // Hard cap at 9 Million to allow DCI 4K but block 5K/8K or "Long 4K" files.
+            val maxPixels = 9_000_000
+
+            Log.i(tag, "Video Analysis: ${width}x${height} ($pixelCount pixels). Max allowed: $maxPixels")
+
+            if (pixelCount > maxPixels) {
+                Toast.makeText(context, "Video too large! Max supported resolution is 4K (UHD).", Toast.LENGTH_LONG).show()
+
+                // Stop!
+                retriever.release()
+                return
             }
+
+            retriever.release()
         } catch (e: Exception) {
-            Log.e(tag, "Failed to get video dimensions for $uri", e)
+            Log.e(tag, "Failed to analyze video dimensions for $uri", e)
+
         }
 
 

@@ -10,19 +10,24 @@ import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.service.wallpaper.WallpaperService
 import android.util.Log
 import android.view.SurfaceHolder
+import android.widget.Toast
 import androidx.annotation.OptIn
 import androidx.annotation.RequiresApi
 import androidx.core.net.toUri
 import androidx.media3.common.C
 import androidx.media3.common.C.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.SeekParameters
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
@@ -69,6 +74,7 @@ class UndeadWallpaperService : WallpaperService() {
         private var hasPlaybackCompleted = false
 
         private var renderer: GLVideoRenderer? = null
+        private var recoveryAttempts = 0
 
 
         // The receiver that listens for our signal
@@ -161,7 +167,13 @@ class UndeadWallpaperService : WallpaperService() {
                 .setPrioritizeTimeOverSizeThresholds(false) // !! Enforce the 32MB cap strictly, otherwise size is priority
                 .build()
 
-            val player = ExoPlayer.Builder(baseContext)
+            // Factory to give on creation to enable a fallback for non standard res, possible very hi res.
+            val renderersFactory = DefaultRenderersFactory(baseContext).apply {
+                setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF)
+                setEnableDecoderFallback(true) // Crucial for non-standard resolutions
+            }
+
+            val player = ExoPlayer.Builder(baseContext, renderersFactory)
                 .setLoadControl(loadControl)
                 .setSeekParameters(SeekParameters.CLOSEST_SYNC)
                 .build()
@@ -197,29 +209,50 @@ class UndeadWallpaperService : WallpaperService() {
                     // Send all values to renderer updating it, will be used for matrix calc.
                     refreshRenderer()
 
-                    // Listen for size changes
+                    // Listen for size changes and errors
                     addListener(object : Player.Listener {
 
                         // Listener for error recovery
                         override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                             Log.e(TAG, "ExoPlayer Error: ${error.errorCodeName} - ${error.message}")
 
-                            // Check for Decoder Init Failures (Hardware Busy/Stolen)
-                            if (error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_DECODER_INIT_FAILED ||
-                                error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_DECODER_QUERY_FAILED) {
+                            // 1. Identify if this is a Decoder/Hardware issue
+                            val isDecoderError = error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_DECODER_INIT_FAILED ||
+                                    error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_DECODER_QUERY_FAILED ||
+                                    error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_DECODING_RESOURCES_RECLAIMED // <--- Added this!
 
-                                Log.w(TAG, "Hardware Decoder lost! Attempting auto-recovery...")
+                            if (isDecoderError) {
+                                // 2. CHECK FOR IMMEDIATE FATAL SIGNS (Strings that confirm NO_MEMORY)
+                                val msg = error.message ?: ""
+                                val causeMsg = error.cause?.message ?: ""
+                                if (msg.contains("NO_MEMORY") || causeMsg.contains("NO_MEMORY")) {
+                                    handleCriticalError("Memory limit exceeded.")
+                                    return
+                                }
 
-                                // Release the dead player
-                                releasePlayer()
+                                // 3. RETRY LOGIC (The Safety Net)
+                                if (recoveryAttempts < 3) {
+                                    recoveryAttempts++
+                                    Log.w(TAG, "Hardware Decoder lost (Attempt $recoveryAttempts/3). Auto-recovering...")
 
-                                // Wait a moment for the hardware to free up, then restart
-                                kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
-                                    kotlinx.coroutines.delay(1000) // Wait 1 second
-                                    if (isVisible) {
-                                        Log.i(TAG, "Auto-recovering player now...")
-                                        initializePlayer()
+                                    releasePlayer()
+
+                                    // Wait 2 seconds, then try again
+                                    kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
+                                        kotlinx.coroutines.delay(2000)
+                                        if (isVisible) {
+                                            initializePlayer()
+                                        }
                                     }
+                                } else {
+                                    // 4. WE TRIED 3 TIMES AND FAILED -> IT'S A BAD FILE
+                                    recoveryAttempts = 0
+                                    handleCriticalError("Persistent hardware failure (Loop detected).")
+                                }
+                            } else {
+                                // Generic non-hardware error
+                                Handler(Looper.getMainLooper()).post {
+                                    Toast.makeText(baseContext, "Error: ${error.errorCodeName}", Toast.LENGTH_LONG).show()
                                 }
                             }
                         }
@@ -262,6 +295,12 @@ class UndeadWallpaperService : WallpaperService() {
                         // Listener for status change
                         override fun onPlaybackStateChanged(playbackState: Int) {
                             super.onPlaybackStateChanged(playbackState)
+
+                            // If the player actually gets STATE_READY, reset recovery attempts counter.
+                            if (playbackState == Player.STATE_READY) {
+                                recoveryAttempts = 0
+                            }
+
                             // detecting one shot playback and pausing
                             if (currentPlaybackMode == PlaybackMode.ONE_SHOT) {
                                 when (playbackState) {
@@ -352,6 +391,26 @@ class UndeadWallpaperService : WallpaperService() {
                 uriString.toUri()
             }
         }
+
+        /**
+         * Called when the video file is "illegal" for the hardware (too large/unsupported).
+         * This prevents a boot loop of the service crashing and restarting.
+         */
+        private fun handleCriticalError(reason: String) {
+            Log.e(TAG, "CRITICAL ERROR: $reason. Disabling wallpaper.")
+
+            Handler(Looper.getMainLooper()).post {
+                Toast.makeText(baseContext, "Wallpaper Disabled: $reason", Toast.LENGTH_LONG).show()
+            }
+
+            // Clear the Preference so it doesn't try to load again on restart
+            val prefs = PreferencesManager(baseContext)
+            prefs.saveVideoUri("")
+
+            // Kill the player and DO NOT restart it.
+            releasePlayer()
+        }
+
 
         override fun onSurfaceCreated(holder: SurfaceHolder) {
             super.onSurfaceCreated(holder)
@@ -485,7 +544,7 @@ class UndeadWallpaperService : WallpaperService() {
         ): Bundle? {
 
             super.onCommand(action, x, y, z, extras, resultRequested)
-            Log.d(TAG, "onCommand received: $action")
+            //Log.d(TAG, "onCommand received: $action")
 
             if (action == ACTION_PLAYBACK_MODE_CHANGED ||
                 action == ACTION_VIDEO_URI_CHANGED ||
