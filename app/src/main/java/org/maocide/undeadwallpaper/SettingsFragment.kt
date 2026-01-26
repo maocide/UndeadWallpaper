@@ -87,8 +87,8 @@ class SettingsFragment : Fragment() {
      * @param uri The URI of the video.
      * @return The duration in milliseconds, or 0L if it cannot be determined.
      */
-    private fun getVideoDuration(uri: Uri): Long {
-        return try {
+    private suspend fun getVideoDuration(uri: Uri): Long = withContext(Dispatchers.IO) {
+        return@withContext try {
             val retriever = MediaMetadataRetriever()
             retriever.setDataSource(context, uri)
             val durationString = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
@@ -182,7 +182,7 @@ class SettingsFragment : Fragment() {
      * @param uri The URI of the new video file.
      * @param sendBroadcast Weather to send a broadcast to the service to cause a video reload.
      */
-    private fun updateVideoSource(uri: Uri, forceChange: Boolean) {
+    private suspend fun updateVideoSource(uri: Uri, forceChange: Boolean) {
         // Clear any previous trimming data
         preferencesManager.removeClippingTimes()
 
@@ -220,7 +220,9 @@ class SettingsFragment : Fragment() {
             recentFiles,
             onItemClick = { recentFile ->
                 val fileUri = Uri.fromFile(recentFile.file)
-                updateVideoSource(fileUri, false)
+                viewLifecycleOwner.lifecycleScope.launch {
+                    updateVideoSource(fileUri, false)
+                }
             }
         )
         binding.recyclerViewRecentFiles.layoutManager = LinearLayoutManager(context)
@@ -270,7 +272,7 @@ class SettingsFragment : Fragment() {
      * Calling this BEFORE listeners prevents accidental triggers.
      * Also called by reset button listener after resetting values
      */
-    private fun syncUiState() {
+    private suspend fun syncUiState() {
 
         // SET to avoid overriding
         isUpdatingUi = true
@@ -468,7 +470,9 @@ class SettingsFragment : Fragment() {
             resetPreferencesToDefaults()
 
             // Reload UI (Warning!! might refire listeners of controls! Should be ok...)
-            syncUiState()
+            viewLifecycleOwner.lifecycleScope.launch {
+                syncUiState()
+            }
 
             // Notify wallpaper service
             notifySettingsChanged()
