@@ -22,7 +22,7 @@ class RecentFilesAdapter(
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val recentFile = recentFiles[position]
-        holder.bind(recentFile, onItemClick)
+        holder.bind(recentFile)
     }
 
     override fun getItemCount(): Int = recentFiles.size
@@ -33,19 +33,24 @@ class RecentFilesAdapter(
         notifyDataSetChanged()
     }
 
-    class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+    inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val thumbnail: ImageView = itemView.findViewById(R.id.thumbnail)
         private val fileName: TextView = itemView.findViewById(R.id.file_name)
 
-        fun bind(
-            recentFile: RecentFile,
-            onItemClick: (RecentFile) -> Unit
-        ) {
+        init {
+            itemView.setOnClickListener {
+                val position = bindingAdapterPosition
+                if (position != RecyclerView.NO_POSITION) {
+                    onItemClick(recentFiles[position])
+                }
+            }
+        }
+
+        fun bind(recentFile: RecentFile) {
             fileName.text = recentFile.file.name
             if (recentFile.thumbnail != null) {
                 thumbnail.setImageBitmap(recentFile.thumbnail)
             }
-            itemView.setOnClickListener { onItemClick(recentFile) }
         }
     }
 }
