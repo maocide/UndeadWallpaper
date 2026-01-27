@@ -3,10 +3,6 @@ name: Prepare Build For Release
 on:
   workflow_dispatch:
     inputs:
-      branch:
-        description: 'Branch to build'
-        required: true
-        default: 'master'
       version:
         description: 'Version to tag (e.g., v1.0.0)'
         required: true
@@ -21,8 +17,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
-        with:
-          ref: ${{ github.event.inputs.branch }} # Checkout the branch passed as input
 
       # Set up JDK 17 for Android build compatibility
       - name: Set up JDK 17
