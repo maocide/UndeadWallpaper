@@ -13,6 +13,9 @@ jobs:
     permissions:
       # Minimal permissions for build job - only read access needed
       contents: read
+    env:
+      # Github docs state that Secrets cannot be directly referenced in if: conditionals, we will use this ENV
+      SIGNING_ENABLED: ${{ secrets.KEYSTORE_BASE64 && 'true' || '' }}
 
     steps:
       - name: Checkout repository
@@ -36,13 +39,13 @@ jobs:
       # - KEY_ALIAS: Alias of the signing key
       # - KEY_PASSWORD: Password for the signing key
       - name: Setup signing keystore
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        if: ${{ env.SIGNING_ENABLED == 'true' }}
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/keystore.jks
 
       # Warn when signing secrets are not configured (debug signing will be used)
       - name: Warn if using debug signing
-        if: ${{ secrets.KEYSTORE_BASE64 == '' }}
+        if: ${{ env.SIGNING_ENABLED != 'true' }}
         run: |
           echo "::warning::Signing secrets not configured. APK will be signed with debug key. To enable release signing, add KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS, and KEY_PASSWORD secrets."
 
@@ -65,7 +68,7 @@ jobs:
 
       # Clean up keystore file after build for security
       - name: Cleanup keystore
-        if: ${{ always() && secrets.KEYSTORE_BASE64 != '' }}
+        if: ${{ always() && env.SIGNING_ENABLED == 'true' }}
         run: rm -f app/keystore.jks
 
   release:
