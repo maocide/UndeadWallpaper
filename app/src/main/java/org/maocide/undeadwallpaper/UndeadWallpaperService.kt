@@ -33,6 +33,7 @@ import androidx.media3.exoplayer.SeekParameters
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.upstream.DefaultAllocator
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.maocide.undeadwallpaper.model.PlaybackMode
 import org.maocide.undeadwallpaper.model.ScalingMode
@@ -75,6 +76,59 @@ class UndeadWallpaperService : WallpaperService() {
 
         private var renderer: GLVideoRenderer? = null
         private var recoveryAttempts = 0
+
+
+        private var playerSetupJob: kotlinx.coroutines.Job? = null
+
+        // --- NEW: Stall Watchdog ---
+        private var lastPosition: Long = 0
+        private var stallCount: Int = 0
+        private val watchdogHandler = Handler(Looper.getMainLooper())
+        private val watchdogRunnable = object : Runnable {
+            override fun run() {
+                checkPlaybackStall()
+                // Re-run continuously while visible
+                watchdogHandler.postDelayed(this, 2000) // Check every 2 seconds
+            }
+        }
+
+        /**
+         * Checks if the player claims to be playing but isn't advancing.
+         */
+        private fun checkPlaybackStall() {
+            val player = mediaPlayer ?: return
+
+            // We only care if we SHOULD be playing
+            if (player.isPlaying) {
+                val currentPos = player.currentPosition
+
+                // If position hasn't changed since last check (2000ms ago)
+                if (currentPos == lastPosition && (mediaPlayer?.duration ?: 0) > 2000) {
+                    stallCount++
+                    Log.w(TAG, "Watchdog: Playback stalled? ($stallCount/2)")
+
+                    if (stallCount >= 2) { // Stalled for ~4 seconds
+                        Log.e(TAG, "Watchdog: STALL CONFIRMED. Restarting player.")
+                        stallCount = 0
+                        initializePlayer() // Force restart
+                    }
+                } else {
+                    // It moved! Reset counters.
+                    stallCount = 0
+                    lastPosition = currentPos
+                }
+            }
+        }
+
+        private fun startStallWatchdog() {
+            stopStallWatchdog() // Ensure we don't double-post
+            watchdogHandler.post(watchdogRunnable)
+        }
+
+        private fun stopStallWatchdog() {
+            watchdogHandler.removeCallbacks(watchdogRunnable)
+            stallCount = 0
+        }
 
 
         // The receiver that listens for our signal
@@ -124,6 +178,9 @@ class UndeadWallpaperService : WallpaperService() {
 
         @OptIn(UnstableApi::class)
         private fun initializePlayer() {
+            // Cancel any startup issued, avoid race conditions
+            playerSetupJob?.cancel()
+
             if (mediaPlayer != null) {
                 releasePlayer()
             }
@@ -322,6 +379,22 @@ class UndeadWallpaperService : WallpaperService() {
 
                     // WAIT for the GL Surface, then attach
                     // We need a coroutine here because waitForVideoSurface is suspend
+                    playerSetupJob = kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
+                        val glSurface = renderer?.waitForVideoSurface()
+
+                        // If this job was cancelled, video switch or anything, STOP.
+                        if (!isActive) return@launch
+
+                        if (glSurface != null) {
+                            seekTo(playheadTime)
+                            setVideoSurface(glSurface)
+                            prepare()
+                            play()
+                        }
+                    }
+
+
+                    /* Old launch code, might cause race condition, changed with coroutine above
                     val currentScope = kotlinx.coroutines.CoroutineScope(Dispatchers.Main)
                     currentScope.launch {
                         val glSurface = renderer?.waitForVideoSurface()
@@ -331,7 +404,9 @@ class UndeadWallpaperService : WallpaperService() {
                             prepare()
                             play()
                         }
-                    }
+                    }*/
+
+
                     /* Old ExoPlayer surface code
                     seekTo(playheadTime)
                     setVideoSurface(holder.surface)
@@ -353,6 +428,9 @@ class UndeadWallpaperService : WallpaperService() {
          * new player is initialized. The `mediaPlayer` instance is set to null after release.
          */
         private fun releasePlayer() {
+            // Stop any startup jobs
+            playerSetupJob?.cancel()
+
             mediaPlayer?.let { player ->
                 Log.i(TAG, "Releasing ExoPlayer...")
                 playheadTime = player.currentPosition
@@ -372,6 +450,8 @@ class UndeadWallpaperService : WallpaperService() {
          *
          */
         private fun releaseRenderer() {
+            playerSetupJob?.cancel() // Startup job waiting for GL surface cancelled
+
             if (renderer != null) {
                 Log.i(TAG, "Releasing GlRenderer...")
                 renderer?.release()
@@ -446,6 +526,7 @@ class UndeadWallpaperService : WallpaperService() {
         override fun onDestroy() {
             super.onDestroy()
             Log.i(TAG, "Engine onDestroy")
+            stopStallWatchdog() // Kill the playback watchdog
             releasePlayer()
             releaseRenderer()
             unregisterReceiver(videoChangeReceiver)
@@ -457,6 +538,8 @@ class UndeadWallpaperService : WallpaperService() {
             Log.i(TAG, "onVisibilityChanged: visible = $visible isPreview = $isPreview, playbackMode = $currentPlaybackMode")
 
             if (visible) {
+                startStallWatchdog() // Monitor for playback running
+
                 // Check if the URI in memory matches the one on disk/prefs
                 val currentUriOnDisk = getMediaUri().toString()
 
@@ -478,6 +561,8 @@ class UndeadWallpaperService : WallpaperService() {
                     mediaPlayer?.play()
                 }
             } else {
+                stopStallWatchdog() // Stop monitoring for playback running
+
                 mediaPlayer?.pause()
                 mediaPlayer?.playWhenReady = false
             }
