@@ -70,9 +70,9 @@ jobs:
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
 
-      # Generate build provenance attestations so we can confirm a given binary was built using github action
+        # Generate build provenance attestations so we can confirm a given binary was built using github action
       - name: Attest APK Builds
-      - uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v3
         with:
           subject-path: app/build/outputs/apk/release/*.apk
 
