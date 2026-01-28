@@ -13,6 +13,10 @@ jobs:
     permissions:
       # Minimal permissions for build job - only read access needed
       contents: read
+      # Required by attest-build-provenance action
+      id-token: write
+      attestations: write
+      artifact-metadata: write
     env:
       # Github docs state that Secrets cannot be directly referenced in if: conditionals, we will use this ENV
       SIGNING_ENABLED: ${{ secrets.KEYSTORE_BASE64 && 'true' || '' }}
@@ -65,6 +69,12 @@ jobs:
           name: app-release
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
+
+      # Generate build provenance attestations so we can confirm a given binary was built using github action
+      - name: Attest APK Builds
+      - uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: app/build/outputs/apk/release/*.apk
 
       # Clean up keystore file after build for security
       - name: Cleanup keystore
