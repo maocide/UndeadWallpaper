@@ -17,6 +17,20 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        // CI signing config using environment variables (optional)
+        // Set KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD env vars and place keystore at app/keystore.jks
+        create("release") {
+            val keystoreFile = file("keystore.jks")
+            if (keystoreFile.exists() && System.getenv("KEYSTORE_PASSWORD") != null) {
+                storeFile = keystoreFile
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -24,7 +38,12 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug")
+            // Use release signing if keystore exists and env vars are set, otherwise fall back to debug
+            signingConfig = if (file("keystore.jks").exists() && System.getenv("KEYSTORE_PASSWORD") != null) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
     compileOptions {
