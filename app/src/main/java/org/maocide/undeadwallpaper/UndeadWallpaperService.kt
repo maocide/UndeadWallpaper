@@ -66,7 +66,6 @@ class UndeadWallpaperService : WallpaperService() {
         private var surfaceHolder: SurfaceHolder? = null
         private var playheadTime: Long = 0L
         private val TAG: String = javaClass.simpleName
-        private lateinit var sharedPrefs: SharedPreferences
         private var isScalingModeSet = false
 
         private var currentPlaybackMode = PlaybackMode.LOOP
@@ -75,12 +74,12 @@ class UndeadWallpaperService : WallpaperService() {
         private var hasPlaybackCompleted = false
 
         private var renderer: GLVideoRenderer? = null
-        private var recoveryAttempts = 0
+        private var recoveryAttempts = 0 // Counter for error recovery retry attempts
 
 
         private var playerSetupJob: kotlinx.coroutines.Job? = null
 
-        // --- NEW: Stall Watchdog ---
+        // Stall Watchdog vars
         private var lastPosition: Long = 0
         private var stallCount: Int = 0
         private val watchdogHandler = Handler(Looper.getMainLooper())
@@ -94,6 +93,7 @@ class UndeadWallpaperService : WallpaperService() {
 
         /**
          * Checks if the player claims to be playing but isn't advancing.
+         * Used by the Stall Watchdog
          */
         private fun checkPlaybackStall() {
             val player = mediaPlayer ?: return
@@ -273,13 +273,13 @@ class UndeadWallpaperService : WallpaperService() {
                         override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                             Log.e(TAG, "ExoPlayer Error: ${error.errorCodeName} - ${error.message}")
 
-                            // 1. Identify if this is a Decoder/Hardware issue
+                            // Identify if this is a Decoder/Hardware issue
                             val isDecoderError = error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_DECODER_INIT_FAILED ||
                                     error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_DECODER_QUERY_FAILED ||
-                                    error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_DECODING_RESOURCES_RECLAIMED // <--- Added this!
+                                    error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_DECODING_RESOURCES_RECLAIMED
 
                             if (isDecoderError) {
-                                // 2. CHECK FOR IMMEDIATE FATAL SIGNS (Strings that confirm NO_MEMORY)
+                                // Check for strings that confirm NO_MEMORY
                                 val msg = error.message ?: ""
                                 val causeMsg = error.cause?.message ?: ""
                                 if (msg.contains("NO_MEMORY") || causeMsg.contains("NO_MEMORY")) {
@@ -287,7 +287,7 @@ class UndeadWallpaperService : WallpaperService() {
                                     return
                                 }
 
-                                // 3. RETRY LOGIC (The Safety Net)
+                                // RETRY ATTEMPT
                                 if (recoveryAttempts < 3) {
                                     recoveryAttempts++
                                     Log.w(TAG, "Hardware Decoder lost (Attempt $recoveryAttempts/3). Auto-recovering...")
@@ -302,7 +302,7 @@ class UndeadWallpaperService : WallpaperService() {
                                         }
                                     }
                                 } else {
-                                    // 4. WE TRIED 3 TIMES AND FAILED -> IT'S A BAD FILE
+                                    // WE TRIED 3 TIMES AND FAILED -> IT'S A BAD FILE
                                     recoveryAttempts = 0
                                     handleCriticalError("Persistent hardware failure (Loop detected).")
                                 }
@@ -314,6 +314,7 @@ class UndeadWallpaperService : WallpaperService() {
                             }
                         }
 
+                        // Handle size changes
                         override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
                             super.onVideoSizeChanged(videoSize)
 
@@ -365,9 +366,6 @@ class UndeadWallpaperService : WallpaperService() {
                                         Log.i(TAG, "Playback ended!")
                                         hasPlaybackCompleted = true
                                         pause()
-                                        /*
-                                        Log.d(TAG, "safeDuration: $safeDuration")
-                                        */
                                     }
                                     Player.STATE_READY -> {
                                         if (hasPlaybackCompleted) pause()
@@ -404,16 +402,14 @@ class UndeadWallpaperService : WallpaperService() {
                             prepare()
                             play()
                         }
-                    }*/
+                    } */
 
 
                     /* Old ExoPlayer surface code
                     seekTo(playheadTime)
                     setVideoSurface(holder.surface)
                     prepare()
-                    play()
-
-                     */
+                    play() */
                 }
 
             mediaPlayer = player
@@ -519,7 +515,7 @@ class UndeadWallpaperService : WallpaperService() {
             super.onSurfaceDestroyed(holder)
             Log.i(TAG, "onSurfaceDestroyed")
             releasePlayer()
-            releaseRenderer() // 3. Kill the GL Renderer
+            releaseRenderer()
             this.surfaceHolder = null
         }
 
@@ -538,7 +534,7 @@ class UndeadWallpaperService : WallpaperService() {
             Log.i(TAG, "onVisibilityChanged: visible = $visible isPreview = $isPreview, playbackMode = $currentPlaybackMode")
 
             if (visible) {
-                startStallWatchdog() // Monitor for playback running
+                startStallWatchdog() // Monitor for playback running, running at intervals only when visible
 
                 // Check if the URI in memory matches the one on disk/prefs
                 val currentUriOnDisk = getMediaUri().toString()
@@ -552,6 +548,7 @@ class UndeadWallpaperService : WallpaperService() {
                 if (mediaPlayer == null) {
                     initializePlayer()
                 } else {
+                    // Check if one shot mode needs restating
                     if (currentPlaybackMode == PlaybackMode.ONE_SHOT && hasPlaybackCompleted && !isPreview()) {
                         Log.i(TAG, "Seeking back to 0 on change visibility for one shot")
                         mediaPlayer?.seekTo(0)
