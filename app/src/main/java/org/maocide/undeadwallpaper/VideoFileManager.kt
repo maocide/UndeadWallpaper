@@ -90,7 +90,7 @@ class VideoFileManager(private val context: Context) {
                 copyStreamToFile(iStream, outputFile)
             }
         } catch (e: Exception) {
-            Log.e(tag, "Error copying file from URI: $fileUri", e)
+            Log.e(tag, "Error copying file from URI", e)
             return null
         }
 

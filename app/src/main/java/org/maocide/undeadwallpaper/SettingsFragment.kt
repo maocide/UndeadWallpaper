@@ -95,7 +95,7 @@ class SettingsFragment : Fragment() {
             retriever.release()
             durationString?.toLong() ?: 0L
         } catch (e: Exception) {
-            Log.e(tag, "Failed to get video duration for URI: $uri", e)
+            Log.e(tag, "Failed to get video duration", e)
             0L
         }
     }
@@ -521,7 +521,7 @@ class SettingsFragment : Fragment() {
         when {
             // If the permission is already granted, we can proceed directly.
             ContextCompat.checkSelfPermission(requireContext(), permission) == PackageManager.PERMISSION_GRANTED -> {
-                Log.d(tag, "Permission '$permission' already granted. Opening picker.")
+                Log.d(tag, "Permission already granted. Opening picker.")
                 openFilePicker()
             }
             // If we want to show a popup explaining why we need the permission.
@@ -560,7 +560,7 @@ class SettingsFragment : Fragment() {
      * @param uri The content URI of the selected media.
      */
     private fun handleSelectedMedia(uri: Uri) {
-        Log.d(tag, "Handling selected media URI: $uri")
+        Log.d(tag, "Handling selected media URI")
 
         // Try to take persistable permission (Nice to have, but NOT required for copying)
         val contentResolver = requireActivity().contentResolver
@@ -602,7 +602,7 @@ class SettingsFragment : Fragment() {
 
             retriever.release()
         } catch (e: Exception) {
-            Log.e(tag, "Failed to analyze video dimensions for $uri", e)
+            Log.e(tag, "Failed to analyze video dimensions", e)
 
         }
 
@@ -614,10 +614,10 @@ class SettingsFragment : Fragment() {
             }
             if (copiedFile != null) {
                 val savedFileUri = Uri.fromFile(copiedFile)
-                Log.d(tag, "File copied to: $savedFileUri")
+                Log.d(tag, "File copied to destination")
                 updateVideoSource(savedFileUri, false) // Centralized update logic
             } else {
-                Log.e(tag, "Failed to copy file from URI: $uri")
+                Log.e(tag, "Failed to copy file from URI")
                 Toast.makeText(context, getString(R.string.error_copy_failed), Toast.LENGTH_LONG).show()
             }
         }

@@ -463,7 +463,7 @@ class UndeadWallpaperService : WallpaperService() {
                 Log.w(TAG, "Video URI is null or empty.")
                 null
             } else {
-                Log.i(TAG, "Found URI: $uriString")
+                Log.i(TAG, "Found URI.")
                 uriString.toUri()
             }
         }
