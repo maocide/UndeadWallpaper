@@ -147,7 +147,6 @@ class SettingsFragment : Fragment() {
             // load the data/settings
             syncUiState()
             setupListeners()
-            loadRecentFiles()
         }
 
     }
@@ -280,8 +279,6 @@ class SettingsFragment : Fragment() {
                 // Switch back to Main thread to update Prefs safely
                 withContext(Dispatchers.Main) {
                     preferencesManager.saveVideoUri(defaultUri.toString())
-                    // Update your variable/preview here if needed
-                    updateVideoSource(defaultUri, false)
                 }
             }
         }
@@ -330,9 +327,13 @@ class SettingsFragment : Fragment() {
             binding.brightnessSlider.setValueSafe(preferencesManager.getBrightness())
 
             // Load Video Preview and set the video as selected
-            preferencesManager.getVideoUri()?.let { uriString ->
+            val savedUri = preferencesManager.getVideoUri()
+            if (savedUri != null) {
                 //setupVideoPreview(uriString.toUri())
-                updateVideoSource(uriString.toUri(), false)
+                updateVideoSource(savedUri.toUri(), false)
+            } else {
+                // Fallback: If no video is selected, still load recent files
+                loadRecentFiles()
             }
         } finally {
             isUpdatingUi = false
