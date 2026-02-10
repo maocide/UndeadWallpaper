@@ -60,6 +60,9 @@ class UndeadWallpaperService : WallpaperService() {
 
     private inner class MyWallpaperEngine : Engine() {
 
+        // Lazy instantiation for performance reuse
+        private val prefs by lazy { PreferencesManager(baseContext) }
+
         private var isAudioEnabled: Boolean = false
         private lateinit var currentScalingMode: ScalingMode
         private var mediaPlayer: ExoPlayer? = null
@@ -164,16 +167,15 @@ class UndeadWallpaperService : WallpaperService() {
 
         private fun refreshRenderer() {
             // Send the whole package to the renderer
-            val prefManager = PreferencesManager(baseContext)
-            currentScalingMode = prefManager.getScalingMode()
+            currentScalingMode = prefs.getScalingMode()
             renderer?.setScalingMode(currentScalingMode)
             renderer?.setTransforms(
-                x = prefManager.getPositionX(),
-                y = prefManager.getPositionY(),
-                zoom = prefManager.getZoom(),
-                rotation = prefManager.getRotation()
+                x = prefs.getPositionX(),
+                y = prefs.getPositionY(),
+                zoom = prefs.getZoom(),
+                rotation = prefs.getRotation()
             )
-            renderer?.setBrightness(prefManager.getBrightness())
+            renderer?.setBrightness(prefs.getBrightness())
         }
 
         @OptIn(UnstableApi::class)
@@ -196,9 +198,8 @@ class UndeadWallpaperService : WallpaperService() {
 
 
             // Load prefs
-            val preferenceManager = PreferencesManager(baseContext)
-            isAudioEnabled = preferenceManager.isAudioEnabled()
-            currentPlaybackMode = preferenceManager.getPlaybackMode()
+            isAudioEnabled = prefs.isAudioEnabled()
+            currentPlaybackMode = prefs.getPlaybackMode()
 
             hasPlaybackCompleted = false
 
@@ -480,7 +481,6 @@ class UndeadWallpaperService : WallpaperService() {
             }
 
             // Clear the Preference so it doesn't try to load again on restart
-            val prefs = PreferencesManager(baseContext)
             prefs.saveVideoUri("")
 
             // Kill the player and DO NOT restart it.
@@ -586,8 +586,7 @@ class UndeadWallpaperService : WallpaperService() {
 
 
         override fun onComputeColors(): WallpaperColors? {
-            val preferenceManager = PreferencesManager(baseContext)
-            val mode = preferenceManager.getStatusBarColor()
+            val mode = prefs.getStatusBarColor()
 
             // If Auto, let system decide
             if (mode == StatusBarColor.AUTO) return null
