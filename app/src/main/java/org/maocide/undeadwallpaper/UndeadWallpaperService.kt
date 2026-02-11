@@ -14,6 +14,7 @@ import android.os.Handler
 import android.os.Looper
 import android.service.wallpaper.WallpaperService
 import android.util.Log
+import org.maocide.undeadwallpaper.BuildConfig
 import android.view.SurfaceHolder
 import android.widget.Toast
 import androidx.annotation.OptIn
@@ -472,7 +473,11 @@ class UndeadWallpaperService : WallpaperService() {
                 Log.w(TAG, "Video URI is null or empty.")
                 null
             } else {
-                Log.i(TAG, "Found URI: $uriString")
+                if (BuildConfig.DEBUG) {
+                    Log.i(TAG, "Found URI: $uriString")
+                } else {
+                    Log.i(TAG, "Found URI in preferences")
+                }
                 uriString.toUri()
             }
         }

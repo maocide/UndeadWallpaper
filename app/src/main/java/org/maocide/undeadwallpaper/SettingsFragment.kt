@@ -10,6 +10,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import org.maocide.undeadwallpaper.BuildConfig
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -95,7 +96,11 @@ class SettingsFragment : Fragment() {
             retriever.release()
             durationString?.toLong() ?: 0L
         } catch (e: Exception) {
-            Log.e(tag, "Failed to get video duration for URI: $uri", e)
+            if (BuildConfig.DEBUG) {
+                Log.e(tag, "Failed to get video duration for URI: $uri", e)
+            } else {
+                Log.e(tag, "Failed to get video duration", e)
+            }
             0L
         }
     }
@@ -522,7 +527,11 @@ class SettingsFragment : Fragment() {
         when {
             // If the permission is already granted, we can proceed directly.
             ContextCompat.checkSelfPermission(requireContext(), permission) == PackageManager.PERMISSION_GRANTED -> {
-                Log.d(tag, "Permission '$permission' already granted. Opening picker.")
+                if (BuildConfig.DEBUG) {
+                    Log.d(tag, "Permission '$permission' already granted. Opening picker.")
+                } else {
+                    Log.d(tag, "Permission already granted. Opening picker.")
+                }
                 openFilePicker()
             }
             // If we want to show a popup explaining why we need the permission.
@@ -533,7 +542,11 @@ class SettingsFragment : Fragment() {
             }
             // If we don't have the permission, we launch the request.
             else -> {
-                Log.d(tag, "Requesting permission: $permission")
+                if (BuildConfig.DEBUG) {
+                    Log.d(tag, "Requesting permission: $permission")
+                } else {
+                    Log.d(tag, "Requesting permission")
+                }
                 requestPermissionLauncher.launch(permission)
             }
         }
@@ -561,7 +574,11 @@ class SettingsFragment : Fragment() {
      * @param uri The content URI of the selected media.
      */
     private fun handleSelectedMedia(uri: Uri) {
-        Log.d(tag, "Handling selected media URI: $uri")
+        if (BuildConfig.DEBUG) {
+            Log.d(tag, "Handling selected media URI: $uri")
+        } else {
+            Log.d(tag, "Handling selected media URI")
+        }
 
         // Try to take persistable permission (Nice to have, but NOT required for copying)
         val contentResolver = requireActivity().contentResolver
@@ -603,7 +620,11 @@ class SettingsFragment : Fragment() {
 
             retriever.release()
         } catch (e: Exception) {
-            Log.e(tag, "Failed to analyze video dimensions for $uri", e)
+            if (BuildConfig.DEBUG) {
+                Log.e(tag, "Failed to analyze video dimensions for $uri", e)
+            } else {
+                Log.e(tag, "Failed to analyze video dimensions", e)
+            }
 
         }
 
@@ -615,10 +636,18 @@ class SettingsFragment : Fragment() {
             }
             if (copiedFile != null) {
                 val savedFileUri = Uri.fromFile(copiedFile)
-                Log.d(tag, "File copied to: $savedFileUri")
+                if (BuildConfig.DEBUG) {
+                    Log.d(tag, "File copied to: $savedFileUri")
+                } else {
+                    Log.d(tag, "File copied to local storage")
+                }
                 updateVideoSource(savedFileUri, false) // Centralized update logic
             } else {
-                Log.e(tag, "Failed to copy file from URI: $uri")
+                if (BuildConfig.DEBUG) {
+                    Log.e(tag, "Failed to copy file from URI: $uri")
+                } else {
+                    Log.e(tag, "Failed to copy file from URI")
+                }
                 Toast.makeText(context, getString(R.string.error_copy_failed), Toast.LENGTH_LONG).show()
             }
         }
