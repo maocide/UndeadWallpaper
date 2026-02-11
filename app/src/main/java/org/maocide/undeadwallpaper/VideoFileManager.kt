@@ -9,7 +9,11 @@ import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
@@ -128,12 +132,24 @@ class VideoFileManager(private val context: Context) {
      *
      * @return A list of [RecentFile] objects.
      */
-    fun loadRecentFiles(): List<RecentFile> {
+    suspend fun loadRecentFiles(): List<RecentFile> = withContext(Dispatchers.IO) {
         val videosDir = getAppSpecificAlbumStorageDir(context, "videos")
-        return videosDir.listFiles()?.map { file ->
-            val thumbnail = createVideoThumbnail(file.path)
-            RecentFile(file, thumbnail)
-        } ?: emptyList()
+        val files = videosDir.listFiles() ?: return@withContext emptyList()
+        val semaphore = Semaphore(4) // Limit to 4 concurrent thumbnail generations
+
+        files.map { file ->
+            async {
+                semaphore.withPermit {
+                    try {
+                        val thumbnail = createVideoThumbnail(file.path)
+                        RecentFile(file, thumbnail)
+                    } catch (e: Exception) {
+                        Log.e(tag, "Error loading thumbnail for ${file.name}", e)
+                        RecentFile(file, null)
+                    }
+                }
+            }
+        }.awaitAll()
     }
 
     /**
