@@ -40,6 +40,8 @@ import org.maocide.undeadwallpaper.model.ScalingMode
 import org.maocide.undeadwallpaper.model.StatusBarColor
 import kotlin.math.log
 
+
+
 class UndeadWallpaperService : WallpaperService() {
 
     // FILTERING: Our secret passphrase
@@ -62,7 +64,6 @@ class UndeadWallpaperService : WallpaperService() {
 
         // Lazy instantiation for performance reuse
         private val prefs by lazy { PreferencesManager(baseContext) }
-
         private var isAudioEnabled: Boolean = false
         private lateinit var currentScalingMode: ScalingMode
         private var mediaPlayer: ExoPlayer? = null
@@ -84,6 +85,7 @@ class UndeadWallpaperService : WallpaperService() {
 
         // Stall Watchdog vars
         private var lastPosition: Long = 0
+        private var lastRenderTimestamp: Long = 0
         private var stallCount: Int = 0
         private val watchdogHandler = Handler(Looper.getMainLooper())
         private val watchdogRunnable = object : Runnable {
@@ -100,15 +102,21 @@ class UndeadWallpaperService : WallpaperService() {
          */
         private fun checkPlaybackStall() {
             val player = mediaPlayer ?: return
+            val renderer = renderer ?: return
 
             // We only care if we SHOULD be playing
             if (player.isPlaying) {
                 val currentPos = player.currentPosition
+                val currentRenderTime = renderer.getSurfaceDrawTimestamp()
 
-                // If position hasn't changed since last check (2000ms ago)
-                if (currentPos == lastPosition && (mediaPlayer?.duration ?: 0) > 2000) {
+                val isPlayerStuck = (currentPos == lastPosition)
+                val isScreenFrozen = (currentRenderTime == lastRenderTimestamp)
+
+                // If EITHER is true, the player is stuck with no error.
+                if ((isPlayerStuck || isScreenFrozen) && player.duration > 2000) {
                     stallCount++
-                    Log.w(TAG, "Watchdog: Playback stalled? ($stallCount/2)")
+                    Log.w(TAG, "Watchdog: Stall detected! PlayerStuck=$isPlayerStuck, ScreenFrozen=$isScreenFrozen ($stallCount/2)")
+
 
                     if (stallCount >= 2) { // Stalled for ~4 seconds
                         Log.e(TAG, "Watchdog: STALL CONFIRMED. Restarting player.")
@@ -119,6 +127,7 @@ class UndeadWallpaperService : WallpaperService() {
                     // It moved! Reset counters.
                     stallCount = 0
                     lastPosition = currentPos
+                    lastRenderTimestamp = currentRenderTime
                 }
             }
         }
@@ -481,6 +490,7 @@ class UndeadWallpaperService : WallpaperService() {
             }
 
             // Clear the Preference so it doesn't try to load again on restart
+            val prefs = PreferencesManager(baseContext)
             prefs.saveVideoUri("")
 
             // Kill the player and DO NOT restart it.

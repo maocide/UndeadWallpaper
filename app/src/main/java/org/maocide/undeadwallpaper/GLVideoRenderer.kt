@@ -70,6 +70,7 @@ class GLVideoRenderer(private val context: Context) {
     private val viewMatrix = FloatArray(16)
 
 
+
     private val vertexShaderCode = """
         attribute vec4 aPosition;
         attribute vec4 aTextureCoord;
@@ -116,12 +117,17 @@ class GLVideoRenderer(private val context: Context) {
     private var userZoom = 1.0f
     private var userRotation = 0f
     private var userBrightness = 1.0f
+    @Volatile private var surfaceDrawTimestamp: Long = 0L
 
     init {
         triangleVertices = ByteBuffer.allocateDirect(triangleVerticesData.size * 4)
             .order(ByteOrder.nativeOrder()).asFloatBuffer()
         triangleVertices.put(triangleVerticesData).position(0)
         Matrix.setIdentityM(stMatrix, 0)
+    }
+
+    fun getSurfaceDrawTimestamp(): Long {
+        return surfaceDrawTimestamp
     }
 
     fun setScalingMode(mode: ScalingMode) {
@@ -265,6 +271,9 @@ class GLVideoRenderer(private val context: Context) {
                         } else {
                             Log.w(tag, "eglSwapBuffers failed: $error")
                         }
+                    } else {
+                        // Update surface timestamp for a successful draw call
+                        surfaceDrawTimestamp = System.currentTimeMillis()
                     }
                 } catch (t: Throwable) {
                     // CATCH EVERYTHING here.
