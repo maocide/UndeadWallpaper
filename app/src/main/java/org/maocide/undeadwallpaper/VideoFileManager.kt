@@ -8,6 +8,7 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.util.Log
+import org.maocide.undeadwallpaper.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -47,7 +48,11 @@ class VideoFileManager(private val context: Context) {
             }
             outputFile
         } catch (e: Exception) {
-            Log.e(tag, "Failed to copy default resource: $fileName", e)
+            if (BuildConfig.DEBUG) {
+                Log.e(tag, "Failed to copy default resource: $fileName", e)
+            } else {
+                Log.e(tag, "Failed to copy default resource", e)
+            }
             null
         }
     }
@@ -90,7 +95,11 @@ class VideoFileManager(private val context: Context) {
                 copyStreamToFile(iStream, outputFile)
             }
         } catch (e: Exception) {
-            Log.e(tag, "Error copying file from URI: $fileUri", e)
+            if (BuildConfig.DEBUG) {
+                Log.e(tag, "Error copying file from URI: $fileUri", e)
+            } else {
+                Log.e(tag, "Error copying file from URI", e)
+            }
             return null
         }
 
