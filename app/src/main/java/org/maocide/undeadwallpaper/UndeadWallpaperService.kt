@@ -466,8 +466,7 @@ class UndeadWallpaperService : WallpaperService() {
         }
 
         private fun getMediaUri(): Uri? {
-            val uriString = getSharedPreferences("DEFAULT", MODE_PRIVATE)
-                .getString(getString(R.string.video_uri), null)
+            val uriString = prefs.getVideoUri()
 
             return if (uriString.isNullOrEmpty()) {
                 Log.w(TAG, "Video URI is null or empty.")
@@ -490,7 +489,6 @@ class UndeadWallpaperService : WallpaperService() {
             }
 
             // Clear the Preference so it doesn't try to load again on restart
-            val prefs = PreferencesManager(baseContext)
             prefs.saveVideoUri("")
 
             // Kill the player and DO NOT restart it.
