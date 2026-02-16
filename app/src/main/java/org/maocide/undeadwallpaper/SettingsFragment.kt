@@ -143,6 +143,7 @@ class SettingsFragment : Fragment() {
         binding.zoomSlider.isSaveEnabled = false
         binding.rotationSlider.isSaveEnabled = false
         binding.brightnessSlider.isSaveEnabled = false
+        binding.speedSlider.isSaveEnabled = false
 
         // ASYNC TASKS (Data Loading)
         lifecycleScope.launch {
@@ -167,10 +168,8 @@ class SettingsFragment : Fragment() {
         val isExpanded = savedInstanceState.getBoolean(KEY_ADVANCED_EXPANDED, false)
 
         if (isExpanded) {
-            // 1. Show the container
+            // Show the container
             binding.advancedOptionsContainer.visibility = View.VISIBLE
-
-
             binding.imageArrow.rotation = 180f
         } else {
             binding.advancedOptionsContainer.visibility = View.GONE
@@ -180,21 +179,21 @@ class SettingsFragment : Fragment() {
 
     private suspend fun setPreviewVideo(uri: Uri) {
         // Clear any previous trimming data
-        preferencesManager.removeClippingTimes()
+        preferencesManager.removeClippingTimes() // Now actually removed, might re implement
 
-        // 1. Update ViewModel (Holds the state for the FAB)
+        // Update ViewModel (Holds the state for the FAB)
         sharedViewModel.selectedVideoUri = uri
 
-        // 2. Get duration and update UI
+        // Get duration and update UI
         currentVideoDurationMs = getVideoDuration(uri)
         if (currentVideoDurationMs == 0L) {
             Toast.makeText(context, "Could not read video duration.", Toast.LENGTH_LONG).show()
         }
 
-        // 3. Update the video preview player
+        // Update the video preview player
         setupVideoPreview(uri)
 
-        // 4. Refresh recent files (since we likely just added one)
+        // Refresh recent files (since we likely just added one)
         loadRecentFiles()
     }
 
@@ -330,6 +329,7 @@ class SettingsFragment : Fragment() {
             binding.zoomSlider.setValueSafe(preferencesManager.getZoom())
             binding.rotationSlider.setValueSafe(preferencesManager.getRotation())
             binding.brightnessSlider.setValueSafe(preferencesManager.getBrightness())
+            binding.speedSlider.setValueSafe(preferencesManager.getSpeed())
 
             // Load Video Preview and set the video as selected
             val savedUri = preferencesManager.getVideoUri()
@@ -354,6 +354,7 @@ class SettingsFragment : Fragment() {
             saveZoom(1.0f)
             saveRotation(0f)
             saveBrightness(1.0f)
+            saveSpeed(1.0f)
         }
     }
 
@@ -488,6 +489,11 @@ class SettingsFragment : Fragment() {
         // Rotation
         setupSafeSlider(binding.rotationSlider) { value ->
             preferencesManager.saveRotation(value)
+        }
+
+        // Speed
+        setupSafeSlider(binding.speedSlider) { value ->
+            preferencesManager.saveSpeed(value)
         }
 
         // Reset Values in UI
@@ -677,20 +683,6 @@ class SettingsFragment : Fragment() {
     }
 
     /**
-     * Converts milliseconds to a HH:MM:SS.mmm formatted string.
-     * @param millis The time in milliseconds.
-     * @return A string in HH:MM:SS.mmm format, or an empty string if input is negative.
-     */
-    private fun formatMillisecondsToHHMMSSmmm(millis: Long): String {
-        if (millis < 0) return "" // Return empty for invalid or unset times
-        val hours = millis / (1000 * 60 * 60)
-        val minutes = (millis % (1000 * 60 * 60)) / (1000 * 60)
-        val seconds = (millis % (1000 * 60)) / 1000
-        val milliseconds = millis % 1000
-        return String.format("%02d:%02d:%02d.%03d", hours, minutes, seconds, milliseconds)
-    }
-
-    /**
      * Safely sets the value of a Material Slider, preventing crashes from out-of-range/step values.
      *
      * This extension function ensures that any value assigned to the slider is first clamped
@@ -703,10 +695,10 @@ class SettingsFragment : Fragment() {
      * @param newValue The desired new value for the slider.
      */
     fun com.google.android.material.slider.Slider.setValueSafe(newValue: Float) {
-        // 1. Clamp: Ensure value is strictly between valueFrom and valueTo
+        // Clamp: Ensure value is strictly between valueFrom and valueTo
         val clampedValue = newValue.coerceIn(valueFrom, valueTo)
 
-        // 2. Snap: If a stepSize is defined, ensure the value fits the step
+        // Snap: If a stepSize is defined, ensure the value fits the step
         val finalValue = if (stepSize > 0) {
             // Calculate how many "steps" we are from the start
             val steps = ((clampedValue - valueFrom) / stepSize).roundToInt()
@@ -716,7 +708,7 @@ class SettingsFragment : Fragment() {
             clampedValue
         }
 
-        // 3. Apply: Only now is it safe to set the value
+        // Apply: Only now is it safe to set the value
         this.value = finalValue
     }
 

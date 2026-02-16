@@ -51,6 +51,7 @@
     <string name="vertical_position">Vertical Position</string>
     <string name="zoom">Zoom</string>
     <string name="brightness">Brightness</string>
+    <string name="speed">Speed</string>
     <string name="reset">Reset</string>
     <string name="rotation">Rotation</string>
 

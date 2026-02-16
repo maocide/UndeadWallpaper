@@ -75,6 +75,8 @@ class UndeadWallpaperService : WallpaperService() {
 
         private var currentPlaybackMode = PlaybackMode.LOOP
 
+        private var speed: Float = 1f
+
         private var loadedVideoUriString = ""
         private var hasPlaybackCompleted = false
 
@@ -210,6 +212,8 @@ class UndeadWallpaperService : WallpaperService() {
             // Load prefs
             isAudioEnabled = prefs.isAudioEnabled()
             currentPlaybackMode = prefs.getPlaybackMode()
+            speed = prefs.getSpeed()
+
 
             hasPlaybackCompleted = false
 
@@ -264,7 +268,11 @@ class UndeadWallpaperService : WallpaperService() {
                     // Set source and configure proper looping.
                     setMediaSource(mediaSource)
 
+                    // Apply volume
                     volume = if (isAudioEnabled) 1f else 0f
+
+                    // Apply speed
+                    setPlaybackSpeed(speed)
 
                     // Looping or One shot mode
                     if(currentPlaybackMode == PlaybackMode.LOOP)

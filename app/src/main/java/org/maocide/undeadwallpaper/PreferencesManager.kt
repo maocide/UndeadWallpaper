@@ -33,6 +33,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_ROTATION = "video_rotation"
 
         private const val KEY_STATUSBAR_COLOR = "statusbar_color"
+        private const val KEY_SPEED = "video_speed"
     }
 
     /**
@@ -218,6 +219,18 @@ class PreferencesManager(context: Context) {
         return StatusBarColor.entries.getOrElse(storedOrdinal) { StatusBarColor.AUTO }
     }
 
+    /**
+     * Saves the speed value.
+     * Default is 1.0f (Normal Playback).
+     */
+    fun saveSpeed(speed: Float) {
+        sharedPrefs.edit { putFloat(KEY_SPEED, speed) }
+    }
+
+    fun getSpeed(): Float {
+        // Default to 1.0 if not set
+        return sharedPrefs.getFloat(KEY_SPEED, 1.0f)
+    }
 
 
 
