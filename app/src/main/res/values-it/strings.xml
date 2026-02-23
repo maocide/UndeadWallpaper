@@ -49,6 +49,7 @@
     <string name="warning_4k_video">Attenzione: i video 4K potrebbero causare crash o lag su alcuni dispositivi.</string>
     <string name="error_copy_failed">Impossibile copiare il file video.</string>
     <string name="error_cannot_play_video">Impossibile riprodurre questo file video.</string>
+    <string name="warning_high_speed_stuttering">Velocità elevate potrebbero causare scatti sui video ad alta risoluzione.</string>
 
     <!-- Status Bar Icon Color Settings -->
     <string name="status_bar_icons_label">Icone Barra di Stato</string>

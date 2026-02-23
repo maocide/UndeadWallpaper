@@ -52,6 +52,7 @@ class SettingsFragment : Fragment() {
     private var currentVideoDurationMs: Long = 0L
     private var previewMediaPlayer: MediaPlayer? = null
 
+    private var speedValueWarned = false
     private var isUpdatingUi = false
 
     // Initialize the shared ViewModel
@@ -494,6 +495,12 @@ class SettingsFragment : Fragment() {
         // Speed
         setupSafeSlider(binding.speedSlider) { value ->
             preferencesManager.saveSpeed(value)
+
+            // If not sent a warning, but speed is high, warn about possible hardware bottleneck
+            if (value > 1.0f && !speedValueWarned) {
+                Toast.makeText(context, R.string.warning_high_speed_stuttering, Toast.LENGTH_LONG).show()
+                speedValueWarned = true
+            }
         }
 
         // Reset Values in UI
