@@ -462,7 +462,7 @@ class GLVideoRenderer(private val context: Context) {
         GLES20.glGetShaderiv(vertexShader, GLES20.GL_COMPILE_STATUS, compileStatus, 0)
         if (compileStatus[0] == 0) {
             // Retrieve the error message
-            val errorMsg = GLES20.glGetShaderInfoLog(fragmentShader)
+            val errorMsg = GLES20.glGetShaderInfoLog(vertexShader)
             failed = true
             Log.e(tag,"Vertex Shader compile error: $errorMsg")
         }
