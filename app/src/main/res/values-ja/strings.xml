@@ -56,4 +56,10 @@
     <string name="status_bar_auto">自動</string>
     <string name="status_bar_white_icons">白</string>
     <string name="status_bar_black_icons">黒</string>
+
+    <!-- Start Time Settings -->
+    <string name="start_time_label">再生開始</string>
+    <string name="start_time_resume">続きから</string>
+    <string name="start_time_restart">最初から</string>
+    <string name="start_time_random">ランダム</string>
 </resources>

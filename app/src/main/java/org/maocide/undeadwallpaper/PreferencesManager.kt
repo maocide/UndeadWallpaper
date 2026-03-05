@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import androidx.core.content.edit
 import org.maocide.undeadwallpaper.model.PlaybackMode
 import org.maocide.undeadwallpaper.model.ScalingMode
+import org.maocide.undeadwallpaper.model.StartTime
 import org.maocide.undeadwallpaper.model.StatusBarColor
 
 /**
@@ -33,6 +34,8 @@ class PreferencesManager(context: Context) {
         private const val KEY_ROTATION = "video_rotation"
 
         private const val KEY_STATUSBAR_COLOR = "statusbar_color"
+
+        private const val KEY_START_TIME = "start_time"
         private const val KEY_SPEED = "video_speed"
     }
 
@@ -218,6 +221,20 @@ class PreferencesManager(context: Context) {
         val storedOrdinal = sharedPrefs.getInt(KEY_STATUSBAR_COLOR, StatusBarColor.AUTO.ordinal)
         return StatusBarColor.entries.getOrElse(storedOrdinal) { StatusBarColor.AUTO }
     }
+
+    /**
+     * Saves the start time preference.
+     * Default is 0 Resume, Start is 1, Random is 2
+     */
+    fun saveStartTime(startTime: StartTime) {
+        sharedPrefs.edit { putInt(KEY_START_TIME, startTime.ordinal) }
+    }
+
+    fun getStartTime(): StartTime {
+        val storedOrdinal = sharedPrefs.getInt(KEY_START_TIME, StartTime.RESUME.ordinal)
+        return StartTime.entries.getOrElse(storedOrdinal) { StartTime.RESUME }
+    }
+
 
     /**
      * Saves the speed value.

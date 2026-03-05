@@ -38,9 +38,10 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.maocide.undeadwallpaper.model.PlaybackMode
 import org.maocide.undeadwallpaper.model.ScalingMode
+import org.maocide.undeadwallpaper.model.StartTime
 import org.maocide.undeadwallpaper.model.StatusBarColor
 import kotlin.math.log
-
+import kotlin.random.Random
 
 
 class UndeadWallpaperService : WallpaperService() {
@@ -247,7 +248,7 @@ class UndeadWallpaperService : WallpaperService() {
 
             val player = ExoPlayer.Builder(baseContext, renderersFactory)
                 .setLoadControl(loadControl)
-                .setSeekParameters(SeekParameters.CLOSEST_SYNC)
+                .setSeekParameters(SeekParameters.NEXT_SYNC)
                 .build()
                 .apply {
                     val mediaUri = getMediaUri()
@@ -552,35 +553,62 @@ class UndeadWallpaperService : WallpaperService() {
 
         override fun onVisibilityChanged(visible: Boolean) {
             super.onVisibilityChanged(visible)
-            Log.i(TAG, "onVisibilityChanged: visible = $visible isPreview = $isPreview, playbackMode = $currentPlaybackMode")
+            val startTimePref = prefs.getStartTime()
+
+            Log.i(TAG, "onVisibilityChanged: visible = $visible isPreview = $isPreview, playbackMode = $currentPlaybackMode, startTime = $startTimePref")
 
             if (visible) {
-                startStallWatchdog() // Monitor for playback running, running at intervals only when visible
+                startStallWatchdog() // Monitor for playback running
 
                 // Check if the URI in memory matches the one on disk/prefs
                 val currentUriOnDisk = getMediaUri().toString()
 
-                // If they don't match, force a reload!
-                if (currentUriOnDisk != loadedVideoUriString) {
-                    Log.i(TAG, "WakeUp Check: URI changed while sleeping! Reloading.")
+                // If they don't match, or the player is missing, initialize it!
+                if (currentUriOnDisk != loadedVideoUriString || mediaPlayer == null) {
+                    if (currentUriOnDisk != loadedVideoUriString) {
+                        Log.i(TAG, "WakeUp Check: URI changed while sleeping! Reloading.")
+                    }
                     initializePlayer()
                 }
 
-                if (mediaPlayer == null) {
-                    initializePlayer()
-                } else {
-                    // Check if one shot mode needs restating
-                    if (currentPlaybackMode == PlaybackMode.ONE_SHOT && hasPlaybackCompleted && !isPreview()) {
-                        Log.i(TAG, "Seeking back to 0 on change visibility for one shot")
-                        mediaPlayer?.seekTo(0)
+                // Safely grab the player instance. If it's still null somehow, exit gracefully.
+                val player = mediaPlayer ?: return
+
+                // Apply timeline behavior
+                when (startTimePref) {
+                    StartTime.RESUME -> {
+                        if (currentPlaybackMode == PlaybackMode.ONE_SHOT && hasPlaybackCompleted && !isPreview()) {
+                            Log.i(TAG, "One Shot completed previously, restarting from 0")
+                            playheadTime = 0L // Sync state
+                            player.seekTo(0L)
+                            hasPlaybackCompleted = false
+                        }
+                    }
+                    StartTime.RESTART -> {
+                        playheadTime = 0L // Sync state
+                        player.seekTo(0L)
                         hasPlaybackCompleted = false
                     }
-                    mediaPlayer?.playWhenReady = true
-                    mediaPlayer?.play()
+                    StartTime.RANDOM -> {
+                        val duration = player.duration
+                        if (duration > 0 && duration != C.TIME_UNSET) {
+                            val randomPos = Random.nextLong(0, duration)
+                            Log.d(TAG, "Seeking to random pos: $randomPos")
+                            playheadTime = randomPos // Sync state so coroutine to hook to GLRenderer doesn't overwrite it!
+                            player.seekTo(randomPos)
+                        } else {
+                            playheadTime = 0L
+                            player.seekTo(0L)
+                        }
+                        hasPlaybackCompleted = false
+                    }
                 }
+
+                player.playWhenReady = true
+                player.play()
+
             } else {
                 stopStallWatchdog() // Stop monitoring for playback running
-
                 mediaPlayer?.pause()
                 mediaPlayer?.playWhenReady = false
             }
