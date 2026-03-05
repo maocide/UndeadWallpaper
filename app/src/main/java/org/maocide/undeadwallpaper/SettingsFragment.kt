@@ -33,6 +33,7 @@ import org.maocide.undeadwallpaper.model.PlaybackMode
 import org.maocide.undeadwallpaper.model.ScalingMode
 import androidx.core.view.isVisible
 import com.google.android.material.slider.Slider
+import org.maocide.undeadwallpaper.model.StartTime
 import org.maocide.undeadwallpaper.model.StatusBarColor
 import kotlin.math.roundToInt
 
@@ -317,6 +318,13 @@ class SettingsFragment : Fragment() {
                 ScalingMode.STRETCH -> binding.scalingModeGroup.check(binding.scalingModeStretch.id)
             }
 
+            // Start Time
+            when (preferencesManager.getStartTime()) {
+                StartTime.RESUME -> binding.startTimeGroup.check(binding.startTimeResume.id)
+                StartTime.RESTART -> binding.startTimeGroup.check(binding.startTimeRestart.id)
+                StartTime.RANDOM -> binding.startTimeGroup.check(binding.startTimeRandom.id)
+            }
+
             // StatusBar Color
             when (preferencesManager.getStatusBarColor()) {
                 StatusBarColor.AUTO -> binding.statusBarColorGroup.check(binding.statusBarAuto.id)
@@ -404,6 +412,26 @@ class SettingsFragment : Fragment() {
 
             preferencesManager.setPlaybackMode(newMode)
             notifySettingsChanged()
+        }
+
+        // StartTime preference
+        binding.startTimeGroup.setOnCheckedStateChangeListener { group, checkedIds ->
+            if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
+
+            val checkedId = checkedIds[0] // Get the single selected ID
+
+            val newMode = when (checkedId) {
+                binding.startTimeRestart.id -> StartTime.RESTART
+                binding.startTimeRandom.id -> StartTime.RANDOM
+                else -> StartTime.RESUME
+            }
+            preferencesManager.saveStartTime(newMode)
+
+            // Specific intent sent to apply
+            val intent = Intent(UndeadWallpaperService.ACTION_PLAYBACK_MODE_CHANGED).apply {
+                setPackage(requireContext().packageName)
+            }
+            requireContext().applicationContext.sendBroadcast(intent)
         }
 
         // StatusBar Color
@@ -602,48 +630,62 @@ class SettingsFragment : Fragment() {
             Log.w(tag, "Failed to take persistable URI permission. Proceeding with copy anyway.", e)
         }
 
-        // SAFETY CHECK
-        try {
-            val retriever = MediaMetadataRetriever()
-            retriever.setDataSource(context, uri)
+        // Metadata check in coroutine
+        viewLifecycleOwner.lifecycleScope.launch {
+            // Check if the video is valid to be played
+            val isValid = withContext(Dispatchers.IO) {
 
-            // Extract dimensions
-            val widthStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
-            val heightStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
-            val rotationStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)
+                val retriever = MediaMetadataRetriever()
+                try {
+                    retriever.setDataSource(context, uri)
 
-            val width = widthStr?.toIntOrNull() ?: 0
-            val height = heightStr?.toIntOrNull() ?: 0
+                    // Extract dimensions
+                    val widthStr =
+                        retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
+                    val heightStr =
+                        retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
+                    val rotationStr =
+                        retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)
 
-            // Calculate total pixels
-            val pixelCount = width * height
+                    val width = widthStr?.toIntOrNull() ?: 0
+                    val height = heightStr?.toIntOrNull() ?: 0
 
-            // Hard cap at 9 Million to allow DCI 4K but block 5K/8K or "Long 4K" files.
-            val maxPixels = 9_000_000
+                    // Calculate total pixels
+                    val pixelCount = width * height
 
-            Log.i(tag, "Video Analysis: ${width}x${height} ($pixelCount pixels). Max allowed: $maxPixels")
+                    // Hard cap at 9 Million to allow DCI 4K but block 5K/8K or "Long 4K" files.
+                    val maxPixels = 9_000_000
 
-            if (pixelCount > maxPixels) {
-                Toast.makeText(context, "Video too large! Max supported resolution is 4K (UHD).", Toast.LENGTH_LONG).show()
+                    Log.i(
+                        tag,
+                        "Video Analysis: ${width}x${height} ($pixelCount pixels). Max allowed: $maxPixels"
+                    )
+
+                    pixelCount < maxPixels // If valid
+                } catch (e: Exception) {
+                    if (BuildConfig.DEBUG) {
+                        Log.e(tag, "Failed to analyze video dimensions for $uri", e)
+                    } else {
+                        Log.e(tag, "Failed to analyze video dimensions", e)
+                    }
+                    true // We let the check pass anyway on error.
+                } finally {
+                    retriever.release()
+                }
+            }
+
+            if (!isValid) {
+                Toast.makeText(
+                    context,
+                    "Video too large! Max supported resolution is 4K (UHD).",
+                    Toast.LENGTH_LONG
+                ).show()
 
                 // Stop!
-                retriever.release()
-                return
+                return@launch
             }
 
-            retriever.release()
-        } catch (e: Exception) {
-            if (BuildConfig.DEBUG) {
-                Log.e(tag, "Failed to analyze video dimensions for $uri", e)
-            } else {
-                Log.e(tag, "Failed to analyze video dimensions", e)
-            }
-
-        }
-
-
-        // Copy the file to internal storage in a background thread
-        viewLifecycleOwner.lifecycleScope.launch {
+            // Copy the file to internal storage in a background thread
             val copiedFile = withContext(Dispatchers.IO) {
                 videoFileManager.createFileFromContentUri(uri)
             }
@@ -663,7 +705,9 @@ class SettingsFragment : Fragment() {
                 }
                 Toast.makeText(context, getString(R.string.error_copy_failed), Toast.LENGTH_LONG).show()
             }
+
         }
+
     }
 
     /**

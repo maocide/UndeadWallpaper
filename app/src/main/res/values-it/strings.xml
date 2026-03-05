@@ -57,4 +57,10 @@
     <string name="status_bar_white_icons">Bianche</string>
     <string name="status_bar_black_icons">Nere</string>
 
+    <!-- Start Time Settings -->
+    <string name="start_time_label">All\'avvio</string>
+    <string name="start_time_resume">Riprendi</string>
+    <string name="start_time_restart">Riavvia</string>
+    <string name="start_time_random">Casuale</string>
+
 </resources>
