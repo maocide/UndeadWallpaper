@@ -82,17 +82,24 @@ class VideoFileManager(private val context: Context) {
                     }
                 }
             }
+            originalFileName = java.io.File(originalFileName).name
         } catch (e: Exception) {
             Log.w(tag, "Could not query file name, generating fallback.", e)
         }
 
-        // If name query failed or returned blank, generate a timestamp name
+        // Use UUID for the fallback
         if (originalFileName.isBlank()) {
-            originalFileName = "imported_video_${System.currentTimeMillis()}.mp4"
+            originalFileName = "imported_video_${java.util.UUID.randomUUID()}.mp4"
         }
 
         val outputDir = getAppSpecificAlbumStorageDir(context, "videos")
         val outputFile = File(outputDir, originalFileName)
+
+        // If the final path doesn't start with output folder, someone is tampering
+        if (!outputFile.canonicalPath.startsWith(outputDir.canonicalPath)) {
+            Log.e(tag, "Security Warning: Path traversal attempt detected!")
+            return null
+        }
 
         try {
             context.contentResolver.openInputStream(fileUri)?.use { iStream ->
