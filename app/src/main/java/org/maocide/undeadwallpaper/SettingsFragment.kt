@@ -55,6 +55,7 @@ class SettingsFragment : Fragment() {
     private var previewMediaPlayer: MediaPlayer? = null
 
     private var speedValueWarned = false
+    private var randomStartTimeWarned = false
     private var isUpdatingUi = false
 
     // Initialize the shared ViewModel
@@ -427,6 +428,11 @@ class SettingsFragment : Fragment() {
                 else -> StartTime.RESUME
             }
             preferencesManager.saveStartTime(newMode)
+
+            if (newMode == StartTime.RANDOM && !randomStartTimeWarned) {
+                Toast.makeText(requireContext(), R.string.warning_random_start_time_delay, Toast.LENGTH_LONG).show()
+                randomStartTimeWarned = true
+            }
 
             // Specific intent sent to apply
             val intent = Intent(UndeadWallpaperService.ACTION_PLAYBACK_MODE_CHANGED).apply {
