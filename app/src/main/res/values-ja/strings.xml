@@ -50,6 +50,8 @@
     <string name="error_copy_failed">ビデオファイルのコピーに失敗しました。</string>
     <string name="error_cannot_play_video">このビデオファイルは再生できません。</string>
     <string name="warning_high_speed_stuttering">高速再生は高解像度動画でカクつきを引き起こす可能性があります。</string>
+    <string name="error_file_picker_not_available">ファイルピッカーがシステムで利用できません。</string>
+    <string name="error_could_not_read_video_duration">動画の長さを読み取れませんでした。</string>
 
     <!-- Status Bar Icon Color Settings -->
     <string name="status_bar_icons_label">ステータスバーのアイコン</string>

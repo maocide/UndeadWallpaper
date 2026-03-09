@@ -61,6 +61,8 @@
     <string name="error_copy_failed">Failed to copy video file.</string>
     <string name="error_cannot_play_video">Cannot play this video file.</string>
     <string name="warning_high_speed_stuttering">High speeds may cause stuttering on high-res videos.</string>
+    <string name="error_file_picker_not_available">File picker not available in the system!</string>
+    <string name="error_could_not_read_video_duration">Could not read video duration.</string>
 
     <!-- Status Bar Icon Color Settings -->
     <string name="status_bar_icons_label">Status Bar Icons</string>
