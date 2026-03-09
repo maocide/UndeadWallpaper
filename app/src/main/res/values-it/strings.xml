@@ -52,7 +52,7 @@
     <string name="warning_high_speed_stuttering">Velocità elevate potrebbero causare scatti sui video ad alta risoluzione.</string>
     <string name="error_file_picker_not_available">Il selettore file non è disponibile nel sistema!</string>
     <string name="error_could_not_read_video_duration">Impossibile leggere la durata del video.</string>
-
+    <string name="warning_random_start_time_delay">Random potrebbe causare ritardi a causa della ricerca</string>
     <!-- Status Bar Icon Color Settings -->
     <string name="status_bar_icons_label">Icone Barra di Stato</string>
     <string name="status_bar_auto">Automatico</string>
