@@ -16,6 +16,7 @@ import android.service.wallpaper.WallpaperService
 import android.util.Log
 import org.maocide.undeadwallpaper.BuildConfig
 import android.view.SurfaceHolder
+import androidx.core.content.ContextCompat
 import android.widget.Toast
 import androidx.annotation.OptIn
 import androidx.annotation.RequiresApi
@@ -629,14 +630,14 @@ class UndeadWallpaperService : WallpaperService() {
                 addAction(ACTION_PLAYBACK_MODE_CHANGED)
                 addAction(ACTION_STATUS_BAR_COLOR_CHANGED)
             }
-            // Using registerReceiver with the RECEIVER_NOT_EXPORTED flag is the way...
-            // more modern, secure for Android 13+
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                registerReceiver(videoChangeReceiver, intentFilter, RECEIVER_NOT_EXPORTED)
-            } else {
-                @Suppress("UnspecifiedRegisterReceiverFlag") // Flag not needed for older APIs
-                registerReceiver(videoChangeReceiver, intentFilter)
-            }
+            // Registering the broadcast receiver with ContextCompat.RECEIVER_NOT_EXPORTED
+            // ensures it is secure across all API levels by preventing external intent injection.
+            ContextCompat.registerReceiver(
+                this@UndeadWallpaperService,
+                videoChangeReceiver,
+                intentFilter,
+                ContextCompat.RECEIVER_NOT_EXPORTED
+            )
         }
 
 

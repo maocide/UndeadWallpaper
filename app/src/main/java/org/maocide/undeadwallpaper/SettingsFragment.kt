@@ -229,7 +229,9 @@ class SettingsFragment : Fragment() {
         // Save the preference and notify the service to reload the video from that value
         if(forceChange) {
             preferencesManager.saveVideoUri(uri.toString())
-            val intent = Intent(UndeadWallpaperService.ACTION_VIDEO_URI_CHANGED)
+            val intent = Intent(UndeadWallpaperService.ACTION_VIDEO_URI_CHANGED).apply {
+                setPackage(context?.packageName)
+            }
             context?.sendBroadcast(intent)
         }
 
