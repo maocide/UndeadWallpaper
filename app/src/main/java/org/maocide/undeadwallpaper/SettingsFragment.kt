@@ -2,6 +2,7 @@ package org.maocide.undeadwallpaper
 
 import android.Manifest
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.MediaMetadataRetriever
@@ -189,7 +190,7 @@ class SettingsFragment : Fragment() {
         // Get duration and update UI
         currentVideoDurationMs = getVideoDuration(uri)
         if (currentVideoDurationMs == 0L) {
-            Toast.makeText(context, "Could not read video duration.", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, R.string.error_could_not_read_video_duration, Toast.LENGTH_LONG).show()
         }
 
         // Update the video preview player
@@ -218,7 +219,7 @@ class SettingsFragment : Fragment() {
         currentVideoDurationMs = getVideoDuration(uri)
         if (currentVideoDurationMs == 0L) {
             // Handle case where duration is invalid or video is corrupt
-            Toast.makeText(context, "Could not read video duration.", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, R.string.error_could_not_read_video_duration, Toast.LENGTH_LONG).show()
         }
 
         // Update the video preview
@@ -604,7 +605,12 @@ class SettingsFragment : Fragment() {
             // We request persistable permissions to access the file across device reboots.
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
         }
-        pickMediaLauncher.launch(intent)
+        try {
+            pickMediaLauncher.launch(intent)
+        } catch (activityNotFoundException: ActivityNotFoundException) {
+            Log.e(tag, "Failed to open file picker", activityNotFoundException)
+            Toast.makeText(context, R.string.error_file_picker_not_available, Toast.LENGTH_LONG).show()
+        }
     }
 
     /**

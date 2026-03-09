@@ -237,7 +237,7 @@ class UndeadWallpaperService : WallpaperService() {
                     5_000   // Buffer for rebuffer
                 )
                 .setTargetBufferBytes(targetBufferBytes)
-                .setPrioritizeTimeOverSizeThresholds(false) // !! Enforce the 32MB cap strictly, otherwise size is priority
+                .setPrioritizeTimeOverSizeThresholds(false) // !! Enforce the 32MB cap strictly, otherwise time is priority. The Above size will be the limit.
                 .build()
 
             // Factory to give on creation to enable a fallback for non standard res, possible very hi res.
@@ -402,6 +402,12 @@ class UndeadWallpaperService : WallpaperService() {
 
                         // If this job was cancelled, video switch or anything, STOP.
                         if (!isActive) return@launch
+
+                        // Check if player is alive, surface is valid, surface is ready.
+                        if (mediaPlayer == null || surfaceHolder == null || surfaceHolder?.surface == null || !surfaceHolder?.surface?.isValid!!) {
+                            Log.w(TAG, "Engine destroyed or surface invalid before player setup completed. Aborting.")
+                            return@launch
+                        }
 
                         if (glSurface != null) {
                             seekTo(playheadTime)
