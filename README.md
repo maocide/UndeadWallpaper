@@ -32,9 +32,9 @@ This isn't just a clever pun on "live" wallpaper. The name **UndeadWallpaper** i
 
 ## Join the Horde! (Contribute & Connect)
 
-This project clawed its way back from the dead, but it was the **community** that truly gave it a soul. The launch on Reddit was a whirlwind of incredible feedback, brilliant ideas, and amazing support. It's where the next chapter of this story is being written.
+This project clawed its way back from the dead, but it was the **people** that truly gave it a soul.
 
-* Want to see what the horde is saying? **[Dive into the main feedback thread right here!](https://www.reddit.com/r/androidapps/comments/your_thread_id_here)**
+* Want to see what the horde is saying? **[Dive into the main feedback thread right here!](https://www.reddit.com/r/androidapps/comments/1nl2zwj/i_made_a_free_noads_opensource_app_that_lets_you/)**
 
 Got your own ideas? Found a bug? Wanna make this thing even more badass? Contributions are not just welcome; they're celebrated!
 
