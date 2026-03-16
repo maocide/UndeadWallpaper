@@ -283,6 +283,9 @@ class SettingsFragment : Fragment() {
                     .setTitle(getString(R.string.delete_file_title))
                     .setMessage(getString(R.string.delete_file_message, item.file.name))
                     .setPositiveButton(getString(R.string.delete)) { _, _ ->
+                        val deletedUriString = Uri.fromFile(item.file).toString()
+                        val currentUriString = preferencesManager.getVideoUri()
+
                         // 1. Remove from adapter
                         recentFilesAdapter.onItemDismiss(position)
 
@@ -293,6 +296,26 @@ class SettingsFragment : Fragment() {
 
                         // 3. Save new list order
                         saveCurrentPlaylistOrder()
+
+                        // 4. Handle edge case: User deleted the currently playing video
+                        if (deletedUriString == currentUriString) {
+                            val nextItem = recentFilesAdapter.getItems().firstOrNull()
+                            if (nextItem != null) {
+                                val newUri = Uri.fromFile(nextItem.file)
+                                viewLifecycleOwner.lifecycleScope.launch {
+                                    updateVideoSource(newUri, true)
+                                }
+                            } else {
+                                // Fallback if list is entirely empty (shouldn't happen due to default asset protection)
+                                viewLifecycleOwner.lifecycleScope.launch {
+                                    ensureDefaultVideoExists()
+                                    val defaultUri = preferencesManager.getVideoUri()
+                                    if (defaultUri != null) {
+                                        updateVideoSource(defaultUri.toUri(), true)
+                                    }
+                                }
+                            }
+                        }
                     }
                     .setNegativeButton(getString(R.string.cancel)) { dialog, _ ->
                         recentFilesAdapter.notifyItemChanged(position)
