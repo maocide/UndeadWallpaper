@@ -1,17 +1,22 @@
 package org.maocide.undeadwallpaper
 
 import android.graphics.Bitmap
+import android.graphics.Color
+import android.net.Uri
+import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import java.io.File
 import java.util.Collections
 
 class RecentFilesAdapter(
     private val recentFiles: MutableList<RecentFile>,
+    var currentVideoUriString: String?,
     private val onItemClick: (RecentFile) -> Unit
 ) : RecyclerView.Adapter<RecentFilesAdapter.ViewHolder>() {
 
@@ -73,6 +78,20 @@ class RecentFilesAdapter(
             fileName.text = recentFile.file.name
             if (recentFile.thumbnail != null) {
                 thumbnail.setImageBitmap(recentFile.thumbnail)
+            } else {
+                thumbnail.setImageDrawable(null) // clear if recycled
+            }
+
+            val itemUriString = Uri.fromFile(recentFile.file).toString()
+            if (itemUriString == currentVideoUriString) {
+                // Highlight the active row using colorControlHighlight
+                val typedValue = TypedValue()
+                itemView.context.theme.resolveAttribute(android.R.attr.colorControlHighlight, typedValue, true)
+                val color = ContextCompat.getColor(itemView.context, typedValue.resourceId)
+                itemView.setBackgroundColor(color)
+            } else {
+                // Reset background
+                itemView.setBackgroundColor(Color.TRANSPARENT)
             }
         }
     }

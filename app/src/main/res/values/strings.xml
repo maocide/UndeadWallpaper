@@ -13,6 +13,8 @@
     <string name="setting_audio_enabled">Enable Audio</string>
     <string name="playback_mode_setting">Playback Mode</string>
     <string name="recent_files">Recent Files</string>
+    <string name="playlist_instructions">Long-press to reorder. Swipe left or right to delete.</string>
+    <string name="error_cannot_delete_last_video">Cannot delete the last video in the playlist.</string>
     <string name="apply_trim">Apply</string>
     <string name="wallpaper_description">A live wallpaper that plays video.</string>
     <string name="activating_wallpaper_message">Activating wallpaper…</string>

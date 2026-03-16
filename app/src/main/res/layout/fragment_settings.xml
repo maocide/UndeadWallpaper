@@ -505,6 +505,14 @@
                     android:text="@string/recent_files"
                     android:textAppearance="?attr/textAppearanceTitleMedium" />
 
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/playlist_instructions"
+                    android:textAppearance="?attr/textAppearanceCaption"
+                    android:textColor="?android:attr/textColorSecondary" />
+
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/recycler_view_recent_files"
                     android:layout_width="match_parent"

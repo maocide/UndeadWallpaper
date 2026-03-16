@@ -248,12 +248,14 @@ class SettingsFragment : Fragment() {
      * Sets up the RecyclerView for displaying recent files.
      */
     private fun setupRecyclerView() {
+        val currentUri = preferencesManager.getVideoUri()
         recentFilesAdapter = RecentFilesAdapter(
             recentFiles,
+            currentVideoUriString = currentUri,
             onItemClick = { recentFile ->
                 val fileUri = Uri.fromFile(recentFile.file)
                 viewLifecycleOwner.lifecycleScope.launch {
-                    updateVideoSource(fileUri, false)
+                    updateVideoSource(fileUri, true)
                 }
             }
         )
@@ -278,6 +280,12 @@ class SettingsFragment : Fragment() {
             override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
                 val position = viewHolder.bindingAdapterPosition
                 val item = recentFilesAdapter.getItems()[position]
+
+                if (recentFilesAdapter.itemCount <= 1) {
+                    Toast.makeText(context, getString(R.string.error_cannot_delete_last_video), Toast.LENGTH_SHORT).show()
+                    recentFilesAdapter.notifyItemChanged(position)
+                    return
+                }
 
                 MaterialAlertDialogBuilder(requireContext())
                     .setTitle(getString(R.string.delete_file_title))
@@ -333,13 +341,11 @@ class SettingsFragment : Fragment() {
                 saveCurrentPlaylistOrder()
             }
 
-            // disable swipe on default asset
             override fun getSwipeDirs(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder): Int {
                 val position = viewHolder.bindingAdapterPosition
                 if (position == RecyclerView.NO_POSITION) return 0
-                val item = recentFilesAdapter.getItems()[position]
-                if (item.file.name == getString(R.string.default_video_filename)) {
-                    return 0 // Disable swipe
+                if (recentFilesAdapter.itemCount <= 1) {
+                    return 0 // Disable swipe if it's the last item
                 }
                 return super.getSwipeDirs(recyclerView, viewHolder)
             }
