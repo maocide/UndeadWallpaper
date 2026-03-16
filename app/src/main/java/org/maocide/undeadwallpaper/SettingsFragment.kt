@@ -219,6 +219,12 @@ class SettingsFragment : Fragment() {
         // Store the new video URI as a shared value
         sharedViewModel.selectedVideoUri = uri
 
+        // Update the active video highlight in the adapter
+        if (::recentFilesAdapter.isInitialized) {
+            recentFilesAdapter.currentVideoUriString = uri.toString()
+            recentFilesAdapter.notifyDataSetChanged()
+        }
+
         // Get duration and update UI
         currentVideoDurationMs = getVideoDuration(uri)
         if (currentVideoDurationMs == 0L) {
