@@ -84,14 +84,17 @@ class RecentFilesAdapter(
 
             val itemUriString = Uri.fromFile(recentFile.file).toString()
             if (itemUriString == currentVideoUriString) {
-                // Highlight the active row using colorControlHighlight
+                // Highlight the active row using the app's primary color with 20% opacity
                 val typedValue = TypedValue()
-                itemView.context.theme.resolveAttribute(android.R.attr.colorControlHighlight, typedValue, true)
-                val color = ContextCompat.getColor(itemView.context, typedValue.resourceId)
-                itemView.setBackgroundColor(color)
+                itemView.context.theme.resolveAttribute(androidx.appcompat.R.attr.colorPrimary, typedValue, true)
+                val primaryColor = ContextCompat.getColor(itemView.context, typedValue.resourceId)
+                // 51 is roughly 20% alpha (0.2 * 255)
+                val highlightColor = androidx.core.graphics.ColorUtils.setAlphaComponent(primaryColor, 51)
+
+                itemView.findViewById<View>(R.id.item_container).setBackgroundColor(highlightColor)
             } else {
                 // Reset background
-                itemView.setBackgroundColor(Color.TRANSPARENT)
+                itemView.findViewById<View>(R.id.item_container).setBackgroundColor(Color.TRANSPARENT)
             }
         }
     }

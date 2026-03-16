@@ -248,7 +248,7 @@ class SettingsFragment : Fragment() {
      * Sets up the RecyclerView for displaying recent files.
      */
     private fun setupRecyclerView() {
-        val currentUri = preferencesManager.getVideoUri()
+        val currentUri = sharedViewModel.selectedVideoUri?.toString() ?: preferencesManager.getVideoUri()
         recentFilesAdapter = RecentFilesAdapter(
             recentFiles,
             currentVideoUriString = currentUri,
