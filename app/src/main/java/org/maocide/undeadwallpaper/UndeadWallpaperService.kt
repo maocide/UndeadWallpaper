@@ -261,15 +261,47 @@ class UndeadWallpaperService : WallpaperService() {
                         return
                     }
 
-                    // Build a MediaItem WITHOUT the clipping config.
-                    val mediaItem = MediaItem.fromUri(mediaUri)
+                    // Setup Media Source(s) based on playback mode
+                    val dataSourceFactory = DefaultDataSource.Factory(baseContext)
+                    val mediaSourceFactory = ProgressiveMediaSource.Factory(dataSourceFactory)
 
-                    // Create the base MediaSource from that item.
-                    val mediaSource = ProgressiveMediaSource.Factory(DefaultDataSource.Factory(baseContext))
-                        .createMediaSource(mediaItem)
+                    if (currentPlaybackMode == PlaybackMode.LOOP_ALL || currentPlaybackMode == PlaybackMode.SHUFFLE) {
+                        // Load full playlist
+                        val playlistUris = playlistManager.getPlaylistUris()
 
-                    // Set source and configure proper looping.
-                    setMediaSource(mediaSource)
+                        if (playlistUris.isNotEmpty()) {
+                            val mediaSources = playlistUris.map { uriStr ->
+                                val mediaItem = MediaItem.Builder()
+                                    .setUri(uriStr)
+                                    .setMediaId(uriStr)
+                                    .build()
+                                mediaSourceFactory.createMediaSource(mediaItem)
+                            }
+
+                            // Find starting index
+                            var startIndex = playlistUris.indexOf(loadedVideoUriString)
+                            if (startIndex == -1) startIndex = 0
+
+                            setMediaSources(mediaSources)
+                            seekTo(startIndex, playheadTime)
+                        } else {
+                            // Fallback to single file if playlist is empty
+                            val mediaItem = MediaItem.Builder()
+                                .setUri(mediaUri)
+                                .setMediaId(loadedVideoUriString)
+                                .build()
+                            setMediaSource(mediaSourceFactory.createMediaSource(mediaItem))
+                            seekTo(playheadTime)
+                        }
+                    } else {
+                        // Single file mode
+                        val mediaItem = MediaItem.Builder()
+                            .setUri(mediaUri)
+                            .setMediaId(loadedVideoUriString)
+                            .build()
+                        setMediaSource(mediaSourceFactory.createMediaSource(mediaItem))
+                        seekTo(playheadTime)
+                    }
 
                     // Apply volume
                     volume = if (isAudioEnabled) 1f else 0f
@@ -277,13 +309,27 @@ class UndeadWallpaperService : WallpaperService() {
                     // Apply speed
                     setPlaybackSpeed(speed)
 
-                    // Looping or One shot mode
-                    if(currentPlaybackMode == PlaybackMode.LOOP)
-                        repeatMode = Player.REPEAT_MODE_ONE // Use built-in looping
-                    else
-                        repeatMode = Player.REPEAT_MODE_OFF // Use one shot, Loop All, or Shuffle
+                    // Configure Repeat & Shuffle Modes
+                    when (currentPlaybackMode) {
+                        PlaybackMode.LOOP -> {
+                            repeatMode = Player.REPEAT_MODE_ONE
+                            shuffleModeEnabled = false
+                        }
+                        PlaybackMode.ONE_SHOT -> {
+                            repeatMode = Player.REPEAT_MODE_OFF
+                            shuffleModeEnabled = false
+                        }
+                        PlaybackMode.LOOP_ALL -> {
+                            repeatMode = Player.REPEAT_MODE_ALL
+                            shuffleModeEnabled = false
+                        }
+                        PlaybackMode.SHUFFLE -> {
+                            repeatMode = Player.REPEAT_MODE_ALL
+                            shuffleModeEnabled = true
+                        }
+                    }
 
-                    Log.d(TAG, "repeatMode: $repeatMode")
+                    Log.d(TAG, "repeatMode: $repeatMode, shuffleModeEnabled: $shuffleModeEnabled")
 
                     // Send all values to renderer updating it, will be used for matrix calc.
                     refreshRenderer()
@@ -340,17 +386,17 @@ class UndeadWallpaperService : WallpaperService() {
                         override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
                             super.onVideoSizeChanged(videoSize)
 
-                            // Send video size to Renderer for Matrix Calculation
-                            renderer?.setVideoSize(videoSize.width, videoSize.height)
-
-                            // refresh all user values to renderer
-                            refreshRenderer()
-
                             // Check for 0x0 size
                             if (videoSize.width == 0 || videoSize.height == 0) {
                                 Log.w(TAG, "Ignoring invalid 0x0 video size change.")
                                 return
                             }
+
+                            // Send video size to Renderer for Matrix Calculation
+                            renderer?.setVideoSize(videoSize.width, videoSize.height)
+
+                            // refresh all user values to renderer
+                            refreshRenderer()
 
                             // Old code for exoplayer surface
                             /* Should be only needed when using exoplayer surface
@@ -393,31 +439,16 @@ class UndeadWallpaperService : WallpaperService() {
                                         if (hasPlaybackCompleted) pause()
                                     }
                                 }
-                            } else if (currentPlaybackMode == PlaybackMode.LOOP_ALL || currentPlaybackMode == PlaybackMode.SHUFFLE) {
-                                if (playbackState == Player.STATE_ENDED) {
-                                    Log.i(TAG, "Playback ended for $currentPlaybackMode mode. Getting next video.")
-                                    val nextUriString = playlistManager.getNextVideoUri(loadedVideoUriString, currentPlaybackMode)
+                            }
+                        }
 
-                                    if (nextUriString != null && nextUriString != loadedVideoUriString) {
-                                        // Save to prefs so it survives a reboot/service restart
-                                        prefs.saveVideoUri(nextUriString)
-
-                                        // Stop the old, load the new, and play
-                                        playheadTime = 0L
-                                        loadedVideoUriString = nextUriString
-                                        val nextMediaItem = MediaItem.fromUri(nextUriString)
-                                        val nextMediaSource = ProgressiveMediaSource.Factory(DefaultDataSource.Factory(baseContext))
-                                            .createMediaSource(nextMediaItem)
-
-                                        setMediaSource(nextMediaSource)
-                                        prepare()
-                                        play()
-                                    } else {
-                                        Log.w(TAG, "No next video found (or single video playlist), replaying current.")
-                                        seekTo(0)
-                                        play()
-                                    }
-                                }
+                        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                            super.onMediaItemTransition(mediaItem, reason)
+                            val nextUriString = mediaItem?.mediaId
+                            if (nextUriString != null && nextUriString != loadedVideoUriString) {
+                                Log.i(TAG, "Transitioning to next video in playlist: $nextUriString")
+                                loadedVideoUriString = nextUriString
+                                prefs.saveVideoUri(nextUriString)
                             }
                         }
                     })
@@ -437,7 +468,11 @@ class UndeadWallpaperService : WallpaperService() {
                         }
 
                         if (glSurface != null) {
-                            seekTo(playheadTime)
+                            if (currentPlaybackMode == PlaybackMode.LOOP_ALL || currentPlaybackMode == PlaybackMode.SHUFFLE) {
+                                seekTo(currentMediaItemIndex, playheadTime)
+                            } else {
+                                seekTo(playheadTime)
+                            }
                             setVideoSurface(glSurface)
                             prepare()
                             play()
@@ -613,13 +648,13 @@ class UndeadWallpaperService : WallpaperService() {
                         if (currentPlaybackMode == PlaybackMode.ONE_SHOT && hasPlaybackCompleted && !isPreview()) {
                             Log.i(TAG, "One Shot completed previously, restarting from 0")
                             playheadTime = 0L // Sync state
-                            player.seekTo(0L)
+                            player.seekToDefaultPosition()
                             hasPlaybackCompleted = false
                         }
                     }
                     StartTime.RESTART -> {
                         playheadTime = 0L // Sync state
-                        player.seekTo(0L)
+                        player.seekToDefaultPosition()
                         hasPlaybackCompleted = false
                     }
                     StartTime.RANDOM -> {
@@ -628,10 +663,10 @@ class UndeadWallpaperService : WallpaperService() {
                             val randomPos = Random.nextLong(0, duration)
                             Log.d(TAG, "Seeking to random pos: $randomPos")
                             playheadTime = randomPos // Sync state so coroutine to hook to GLRenderer doesn't overwrite it!
-                            player.seekTo(randomPos)
+                            player.seekTo(player.currentMediaItemIndex, randomPos)
                         } else {
                             playheadTime = 0L
-                            player.seekTo(0L)
+                            player.seekToDefaultPosition()
                         }
                         hasPlaybackCompleted = false
                     }
