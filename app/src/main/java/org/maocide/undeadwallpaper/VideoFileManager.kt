@@ -144,26 +144,62 @@ class VideoFileManager(private val context: Context) {
     }
 
     /**
-     * Loads the list of recent video files from the app's storage.
+     * Loads the list of recent video files from the app's storage,
+     * synchronizing it with the persisted order.
      *
-     * @return A list of [RecentFile] objects.
+     * @return A list of [RecentFile] objects in the correct order.
      */
     suspend fun loadRecentFiles(): List<RecentFile> = withContext(Dispatchers.IO) {
         val videosDir = getAppSpecificAlbumStorageDir(context, "videos")
-        val files = videosDir.listFiles() ?: return@withContext emptyList()
+        val physicalFiles = videosDir.listFiles() ?: return@withContext emptyList()
+        val preferencesManager = PreferencesManager(context)
+
+        // 1. Get the persisted list of filenames
+        val persistedFileNames = preferencesManager.getRecentFilesList().toMutableList()
+
+        // 2. Identify physical files that are NOT in the persisted list (e.g., newly imported)
+        val physicalFileNames = physicalFiles.map { it.name }.toSet()
+        val newPhysicalFiles = physicalFiles.filter { it.name !in persistedFileNames }
+
+        // 3. Sort new files by modification date (newest first)
+        val sortedNewFiles = newPhysicalFiles.sortedByDescending { it.lastModified() }
+        val sortedNewFileNames = sortedNewFiles.map { it.name }
+
+        // 4. Identify files in the persisted list that no longer exist physically
+        persistedFileNames.retainAll(physicalFileNames)
+
+        // 5. Prepend new files to the beginning of the persisted list (to maintain "recent" behavior)
+        if (sortedNewFileNames.isNotEmpty()) {
+            persistedFileNames.addAll(0, sortedNewFileNames)
+        }
+
+        // 6. Save the synchronized list back to SharedPreferences if it was changed
+        if (sortedNewFileNames.isNotEmpty() || persistedFileNames.size != physicalFiles.size) {
+            preferencesManager.saveRecentFilesList(persistedFileNames)
+        }
+
+        // 7. Create a lookup map for physical files to maintain O(1) access
+        val physicalFileMap = physicalFiles.associateBy { it.name }
+
+        // 8. Generate thumbnails based on the synchronized order
         val semaphore = Semaphore(4) // Limit to 4 concurrent thumbnail generations
 
-        files.map { file ->
-            async {
-                semaphore.withPermit {
-                    try {
-                        val thumbnail = createVideoThumbnail(file.path)
-                        RecentFile(file, thumbnail)
-                    } catch (e: Exception) {
-                        Log.e(tag, "Error loading thumbnail for ${file.name}", e)
-                        RecentFile(file, null)
+        persistedFileNames.mapNotNull { fileName ->
+            val file = physicalFileMap[fileName]
+            if (file != null) {
+                async {
+                    semaphore.withPermit {
+                        try {
+                            val thumbnail = createVideoThumbnail(file.path)
+                            RecentFile(file, thumbnail)
+                        } catch (e: Exception) {
+                            Log.e(tag, "Error loading thumbnail for ${file.name}", e)
+                            RecentFile(file, null)
+                        }
                     }
                 }
+            } else {
+                null
             }
         }.awaitAll()
     }

@@ -26,6 +26,9 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.transition.AutoTransition
 import androidx.transition.TransitionManager
+import androidx.recyclerview.widget.ItemTouchHelper
+import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -256,6 +259,78 @@ class SettingsFragment : Fragment() {
         )
         binding.recyclerViewRecentFiles.layoutManager = LinearLayoutManager(context)
         binding.recyclerViewRecentFiles.adapter = recentFilesAdapter
+
+        val itemTouchHelperCallback = object : ItemTouchHelper.SimpleCallback(
+            ItemTouchHelper.UP or ItemTouchHelper.DOWN, // Drag directions
+            ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT // Swipe directions
+        ) {
+            override fun onMove(
+                recyclerView: RecyclerView,
+                viewHolder: RecyclerView.ViewHolder,
+                target: RecyclerView.ViewHolder
+            ): Boolean {
+                val fromPos = viewHolder.bindingAdapterPosition
+                val toPos = target.bindingAdapterPosition
+                recentFilesAdapter.onItemMove(fromPos, toPos)
+                return true
+            }
+
+            override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
+                val position = viewHolder.bindingAdapterPosition
+                val item = recentFilesAdapter.getItems()[position]
+
+                MaterialAlertDialogBuilder(requireContext())
+                    .setTitle(getString(R.string.delete_file_title))
+                    .setMessage(getString(R.string.delete_file_message, item.file.name))
+                    .setPositiveButton(getString(R.string.delete)) { _, _ ->
+                        // 1. Remove from adapter
+                        recentFilesAdapter.onItemDismiss(position)
+
+                        // 2. Delete physical file
+                        if (item.file.exists()) {
+                            item.file.delete()
+                        }
+
+                        // 3. Save new list order
+                        saveCurrentPlaylistOrder()
+                    }
+                    .setNegativeButton(getString(R.string.cancel)) { dialog, _ ->
+                        recentFilesAdapter.notifyItemChanged(position)
+                        dialog.dismiss()
+                    }
+                    .setOnCancelListener {
+                        recentFilesAdapter.notifyItemChanged(position)
+                    }
+                    .show()
+            }
+
+            override fun clearView(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder) {
+                super.clearView(recyclerView, viewHolder)
+                // Called when drag or swipe is completed (dropped)
+                saveCurrentPlaylistOrder()
+            }
+
+            // disable swipe on default asset
+            override fun getSwipeDirs(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder): Int {
+                val position = viewHolder.bindingAdapterPosition
+                if (position == RecyclerView.NO_POSITION) return 0
+                val item = recentFilesAdapter.getItems()[position]
+                if (item.file.name == getString(R.string.default_video_filename)) {
+                    return 0 // Disable swipe
+                }
+                return super.getSwipeDirs(recyclerView, viewHolder)
+            }
+        }
+
+        ItemTouchHelper(itemTouchHelperCallback).attachToRecyclerView(binding.recyclerViewRecentFiles)
+    }
+
+    /**
+     * Saves the current order of files from the adapter to SharedPreferences.
+     */
+    private fun saveCurrentPlaylistOrder() {
+        val currentFileNames = recentFilesAdapter.getItems().map { it.file.name }
+        preferencesManager.saveRecentFilesList(currentFileNames)
     }
 
     /**
@@ -264,8 +339,7 @@ class SettingsFragment : Fragment() {
     private fun loadRecentFiles() {
         viewLifecycleOwner.lifecycleScope.launch {
             val files = withContext(Dispatchers.IO) {
-                val rawFiles = videoFileManager.loadRecentFiles()
-                rawFiles.sortedWith(compareBy({ it.file.lastModified() }, { it.file.name })).reversed()
+                videoFileManager.loadRecentFiles()
             }
             recentFiles.clear()
             recentFiles.addAll(files)

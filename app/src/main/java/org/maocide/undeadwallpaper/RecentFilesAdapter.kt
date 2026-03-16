@@ -8,6 +8,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import java.io.File
+import java.util.Collections
 
 class RecentFilesAdapter(
     private val recentFiles: MutableList<RecentFile>,
@@ -31,6 +32,28 @@ class RecentFilesAdapter(
         recentFiles.clear()
         recentFiles.addAll(newFiles)
         notifyDataSetChanged()
+    }
+
+    fun onItemMove(fromPosition: Int, toPosition: Int) {
+        if (fromPosition < toPosition) {
+            for (i in fromPosition until toPosition) {
+                Collections.swap(recentFiles, i, i + 1)
+            }
+        } else {
+            for (i in fromPosition downTo toPosition + 1) {
+                Collections.swap(recentFiles, i, i - 1)
+            }
+        }
+        notifyItemMoved(fromPosition, toPosition)
+    }
+
+    fun onItemDismiss(position: Int) {
+        recentFiles.removeAt(position)
+        notifyItemRemoved(position)
+    }
+
+    fun getItems(): List<RecentFile> {
+        return recentFiles.toList()
     }
 
     inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {

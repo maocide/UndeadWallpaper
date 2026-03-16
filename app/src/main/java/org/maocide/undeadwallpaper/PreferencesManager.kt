@@ -3,6 +3,8 @@ package org.maocide.undeadwallpaper
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.maocide.undeadwallpaper.model.PlaybackMode
 import org.maocide.undeadwallpaper.model.ScalingMode
 import org.maocide.undeadwallpaper.model.StartTime
@@ -37,6 +39,8 @@ class PreferencesManager(context: Context) {
 
         private const val KEY_START_TIME = "start_time"
         private const val KEY_SPEED = "video_speed"
+
+        private const val KEY_RECENT_FILES_LIST = "recent_files_list"
     }
 
     /**
@@ -249,6 +253,31 @@ class PreferencesManager(context: Context) {
         return sharedPrefs.getFloat(KEY_SPEED, 1.0f)
     }
 
+    /**
+     * Saves the list of recent files to SharedPreferences as a JSON string.
+     *
+     * @param recentFilesList The list of file names.
+     */
+    fun saveRecentFilesList(recentFilesList: List<String>) {
+        val jsonString = Json.encodeToString(recentFilesList)
+        sharedPrefs.edit { putString(KEY_RECENT_FILES_LIST, jsonString) }
+    }
 
+    /**
+     * Retrieves the list of recent files from SharedPreferences.
+     *
+     * @return The list of file names, or an empty list if not found or on error.
+     */
+    fun getRecentFilesList(): List<String> {
+        val jsonString = sharedPrefs.getString(KEY_RECENT_FILES_LIST, null)
+        if (jsonString.isNullOrBlank()) {
+            return emptyList()
+        }
+        return try {
+            Json.decodeFromString<List<String>>(jsonString)
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
 
 }
