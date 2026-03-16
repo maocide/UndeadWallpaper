@@ -350,9 +350,6 @@ class SettingsFragment : Fragment() {
             override fun getSwipeDirs(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder): Int {
                 val position = viewHolder.bindingAdapterPosition
                 if (position == RecyclerView.NO_POSITION) return 0
-                if (recentFilesAdapter.itemCount <= 1) {
-                    return 0 // Disable swipe if it's the last item
-                }
                 return super.getSwipeDirs(recyclerView, viewHolder)
             }
         }
