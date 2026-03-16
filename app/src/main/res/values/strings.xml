@@ -76,5 +76,9 @@
     <string name="start_time_restart">Restart</string>
     <string name="start_time_random">Random</string>
 
+    <string name="delete_file_title">Delete Video</string>
+    <string name="delete_file_message">Are you sure you want to delete %s?</string>
+    <string name="delete">Delete</string>
+    <string name="cancel">Cancel</string>
 
 </resources>
