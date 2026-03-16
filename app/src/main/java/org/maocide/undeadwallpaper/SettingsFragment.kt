@@ -300,18 +300,18 @@ class SettingsFragment : Fragment() {
                         val deletedUriString = Uri.fromFile(item.file).toString()
                         val currentUriString = preferencesManager.getVideoUri()
 
-                        // 1. Remove from adapter
+                        // Remove from adapter
                         recentFilesAdapter.onItemDismiss(position)
 
-                        // 2. Delete physical file
+                        // Delete physical file
                         if (item.file.exists()) {
                             item.file.delete()
                         }
 
-                        // 3. Save new list order
+                        // Save new list order
                         saveCurrentPlaylistOrder()
 
-                        // 4. Handle edge case: User deleted the currently playing video
+                        // Edge case: User deleted the currently playing video
                         if (deletedUriString == currentUriString) {
                             val nextItem = recentFilesAdapter.getItems().firstOrNull()
                             if (nextItem != null) {
