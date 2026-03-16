@@ -40,8 +40,10 @@
     <string name="about_feature_loops">• Silky-Smooth Loops: Turns any video on your phone into a seamless, stutter-free live wallpaper.</string>
     <string name="about_feature_freedom">• Total Freedom: No ads, no in-app purchases, no bullshit. Ever.</string>
     <string name="about_feature_control">• You\'re in Control: Supports audio toggles and keeps track of your recent videos for quick swaps.</string>
-    <string name="playback_mode_loop">Loop</string>
+    <string name="playback_mode_loop">Loop One</string>
     <string name="playback_mode_oneshot">One Shot</string>
+    <string name="playback_mode_loop_all">Loop All</string>
+    <string name="playback_mode_shuffle">Shuffle</string>
     <string name="scaling_mode">Scaling Mode</string>
     <string name="scaling_mode_fit">Fit</string>
     <string name="scaling_mode_fill">Fill</string>

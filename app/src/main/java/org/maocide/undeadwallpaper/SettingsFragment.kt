@@ -410,6 +410,8 @@ class SettingsFragment : Fragment() {
             when (preferencesManager.getPlaybackMode()) {
                 PlaybackMode.LOOP -> binding.playbackModeGroup.check(binding.playbackModeLoop.id)
                 PlaybackMode.ONE_SHOT -> binding.playbackModeGroup.check(binding.playbackModeOneshot.id)
+                PlaybackMode.LOOP_ALL -> binding.playbackModeGroup.check(binding.playbackModeLoopAll.id)
+                PlaybackMode.SHUFFLE -> binding.playbackModeGroup.check(binding.playbackModeShuffle.id)
             }
 
             // Scaling Mode
@@ -508,6 +510,8 @@ class SettingsFragment : Fragment() {
 
             val newMode = when (checkedId) {
                 binding.playbackModeOneshot.id -> PlaybackMode.ONE_SHOT
+                binding.playbackModeLoopAll.id -> PlaybackMode.LOOP_ALL
+                binding.playbackModeShuffle.id -> PlaybackMode.SHUFFLE
                 else -> PlaybackMode.LOOP
             }
 

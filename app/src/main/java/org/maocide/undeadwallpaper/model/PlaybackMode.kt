@@ -2,5 +2,7 @@ package org.maocide.undeadwallpaper.model
 
 enum class PlaybackMode {
     LOOP,
-    ONE_SHOT
+    ONE_SHOT,
+    LOOP_ALL,
+    SHUFFLE
 }
