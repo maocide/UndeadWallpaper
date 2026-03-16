@@ -10,6 +10,7 @@ import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.WindowManager
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.channels.Channel
@@ -44,6 +45,7 @@ class GLVideoRenderer(private val context: Context) {
     // Surface stuff
     private var surfaceTexture: SurfaceTexture? = null
     private var videoSurface: Surface? = null
+    private var videoSurfaceDeferred = CompletableDeferred<Surface?>()
     private var textureId: Int = 0
 
     private var videoWidth = 0
@@ -208,12 +210,7 @@ class GLVideoRenderer(private val context: Context) {
     }
 
     suspend fun waitForVideoSurface(): Surface? {
-        var limit = 80
-        while (videoSurface == null && limit > 0) {
-            kotlinx.coroutines.delay(100)
-            limit--
-        }
-        return videoSurface
+        return videoSurfaceDeferred.await()
     }
 
     private suspend fun renderLoop() {
@@ -433,6 +430,7 @@ class GLVideoRenderer(private val context: Context) {
             renderSignal.trySend(Unit)
         }
         videoSurface = Surface(surfaceTexture)
+        videoSurfaceDeferred.complete(videoSurface)
 
         val vertexShader = loadShader(GLES20.GL_VERTEX_SHADER, vertexShaderCode)
         val fragmentShader = loadShader(GLES20.GL_FRAGMENT_SHADER, fragmentShaderCode)
@@ -487,6 +485,11 @@ class GLVideoRenderer(private val context: Context) {
         surfaceTexture?.release() // Release texture explicitly
         videoSurface = null
         surfaceTexture = null
+
+        if (!videoSurfaceDeferred.isCompleted) {
+            videoSurfaceDeferred.complete(null)
+        }
+        videoSurfaceDeferred = CompletableDeferred()
     }
 
     private fun loadShader(type: Int, shaderCode: String): Int {
