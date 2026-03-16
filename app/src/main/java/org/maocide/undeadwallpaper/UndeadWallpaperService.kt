@@ -67,6 +67,7 @@ class UndeadWallpaperService : WallpaperService() {
 
         // Lazy instantiation for performance reuse
         private val prefs by lazy { PreferencesManager(baseContext) }
+        private val playlistManager by lazy { PlaylistManager(baseContext, prefs) }
         private var isAudioEnabled: Boolean = false
         private lateinit var currentScalingMode: ScalingMode
         private var mediaPlayer: ExoPlayer? = null
@@ -280,7 +281,7 @@ class UndeadWallpaperService : WallpaperService() {
                     if(currentPlaybackMode == PlaybackMode.LOOP)
                         repeatMode = Player.REPEAT_MODE_ONE // Use built-in looping
                     else
-                        repeatMode = Player.REPEAT_MODE_OFF // Use one shot
+                        repeatMode = Player.REPEAT_MODE_OFF // Use one shot, Loop All, or Shuffle
 
                     Log.d(TAG, "repeatMode: $repeatMode")
 
@@ -390,6 +391,31 @@ class UndeadWallpaperService : WallpaperService() {
                                     }
                                     Player.STATE_READY -> {
                                         if (hasPlaybackCompleted) pause()
+                                    }
+                                }
+                            } else if (currentPlaybackMode == PlaybackMode.LOOP_ALL || currentPlaybackMode == PlaybackMode.SHUFFLE) {
+                                if (playbackState == Player.STATE_ENDED) {
+                                    Log.i(TAG, "Playback ended for $currentPlaybackMode mode. Getting next video.")
+                                    val nextUriString = playlistManager.getNextVideoUri(loadedVideoUriString, currentPlaybackMode)
+
+                                    if (nextUriString != null && nextUriString != loadedVideoUriString) {
+                                        // Save to prefs so it survives a reboot/service restart
+                                        prefs.saveVideoUri(nextUriString)
+
+                                        // Stop the old, load the new, and play
+                                        playheadTime = 0L
+                                        loadedVideoUriString = nextUriString
+                                        val nextMediaItem = MediaItem.fromUri(nextUriString)
+                                        val nextMediaSource = ProgressiveMediaSource.Factory(DefaultDataSource.Factory(baseContext))
+                                            .createMediaSource(nextMediaItem)
+
+                                        setMediaSource(nextMediaSource)
+                                        prepare()
+                                        play()
+                                    } else {
+                                        Log.w(TAG, "No next video found (or single video playlist), replaying current.")
+                                        seekTo(0)
+                                        play()
                                     }
                                 }
                             }
