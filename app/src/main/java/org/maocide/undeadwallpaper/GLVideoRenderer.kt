@@ -154,8 +154,13 @@ class GLVideoRenderer(private val context: Context) {
 
     fun onSurfaceCreated(holder: SurfaceHolder) {
         renderScope.launch {
-            initGL(holder)
-            renderLoop()
+            try {
+                initGL(holder)
+                renderLoop()
+            } catch (e: Exception) {
+                Log.e(tag, "Failed to initialize GL", e)
+                videoSurfaceDeferred.completeExceptionally(e)
+            }
         }
     }
 
@@ -392,30 +397,77 @@ class GLVideoRenderer(private val context: Context) {
         eglDisplay = egl!!.eglGetDisplay(EGL10.EGL_DEFAULT_DISPLAY)
 
         val version = IntArray(2)
-        egl!!.eglInitialize(eglDisplay, version)
+        if (!egl!!.eglInitialize(eglDisplay, version)) {
+            throw IllegalStateException("eglInitialize failed")
+        }
 
-        val configSpec = intArrayOf(
+        val configSpecRGBA8888Recordable = intArrayOf(
             EGL10.EGL_RED_SIZE, 8,
             EGL10.EGL_GREEN_SIZE, 8,
             EGL10.EGL_BLUE_SIZE, 8,
-            EGL10.EGL_ALPHA_SIZE, 8, // MUST stay 8, because screen record function will freeze on android with 0
-            EGL10.EGL_DEPTH_SIZE, 0, // No Depth Buffer (Saves VRAM)
-            EGL10.EGL_STENCIL_SIZE, 0, // No Stencil
-            EGL10.EGL_RENDERABLE_TYPE, 4, // EGL_OPENGL_ES2_BIT
-            EGL_RECORDABLE_ANDROID, 1, // Required to let system record the surface
+            EGL10.EGL_ALPHA_SIZE, 8,
+            EGL10.EGL_DEPTH_SIZE, 0,
+            EGL10.EGL_STENCIL_SIZE, 0,
+            EGL10.EGL_RENDERABLE_TYPE, 4,
+            EGL_RECORDABLE_ANDROID, 1,
+            EGL10.EGL_NONE
+        )
+
+        val configSpecRGB565Recordable = intArrayOf(
+            EGL10.EGL_RED_SIZE, 5,
+            EGL10.EGL_GREEN_SIZE, 6,
+            EGL10.EGL_BLUE_SIZE, 5,
+            EGL10.EGL_ALPHA_SIZE, 0,
+            EGL10.EGL_DEPTH_SIZE, 0,
+            EGL10.EGL_STENCIL_SIZE, 0,
+            EGL10.EGL_RENDERABLE_TYPE, 4,
+            EGL_RECORDABLE_ANDROID, 1,
+            EGL10.EGL_NONE
+        )
+
+        val configSpecRGB565 = intArrayOf(
+            EGL10.EGL_RED_SIZE, 5,
+            EGL10.EGL_GREEN_SIZE, 6,
+            EGL10.EGL_BLUE_SIZE, 5,
+            EGL10.EGL_ALPHA_SIZE, 0,
+            EGL10.EGL_DEPTH_SIZE, 0,
+            EGL10.EGL_STENCIL_SIZE, 0,
+            EGL10.EGL_RENDERABLE_TYPE, 4,
             EGL10.EGL_NONE
         )
 
         val configs = arrayOfNulls<EGLConfig>(1)
         val numConfig = IntArray(1)
-        egl!!.eglChooseConfig(eglDisplay, configSpec, configs, 1, numConfig)
-        val config = configs[0]
+
+        var config: EGLConfig? = null
+
+        if (egl!!.eglChooseConfig(eglDisplay, configSpecRGBA8888Recordable, configs, 1, numConfig) && numConfig[0] > 0) {
+            config = configs[0]
+            Log.i(tag, "Using EGL_RGBA_8888_RECORDABLE config")
+        } else if (egl!!.eglChooseConfig(eglDisplay, configSpecRGB565Recordable, configs, 1, numConfig) && numConfig[0] > 0) {
+            config = configs[0]
+            Log.i(tag, "Using EGL_RGB_565_RECORDABLE config")
+        } else if (egl!!.eglChooseConfig(eglDisplay, configSpecRGB565, configs, 1, numConfig) && numConfig[0] > 0) {
+            config = configs[0]
+            Log.i(tag, "Using EGL_RGB_565 fallback config")
+        } else {
+            throw IllegalStateException("Unable to find a suitable EGL config")
+        }
 
         val attribList = intArrayOf(0x3098, 2, EGL10.EGL_NONE)
         eglContext = egl!!.eglCreateContext(eglDisplay, config, EGL10.EGL_NO_CONTEXT, attribList)
-        eglSurface = egl!!.eglCreateWindowSurface(eglDisplay, config, holder, null)
+        if (eglContext == null || eglContext == EGL10.EGL_NO_CONTEXT) {
+            throw IllegalStateException("eglCreateContext failed")
+        }
 
-        egl!!.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)
+        eglSurface = egl!!.eglCreateWindowSurface(eglDisplay, config, holder, null)
+        if (eglSurface == null || eglSurface == EGL10.EGL_NO_SURFACE) {
+            throw IllegalStateException("eglCreateWindowSurface failed")
+        }
+
+        if (!egl!!.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)) {
+            throw IllegalStateException("eglMakeCurrent failed")
+        }
 
         val textures = IntArray(1)
         GLES20.glGenTextures(1, textures, 0)
@@ -448,26 +500,22 @@ class GLVideoRenderer(private val context: Context) {
         // Check compile status
         val compileStatus = IntArray(1)
         GLES20.glGetShaderiv(fragmentShader, GLES20.GL_COMPILE_STATUS, compileStatus, 0)
-        var failed = false
 
         if (compileStatus[0] == 0) {
             // Retrieve the error message
             val errorMsg = GLES20.glGetShaderInfoLog(fragmentShader)
-            failed = true
             Log.e(tag,"Fragment Shader compile error: $errorMsg")
+            throw IllegalStateException("Fragment Shader compile error: $errorMsg")
         }
 
         GLES20.glGetShaderiv(vertexShader, GLES20.GL_COMPILE_STATUS, compileStatus, 0)
         if (compileStatus[0] == 0) {
             // Retrieve the error message
             val errorMsg = GLES20.glGetShaderInfoLog(vertexShader)
-            failed = true
             Log.e(tag,"Vertex Shader compile error: $errorMsg")
+            throw IllegalStateException("Vertex Shader compile error: $errorMsg")
         }
-        if(!failed)
-            Log.i(tag, "GL Initialized!")
-        else
-            Log.e(tag, "GL Error! ^^^")
+        Log.i(tag, "GL Initialized!")
 
     }
 
