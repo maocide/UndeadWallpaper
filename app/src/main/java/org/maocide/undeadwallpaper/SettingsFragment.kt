@@ -320,7 +320,7 @@ class SettingsFragment : Fragment() {
                                     updateVideoSource(newUri, true)
                                 }
                             } else {
-                                // Fallback if list is entirely empty (shouldn't happen due to default asset protection)
+                                // Fallback if list is entirely empty (shouldn't happen due to 1 video at least enforced)
                                 viewLifecycleOwner.lifecycleScope.launch {
                                     ensureDefaultVideoExists()
                                     val defaultUri = preferencesManager.getVideoUri()
@@ -345,6 +345,12 @@ class SettingsFragment : Fragment() {
                 super.clearView(recyclerView, viewHolder)
                 // Called when drag or swipe is completed (dropped)
                 saveCurrentPlaylistOrder()
+
+                // Send intent to the service to notify a change
+                val intent = Intent(UndeadWallpaperService.ACTION_PLAYLIST_REORDERED).apply {
+                    setPackage(requireContext().packageName)
+                }
+                requireContext().applicationContext.sendBroadcast(intent)
             }
 
             override fun getSwipeDirs(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder): Int {
