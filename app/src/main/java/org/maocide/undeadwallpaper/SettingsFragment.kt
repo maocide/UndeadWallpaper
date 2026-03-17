@@ -298,7 +298,7 @@ class SettingsFragment : Fragment() {
                     .setMessage(getString(R.string.delete_file_message, item.file.name))
                     .setPositiveButton(getString(R.string.delete)) { _, _ ->
                         val deletedUriString = Uri.fromFile(item.file).toString()
-                        val currentUriString = preferencesManager.getVideoUri()
+                        val currentUriString = sharedViewModel.selectedVideoUri?.toString() ?: preferencesManager.getVideoUri()
 
                         // Remove from adapter
                         recentFilesAdapter.onItemDismiss(position)
