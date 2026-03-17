@@ -76,6 +76,7 @@ class UndeadWallpaperService : WallpaperService() {
         private var playheadTime: Long = 0L
         private val TAG: String = javaClass.simpleName
         private var isScalingModeSet = false
+        private var useFallbackSurface = false
 
         private var currentPlaybackMode = PlaybackMode.LOOP
 
@@ -399,24 +400,23 @@ class UndeadWallpaperService : WallpaperService() {
                             // refresh all user values to renderer
                             refreshRenderer()
 
-                            // Old code for exoplayer surface
-                            /* Should be only needed when using exoplayer surface
-                            if (!isScalingModeSet) {
-                                Log.i(TAG, "Valid video size detected: ${videoSize.width}x${videoSize.height}. Setting scaling mode ONCE.")
+                            // Use ExoPlayer's scaling only if fallback surface is used
+                            if (useFallbackSurface) {
+                                if (!isScalingModeSet) {
+                                    Log.i(TAG, "Valid video size detected: ${videoSize.width}x${videoSize.height}. Setting scaling mode ONCE for fallback surface.")
 
-                                val videoAspectRatio = videoSize.width.toFloat() / videoSize.height.toFloat()
-                                val isHorizontalVideo = videoAspectRatio > 1.0
+                                    val videoAspectRatio = videoSize.width.toFloat() / videoSize.height.toFloat()
+                                    val isHorizontalVideo = videoAspectRatio > 1.0
 
-                                this@apply.videoScalingMode = if (isHorizontalVideo) {
-                                    VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
-                                } else {
-                                    VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
-                                } // The same gets applied because the other scaling modes resulted problematic in a surface
-                                // need to clean this app when implementing user defined scaling, but might be not completely possible in a surface
+                                    this@apply.videoScalingMode = if (isHorizontalVideo) {
+                                        VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
+                                    } else {
+                                        VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
+                                    }
 
-                                isScalingModeSet = true // SET THE FLAG SO THIS DOESN'T RUN AGAIN
+                                    isScalingModeSet = true // SET THE FLAG SO THIS DOESN'T RUN AGAIN
+                                }
                             }
-                             */
                         }
 
                         // Listener for status change
@@ -470,7 +470,22 @@ class UndeadWallpaperService : WallpaperService() {
                     // WAIT for the GL Surface, then attach
                     // We need a coroutine here because waitForVideoSurface is suspend
                     playerSetupJob = kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
-                        val glSurface = renderer?.waitForVideoSurface()
+                        var finalSurface: android.view.Surface? = null
+
+                        if (!useFallbackSurface) {
+                            try {
+                                finalSurface = renderer?.waitForVideoSurface()
+                            } catch (e: Exception) {
+                                Log.e(TAG, "GL Renderer failed to provide surface, falling back to default surface", e)
+                                useFallbackSurface = true
+                                releasePlayer()
+                                releaseRenderer()
+                                initializePlayer()
+                                return@launch
+                            }
+                        } else {
+                            finalSurface = surfaceHolder?.surface
+                        }
 
                         // If this job was cancelled, video switch or anything, STOP.
                         if (!isActive) return@launch
@@ -481,13 +496,13 @@ class UndeadWallpaperService : WallpaperService() {
                             return@launch
                         }
 
-                        if (glSurface != null) {
+                        if (finalSurface != null) {
                             if (currentPlaybackMode == PlaybackMode.LOOP_ALL || currentPlaybackMode == PlaybackMode.SHUFFLE) {
                                 seekTo(currentMediaItemIndex, playheadTime)
                             } else {
                                 seekTo(playheadTime)
                             }
-                            setVideoSurface(glSurface)
+                            setVideoSurface(finalSurface)
                             prepare()
                             play()
                         }
@@ -597,9 +612,13 @@ class UndeadWallpaperService : WallpaperService() {
             Log.i(TAG, "onSurfaceCreated")
             this.surfaceHolder = holder
 
-            // Start the GL Renderer
-            renderer = GLVideoRenderer(applicationContext)
-            renderer?.onSurfaceCreated(holder)
+            if (!useFallbackSurface) {
+                // Start the GL Renderer
+                renderer = GLVideoRenderer(applicationContext)
+                renderer?.onSurfaceCreated(holder)
+            } else {
+                Log.i(TAG, "Using fallback surface, skipping GL Renderer creation")
+            }
 
             initializePlayer()
         }
@@ -609,8 +628,10 @@ class UndeadWallpaperService : WallpaperService() {
             Log.i(TAG, "onSurfaceChanged: New dimensions ${width}x${height}")
             this.surfaceHolder = holder
 
-            // Tell Renderer the screen size
-            renderer?.onSurfaceChanged(width, height)
+            if (!useFallbackSurface) {
+                // Tell Renderer the screen size
+                renderer?.onSurfaceChanged(width, height)
+            }
 
             // initializePlayer() // MIGHT BE OVERKILL! TRY WITHOUT
         }
