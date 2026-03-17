@@ -531,6 +531,9 @@ class SettingsFragment : Fragment() {
             }
 
             preferencesManager.setPlaybackMode(newMode)
+            // Forcing an update to current uri in case we switch back from playlist to single video
+            val currentSelectedUri = sharedViewModel.selectedVideoUri?.toString() ?: preferencesManager.getVideoUri()
+            preferencesManager.saveVideoUri(currentSelectedUri.toString())
             notifySettingsChanged()
         }
 
