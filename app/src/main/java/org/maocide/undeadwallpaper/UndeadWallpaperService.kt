@@ -33,6 +33,7 @@ import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.SeekParameters
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder
 import androidx.media3.exoplayer.upstream.DefaultAllocator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
@@ -449,6 +450,19 @@ class UndeadWallpaperService : WallpaperService() {
                                 Log.i(TAG, "Transitioning to next video in playlist: $nextUriString")
                                 loadedVideoUriString = nextUriString
                                 prefs.saveVideoUri(nextUriString)
+                            }
+
+                            // If we hit the end of the shuffled playlist and it repeats, generate a new random order.
+                            val isWrapAround = reason == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT ||
+                                    (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO &&
+                                            currentMediaItemIndex == currentTimeline.getFirstWindowIndex(shuffleModeEnabled))
+
+                            if (isWrapAround && currentPlaybackMode == PlaybackMode.SHUFFLE) {
+                                Log.i(TAG, "Playlist repeated. Generating new shuffle order.")
+                                if (mediaItemCount > 0) {
+                                    val newOrder = DefaultShuffleOrder(mediaItemCount, Random.nextLong())
+                                    (this@apply).setShuffleOrder(newOrder)
+                                }
                             }
                         }
                     })
