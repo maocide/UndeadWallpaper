@@ -374,7 +374,7 @@ class SettingsFragment : Fragment() {
     /**
      * Loads the list of recent files and updates the RecyclerView.
      */
-    private fun loadRecentFiles() {
+    private suspend fun loadRecentFiles() {
         viewLifecycleOwner.lifecycleScope.launch {
             val files = withContext(Dispatchers.IO) {
                 videoFileManager.loadRecentFiles()
@@ -829,7 +829,15 @@ class SettingsFragment : Fragment() {
                 } else {
                     Log.d(tag, "File copied to local storage")
                 }
+
+                // Update the current video
                 updateVideoSource(savedFileUri, false) // Centralized update logic
+
+                // Notifies the service of a change in the playlist
+                val intent = Intent(UndeadWallpaperService.ACTION_PLAYLIST_REORDERED).apply {
+                    setPackage(requireContext().packageName)
+                }
+                requireContext().applicationContext.sendBroadcast(intent)
             } else {
                 if (BuildConfig.DEBUG) {
                     Log.e(tag, "Failed to copy file from URI: $uri")
