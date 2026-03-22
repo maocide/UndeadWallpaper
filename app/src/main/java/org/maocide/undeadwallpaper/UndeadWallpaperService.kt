@@ -14,6 +14,7 @@ import android.os.Handler
 import android.os.Looper
 import android.service.wallpaper.WallpaperService
 import android.util.Log
+import org.maocide.undeadwallpaper.FileLogger
 import org.maocide.undeadwallpaper.BuildConfig
 import android.view.SurfaceHolder
 import androidx.core.content.ContextCompat
@@ -124,11 +125,11 @@ class UndeadWallpaperService : WallpaperService() {
                 // If EITHER is true, the player is stuck with no error.
                 if ((isPlayerStuck || isScreenFrozen) && player.duration > 2000) {
                     stallCount++
-                    Log.w(TAG, "Watchdog: Stall detected! PlayerStuck=$isPlayerStuck, ScreenFrozen=$isScreenFrozen ($stallCount/2)")
+                    FileLogger.w(TAG, "Watchdog: Stall detected! PlayerStuck=$isPlayerStuck, ScreenFrozen=$isScreenFrozen ($stallCount/2)")
 
 
                     if (stallCount >= 2) { // Stalled for ~4 seconds
-                        Log.e(TAG, "Watchdog: STALL CONFIRMED. Restarting player.")
+                        FileLogger.e(TAG, "Watchdog: STALL CONFIRMED. Restarting player.")
                         stallCount = 0
                         initializePlayer() // Force restart
                     }
@@ -200,20 +201,20 @@ class UndeadWallpaperService : WallpaperService() {
                 when (intent?.action) {
                     // Will be called by changing video
                     ACTION_VIDEO_URI_CHANGED -> {
-                        Log.i(TAG, "Broadcast received: Video uri changed, full re-initialization requested.")
+                        FileLogger.i(TAG, "Broadcast received: Video uri changed, full re-initialization requested.")
                         playheadTime = 0L
                         initializePlayer() // force Reinit
                     }
 
                     // Will be called by changing scaling, playback mode, all things requiring a reinit
                     ACTION_PLAYBACK_MODE_CHANGED -> {
-                        Log.i(TAG, "Broadcast received: Playback mode change, full re-initialization requested.")
+                        FileLogger.i(TAG, "Broadcast received: Playback mode change, full re-initialization requested.")
                         playheadTime = 0L
                         initializePlayer() // force Reinit
                     }
 
                     ACTION_STATUS_BAR_COLOR_CHANGED -> {
-                        Log.i(TAG, "Broadcast received: Color changed -> Update just sys colors.")
+                        FileLogger.i(TAG, "Broadcast received: Color changed -> Update just sys colors.")
                         // Only notify the system, DO NOT restart the player
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                             notifyColorsChanged()
@@ -221,7 +222,7 @@ class UndeadWallpaperService : WallpaperService() {
                     }
 
                     ACTION_PLAYLIST_REORDERED -> {
-                        Log.i(TAG, "Playlist reordered. Syncing ExoPlayer timeline.")
+                        FileLogger.i(TAG, "Playlist reordered. Syncing ExoPlayer timeline.")
                         mediaPlayer?.let {
                             // Call the helper (Keep playing seamlessly)
                             bindPlaylistToPlayer(it, keepCurrentPlayback = true)
@@ -257,11 +258,11 @@ class UndeadWallpaperService : WallpaperService() {
             // Get a surface
             val holder = surfaceHolder
             if (holder == null) {
-                Log.w(TAG, "Cannot initialize player: surface is not ready.")
+                FileLogger.w(TAG, "Cannot initialize player: surface is not ready.")
                 return
             }
 
-            Log.i(TAG, "Initializing ExoPlayer...")
+            FileLogger.i(TAG, "Initializing ExoPlayer...")
 
 
             // Load prefs
@@ -309,7 +310,7 @@ class UndeadWallpaperService : WallpaperService() {
                     loadedVideoUriString = mediaUri.toString()
 
                     if (mediaUri == null) {
-                        Log.e(TAG, "Media URI is null, cannot play video.")
+                        FileLogger.e(TAG, "Media URI is null, cannot play video.")
                         return
                     }
 
@@ -342,7 +343,7 @@ class UndeadWallpaperService : WallpaperService() {
                         }
                     }
 
-                    Log.d(TAG, "repeatMode: $repeatMode, shuffleModeEnabled: $shuffleModeEnabled")
+                    FileLogger.d(TAG, "repeatMode: $repeatMode, shuffleModeEnabled: $shuffleModeEnabled")
 
                     // Send all values to renderer updating it, will be used for matrix calc.
                     refreshRenderer()
@@ -352,7 +353,7 @@ class UndeadWallpaperService : WallpaperService() {
 
                         // Listener for error recovery
                         override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                            Log.e(TAG, "ExoPlayer Error: ${error.errorCodeName} - ${error.message}")
+                            FileLogger.e(TAG, "ExoPlayer Error: ${error.errorCodeName} - ${error.message}")
 
                             // Identify if this is a Decoder/Hardware issue
                             val isDecoderError = error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_DECODER_INIT_FAILED ||
@@ -371,7 +372,7 @@ class UndeadWallpaperService : WallpaperService() {
                                 // RETRY ATTEMPT
                                 if (recoveryAttempts < 3) {
                                     recoveryAttempts++
-                                    Log.w(TAG, "Hardware Decoder lost (Attempt $recoveryAttempts/3). Auto-recovering...")
+                                    FileLogger.w(TAG, "Hardware Decoder lost (Attempt $recoveryAttempts/3). Auto-recovering...")
 
                                     releasePlayer()
 
@@ -401,7 +402,7 @@ class UndeadWallpaperService : WallpaperService() {
 
                             // Check for 0x0 size
                             if (videoSize.width == 0 || videoSize.height == 0) {
-                                Log.w(TAG, "Ignoring invalid 0x0 video size change.")
+                                FileLogger.w(TAG, "Ignoring invalid 0x0 video size change.")
                                 return
                             }
 
@@ -414,7 +415,7 @@ class UndeadWallpaperService : WallpaperService() {
                             // Use ExoPlayer's scaling only if fallback surface is used
                             if (useFallbackSurface) {
                                 if (!isScalingModeSet) {
-                                    Log.i(TAG, "Valid video size detected: ${videoSize.width}x${videoSize.height}. Setting scaling mode ONCE for fallback surface.")
+                                    FileLogger.i(TAG, "Valid video size detected: ${videoSize.width}x${videoSize.height}. Setting scaling mode ONCE for fallback surface.")
 
                                     val videoAspectRatio = videoSize.width.toFloat() / videoSize.height.toFloat()
                                     val isHorizontalVideo = videoAspectRatio > 1.0
@@ -443,7 +444,7 @@ class UndeadWallpaperService : WallpaperService() {
                             if (currentPlaybackMode == PlaybackMode.ONE_SHOT) {
                                 when (playbackState) {
                                     Player.STATE_ENDED -> {
-                                        Log.i(TAG, "Playback ended!")
+                                        FileLogger.i(TAG, "Playback ended!")
                                         hasPlaybackCompleted = true
                                         pause()
                                     }
@@ -458,7 +459,7 @@ class UndeadWallpaperService : WallpaperService() {
                             super.onMediaItemTransition(mediaItem, reason)
                             val nextUriString = mediaItem?.mediaId
                             if (nextUriString != null && nextUriString != loadedVideoUriString) {
-                                Log.i(TAG, "Transitioning to next video in playlist: $nextUriString")
+                                FileLogger.i(TAG, "Transitioning to next video in playlist: $nextUriString")
                                 loadedVideoUriString = nextUriString
                                 prefs.saveVideoUri(nextUriString)
                             }
@@ -469,7 +470,7 @@ class UndeadWallpaperService : WallpaperService() {
                                             currentMediaItemIndex == currentTimeline.getFirstWindowIndex(shuffleModeEnabled))
 
                             if (isWrapAround && currentPlaybackMode == PlaybackMode.SHUFFLE) {
-                                Log.i(TAG, "Playlist repeated. Generating new shuffle order.")
+                                FileLogger.i(TAG, "Playlist repeated. Generating new shuffle order.")
                                 if (mediaItemCount > 0) {
                                     val newOrder = DefaultShuffleOrder(mediaItemCount, Random.nextLong())
                                     (this@apply).setShuffleOrder(newOrder)
@@ -487,7 +488,7 @@ class UndeadWallpaperService : WallpaperService() {
                             try {
                                 finalSurface = renderer?.waitForVideoSurface()
                             } catch (e: Exception) {
-                                Log.e(TAG, "GL Renderer failed to provide surface, falling back to default surface", e)
+                                FileLogger.e(TAG, "GL Renderer failed to provide surface, falling back to default surface", e)
                                 useFallbackSurface = true
                                 releasePlayer()
                                 releaseRenderer()
@@ -503,7 +504,7 @@ class UndeadWallpaperService : WallpaperService() {
 
                         // Check if player is alive, surface is valid, surface is ready.
                         if (mediaPlayer == null || surfaceHolder == null || surfaceHolder?.surface == null || !surfaceHolder?.surface?.isValid!!) {
-                            Log.w(TAG, "Engine destroyed or surface invalid before player setup completed. Aborting.")
+                            FileLogger.w(TAG, "Engine destroyed or surface invalid before player setup completed. Aborting.")
                             return@launch
                         }
 
@@ -556,7 +557,7 @@ class UndeadWallpaperService : WallpaperService() {
             playerSetupJob?.cancel()
 
             mediaPlayer?.let { player ->
-                Log.i(TAG, "Releasing ExoPlayer...")
+                FileLogger.i(TAG, "Releasing ExoPlayer...")
                 playheadTime = player.currentPosition
                 player.clearMediaItems()
                 player.release()
@@ -577,7 +578,7 @@ class UndeadWallpaperService : WallpaperService() {
             playerSetupJob?.cancel() // Startup job waiting for GL surface cancelled
 
             if (renderer != null) {
-                Log.i(TAG, "Releasing GlRenderer...")
+                FileLogger.i(TAG, "Releasing GlRenderer...")
                 renderer?.release()
                 renderer = null
             }
@@ -587,13 +588,13 @@ class UndeadWallpaperService : WallpaperService() {
             val uriString = prefs.getVideoUri()
 
             return if (uriString.isNullOrEmpty()) {
-                Log.w(TAG, "Video URI is null or empty.")
+                FileLogger.w(TAG, "Video URI is null or empty.")
                 null
             } else {
                 if (BuildConfig.DEBUG) {
-                    Log.i(TAG, "Found URI: $uriString")
+                    FileLogger.i(TAG, "Found URI: $uriString")
                 } else {
-                    Log.i(TAG, "Found URI in preferences")
+                    FileLogger.i(TAG, "Found URI in preferences")
                 }
                 uriString.toUri()
             }
@@ -604,7 +605,7 @@ class UndeadWallpaperService : WallpaperService() {
          * This prevents a boot loop of the service crashing and restarting.
          */
         private fun handleCriticalError(reason: String) {
-            Log.e(TAG, "CRITICAL ERROR: $reason. Disabling wallpaper.")
+            FileLogger.e(TAG, "CRITICAL ERROR: $reason. Disabling wallpaper.")
 
             Handler(Looper.getMainLooper()).post {
                 Toast.makeText(baseContext, "Wallpaper Disabled: $reason", Toast.LENGTH_LONG).show()
@@ -620,7 +621,7 @@ class UndeadWallpaperService : WallpaperService() {
 
         override fun onSurfaceCreated(holder: SurfaceHolder) {
             super.onSurfaceCreated(holder)
-            Log.i(TAG, "onSurfaceCreated")
+            FileLogger.i(TAG, "onSurfaceCreated")
             this.surfaceHolder = holder
 
             if (!useFallbackSurface) {
@@ -628,7 +629,7 @@ class UndeadWallpaperService : WallpaperService() {
                 renderer = GLVideoRenderer(applicationContext)
                 renderer?.onSurfaceCreated(holder)
             } else {
-                Log.i(TAG, "Using fallback surface, skipping GL Renderer creation")
+                FileLogger.i(TAG, "Using fallback surface, skipping GL Renderer creation")
             }
 
             initializePlayer()
@@ -636,7 +637,7 @@ class UndeadWallpaperService : WallpaperService() {
 
         override fun onSurfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
             super.onSurfaceChanged(holder, format, width, height)
-            Log.i(TAG, "onSurfaceChanged: New dimensions ${width}x${height}")
+            FileLogger.i(TAG, "onSurfaceChanged: New dimensions ${width}x${height}")
             this.surfaceHolder = holder
 
             if (!useFallbackSurface) {
@@ -649,7 +650,7 @@ class UndeadWallpaperService : WallpaperService() {
 
         override fun onSurfaceDestroyed(holder: SurfaceHolder) {
             super.onSurfaceDestroyed(holder)
-            Log.i(TAG, "onSurfaceDestroyed")
+            FileLogger.i(TAG, "onSurfaceDestroyed")
             releasePlayer()
             releaseRenderer()
             this.surfaceHolder = null
@@ -657,7 +658,7 @@ class UndeadWallpaperService : WallpaperService() {
 
         override fun onDestroy() {
             super.onDestroy()
-            Log.i(TAG, "Engine onDestroy")
+            FileLogger.i(TAG, "Engine onDestroy")
             stopStallWatchdog() // Kill the playback watchdog
             releasePlayer()
             releaseRenderer()
@@ -669,7 +670,7 @@ class UndeadWallpaperService : WallpaperService() {
             super.onVisibilityChanged(visible)
             val startTimePref = prefs.getStartTime()
 
-            Log.i(TAG, "onVisibilityChanged: visible = $visible isPreview = $isPreview, playbackMode = $currentPlaybackMode, startTime = $startTimePref")
+            FileLogger.i(TAG, "onVisibilityChanged: visible = $visible isPreview = $isPreview, playbackMode = $currentPlaybackMode, startTime = $startTimePref")
 
             if (visible) {
                 startStallWatchdog() // Monitor for playback running
@@ -680,7 +681,7 @@ class UndeadWallpaperService : WallpaperService() {
                 // If they don't match, or the player is missing, initialize it!
                 if (currentUriOnDisk != loadedVideoUriString || mediaPlayer == null) {
                     if (currentUriOnDisk != loadedVideoUriString) {
-                        Log.i(TAG, "WakeUp Check: URI changed while sleeping! Reloading.")
+                        FileLogger.i(TAG, "WakeUp Check: URI changed while sleeping! Reloading.")
                     }
                     initializePlayer()
                 }
@@ -692,7 +693,7 @@ class UndeadWallpaperService : WallpaperService() {
                 when (startTimePref) {
                     StartTime.RESUME -> {
                         if (currentPlaybackMode == PlaybackMode.ONE_SHOT && hasPlaybackCompleted && !isPreview()) {
-                            Log.i(TAG, "One Shot completed previously, restarting from 0")
+                            FileLogger.i(TAG, "One Shot completed previously, restarting from 0")
                             playheadTime = 0L // Sync state
                             player.seekToDefaultPosition()
                             hasPlaybackCompleted = false
@@ -707,7 +708,7 @@ class UndeadWallpaperService : WallpaperService() {
                         val duration = player.duration
                         if (duration > 0 && duration != C.TIME_UNSET) {
                             val randomPos = Random.nextLong(0, duration)
-                            Log.d(TAG, "Seeking to random pos: $randomPos")
+                            FileLogger.d(TAG, "Seeking to random pos: $randomPos")
                             playheadTime = randomPos // Sync state so coroutine to hook to GLRenderer doesn't overwrite it!
                             player.seekTo(player.currentMediaItemIndex, randomPos)
                         } else {
@@ -730,7 +731,7 @@ class UndeadWallpaperService : WallpaperService() {
 
         override fun onCreate(surfaceHolder: SurfaceHolder) {
             super.onCreate(surfaceHolder)
-            Log.i(TAG, "Engine onCreate")
+            FileLogger.i(TAG, "Engine onCreate")
             // Turn on filter to start listening
             val intentFilter = IntentFilter().apply {
                 addAction(ACTION_VIDEO_URI_CHANGED)
@@ -793,13 +794,13 @@ class UndeadWallpaperService : WallpaperService() {
                 action == ACTION_VIDEO_URI_CHANGED ||
                 action == "android.wallpaper.reapply") {
 
-                Log.i(TAG, "Command received -> Re-initializing player.")
+                FileLogger.i(TAG, "Command received -> Re-initializing player.")
                 // Full reset for major changes
                 initializePlayer()
 
             } else if (action == ACTION_PLAYLIST_REORDERED) {
 
-                Log.i(TAG, "Command received -> Playlist reordered. Syncing silently.")
+                FileLogger.i(TAG, "Command received -> Playlist reordered. Syncing silently.")
 
                 mediaPlayer?.let {
                     bindPlaylistToPlayer(it, keepCurrentPlayback = true)
