@@ -31,6 +31,11 @@ This isn't just a clever pun on "live" wallpaper. The name **UndeadWallpaper** i
 2.  **Tweak It:** Use the new advanced settings to fit, fill, or stretch your video. Zoom in, move it around, make it perfect.
 3.  **Smash the Button:** Like what you see in the preview? Hit that floating button and bring your screen to glorious un-life.
 
+### Keep It Alive (Disable Battery Optimizations) 🧟‍♂️
+Some Android ROMs are absolutely ruthless. They will try to double-tap this app in the background to save a drop of battery, killing the decoders or the background service right when you need them. 
+
+To keep your wallpaper running *smoothly* and truly *undead*, dive into your phone's app settings and **disable battery optimizations** for UndeadWallpaper. Tell the OS to back off and leave the dead alone; it's the perfect workaround for aggressive battery killers.
+
 ## Join the Horde! (Contribute & Connect)
 
 This project clawed its way back from the dead, but it was the **people** that truly gave it a soul.
@@ -51,14 +56,13 @@ This whole shebang is licensed under the **GNU General Public License v3.0**. Fr
 *   **Google Play Store:** [From the Play Store](https://play.google.com/store/apps/details?id=org.maocide.undeadwallpaper)
 *   **GitHub Releases:** [Grab the bleeding-edge APKs here!](https://github.com/maocide/UndeadWallpaper/releases/)
 
+### The Graveyard Shift (Special Thanks) 🪦
+Bringing a project back from the dead takes a village (or at least a few good souls). A big thanks to the people and projects that helped piece this monster together:
 
-## Special Thanks & Acknowledgments 🪦
-
-This project wouldn't be where it is without the incredible feedback, testing, and ideas from the community. A massive thank you to:
-
-* **@kitsumed** - For contributing the GitHub Actions CI pipeline and providing brilliant technical insights on security and intents.
-* **Lucid** - For relentless testing, immense patience, and helping hunt down obscure OEM/custom OS engine crashes. 
-* **@Trick_Equipment_6938** - For sparking the original concept that eventually evolved into the v1.2.0 Dynamic Playlist Engine.
+* **@kitsumed** - For contributing the GitHub Actions CI pipeline and providing brilliant technical insights.
+* **Lucid** - For relentless testing, immense patience, and helping hunt down obscure OEM/custom OS engine crashes.
+* **@sms1sis** - For the great brainstorming about resources and optimization.
+* **Trick_Equipment_6938** - For sparking the original concept that eventually evolved into the v1.2.0 Dynamic Playlist Engine.
 * **@AmazingKo** - For excellent feature suggestions that helped shape the development backlog.
 * **Everyone** who has taken the time to report an issue, leave a review on the Play Store, or test a beta build. Your support keeps the undead alive!
 
