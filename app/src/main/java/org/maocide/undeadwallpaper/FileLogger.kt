@@ -20,6 +20,14 @@ object FileLogger {
     private var logFile: File? = null
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
     private var isInitialized = false
+    private var isLoggingEnabled = false
+
+    /**
+     * Sets whether file logging should actively write to the file.
+     */
+    fun setLoggingEnabled(enabled: Boolean) {
+        isLoggingEnabled = enabled
+    }
 
     /**
      * Initializes the logger by setting up the file in the app's internal files directory.
@@ -44,8 +52,9 @@ object FileLogger {
     /**
      * Helper method to write a formatted string to the log file.
      */
+    @Synchronized
     private fun writeToFile(level: String, tag: String, msg: String, tr: Throwable? = null) {
-        if (!isInitialized || logFile == null) return
+        if (!isInitialized || logFile == null || !isLoggingEnabled) return
 
         try {
             val timestamp = dateFormat.format(Date())

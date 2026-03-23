@@ -2,20 +2,15 @@ package org.maocide.undeadwallpaper
 
 import android.app.Application
 import android.util.Log
-import java.io.File
-import java.io.FileOutputStream
-import java.io.OutputStreamWriter
-import java.io.PrintWriter
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 class UndeadWallpaperApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
 
-        // Initialize the FileLogger
+        // Read preferences and initialize the FileLogger
+        val prefs = PreferencesManager(this)
+        FileLogger.setLoggingEnabled(prefs.isLoggingEnabled())
         FileLogger.init(this)
 
         // Setup the Global Crash Handler

@@ -26,6 +26,7 @@ class PreferencesManager(context: Context) {
         private const val KEY_VIDEO_URI = "video_uri"
         private const val KEY_VIDEO_AUDIO_ENABLED = "video_audio_enabled"
         private const val KEY_VIDEO_START_MS = "video_start_ms"
+        private const val KEY_LOGGING_ENABLED = "logging_enabled"
         private const val KEY_VIDEO_END_MS = "video_end_ms"
         private const val KEY_PLAYBACK_MODE = "playback_mode"
         private const val KEY_SCALING_MODE = "scaling_mode"
@@ -278,6 +279,14 @@ class PreferencesManager(context: Context) {
         } catch (e: Exception) {
             emptyList()
         }
+    }
+
+    fun saveLoggingEnabled(enabled: Boolean) {
+        sharedPrefs.edit().putBoolean(KEY_LOGGING_ENABLED, enabled).apply()
+    }
+
+    fun isLoggingEnabled(): Boolean {
+        return sharedPrefs.getBoolean(KEY_LOGGING_ENABLED, false)
     }
 
 }

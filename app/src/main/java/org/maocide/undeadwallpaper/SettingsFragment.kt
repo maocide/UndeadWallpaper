@@ -673,28 +673,6 @@ class SettingsFragment : Fragment() {
             // Notify wallpaper service
             notifySettingsChanged()
         }
-
-        // Share Debug Log
-        binding.buttonShareLog.setOnClickListener {
-            val logFile = FileLogger.getLogFile()
-            if (logFile != null && logFile.exists()) {
-                val uri = androidx.core.content.FileProvider.getUriForFile(
-                    requireContext(),
-                    "${requireContext().packageName}.fileprovider",
-                    logFile
-                )
-
-                val intent = Intent(Intent.ACTION_SEND).apply {
-                    type = "text/plain"
-                    putExtra(Intent.EXTRA_STREAM, uri)
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                }
-
-                startActivity(Intent.createChooser(intent, "Share Debug Log"))
-            } else {
-                Toast.makeText(context, "Log file not found or empty", Toast.LENGTH_SHORT).show()
-            }
-        }
     }
 
     /**

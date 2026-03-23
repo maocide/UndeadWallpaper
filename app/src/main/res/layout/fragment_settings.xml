@@ -519,16 +519,6 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/button_share_log"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="24dp"
-                    android:layout_marginBottom="16dp"
-                    android:text="Share Debug Log"
-                    app:icon="@drawable/baseline_arrow_drop_down_24" />
-
             </LinearLayout>
 
         </com.google.android.material.card.MaterialCardView>
