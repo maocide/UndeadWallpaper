@@ -116,7 +116,7 @@ class UndeadWallpaperService : WallpaperService() {
             val renderer = renderer ?: return
 
             // We only care if we SHOULD be playing
-            if (player.isPlaying) {
+            if (player.isPlaying && player.playbackState == Player.STATE_READY) {
                 val currentPos = player.currentPosition
                 val currentRenderTime = renderer.getSurfaceDrawTimestamp()
 
@@ -140,6 +140,11 @@ class UndeadWallpaperService : WallpaperService() {
                     lastPosition = currentPos
                     lastRenderTimestamp = currentRenderTime
                 }
+            } else {
+                // If not playing or not ready, reset the watchdog counters to avoid false positives.
+                stallCount = 0
+                lastPosition = player.currentPosition
+                lastRenderTimestamp = renderer.getSurfaceDrawTimestamp()
             }
         }
 
@@ -543,8 +548,16 @@ class UndeadWallpaperService : WallpaperService() {
                             setVideoSurface(finalSurface)
                             prepare()
 
-                            // Check visibility, fixes issues with phones firing visible events just upon creation
-                            if (isVisible) {
+                            // Use the playWhenReady state established by onVisibilityChanged.
+                            // Default it to isVisible just in case onVisibilityChanged hasn't fired yet.
+                            // And make sure that if we were paused by visibility, we don't accidentally start.
+                            val shouldPlay = if (playWhenReady) {
+                                true
+                            } else {
+                                isVisible
+                            }
+
+                            if (shouldPlay) {
                                 playWhenReady = true
                                 play()
                             } else {
