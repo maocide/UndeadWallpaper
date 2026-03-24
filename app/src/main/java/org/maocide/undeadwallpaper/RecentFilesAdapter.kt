@@ -2,7 +2,6 @@ package org.maocide.undeadwallpaper
 
 import android.graphics.Bitmap
 import android.graphics.Color
-import android.net.Uri
 import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.View
@@ -10,14 +9,16 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.core.content.ContextCompat
+import androidx.core.view.isVisible
 import androidx.recyclerview.widget.RecyclerView
-import java.io.File
 import java.util.Collections
 
+// Rows are tied to playlist items now, not just files.
 class RecentFilesAdapter(
     private val recentFiles: MutableList<RecentFile>,
-    var currentVideoUriString: String?,
-    private val onItemClick: (RecentFile) -> Unit
+    var currentItemId: String?,
+    private val onItemClick: (RecentFile) -> Unit,
+    private val onEditClick: (RecentFile) -> Unit
 ) : RecyclerView.Adapter<RecentFilesAdapter.ViewHolder>() {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -64,12 +65,20 @@ class RecentFilesAdapter(
     inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val thumbnail: ImageView = itemView.findViewById(R.id.thumbnail)
         private val fileName: TextView = itemView.findViewById(R.id.file_name)
+        private val statusLabel: TextView = itemView.findViewById(R.id.item_status)
+        private val editButton: ImageView = itemView.findViewById(R.id.edit_item)
 
         init {
             itemView.setOnClickListener {
                 val position = bindingAdapterPosition
                 if (position != RecyclerView.NO_POSITION) {
                     onItemClick(recentFiles[position])
+                }
+            }
+            editButton.setOnClickListener {
+                val position = bindingAdapterPosition
+                if (position != RecyclerView.NO_POSITION) {
+                    onEditClick(recentFiles[position])
                 }
             }
         }
@@ -82,8 +91,18 @@ class RecentFilesAdapter(
                 thumbnail.setImageDrawable(null) // clear if recycled
             }
 
-            val itemUriString = Uri.fromFile(recentFile.file).toString()
-            if (itemUriString == currentVideoUriString) {
+            // Small row summary for disabled state and loop count.
+            val statusText = buildList {
+                if (!recentFile.enabled) add(itemView.context.getString(R.string.disabled_status))
+                if (recentFile.loopCount > 1) {
+                    add(itemView.context.getString(R.string.loop_count_summary, recentFile.loopCount))
+                }
+            }.joinToString(" • ")
+            statusLabel.isVisible = statusText.isNotEmpty()
+            statusLabel.text = statusText
+
+            // Highlight by item ID so reorder/delete does not confuse selection.
+            if (recentFile.itemId == currentItemId) {
                 // Highlight the active row using the app's primary color with 20% opacity
                 val typedValue = TypedValue()
                 itemView.context.theme.resolveAttribute(androidx.appcompat.R.attr.colorPrimary, typedValue, true)
@@ -96,6 +115,12 @@ class RecentFilesAdapter(
                 // Reset background
                 itemView.findViewById<View>(R.id.item_container).setBackgroundColor(Color.TRANSPARENT)
             }
+
+            // Disabled items stay visible, so dim them instead.
+            val alpha = if (recentFile.enabled) 1f else 0.5f
+            thumbnail.alpha = alpha
+            fileName.alpha = alpha
+            statusLabel.alpha = alpha
         }
     }
 }

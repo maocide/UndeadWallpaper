@@ -13,7 +13,7 @@
     <string name="setting_audio_enabled">Enable Audio</string>
     <string name="playback_mode_setting">Playback Mode</string>
     <string name="recent_files">Playlist / Recent Files</string>
-    <string name="playlist_instructions">Long-press to reorder. Swipe left or right to delete.</string>
+    <string name="playlist_instructions">Tap the edit icon for wallpaper settings. Long-press to reorder. Swipe left or right to delete.</string>
     <string name="error_cannot_delete_last_video">Cannot delete the last video in the playlist.</string>
     <string name="apply_trim">Apply</string>
     <string name="wallpaper_description">A live wallpaper that plays video.</string>
@@ -84,5 +84,15 @@
     <string name="delete_file_message">Are you sure you want to delete %s?</string>
     <string name="delete">Delete</string>
     <string name="cancel">Cancel</string>
+    <!-- Per-wallpaper settings and playlist-state labels. -->
+    <string name="save">Save</string>
+    <string name="enabled_label">Enabled</string>
+    <string name="loop_count_label">Loops Per Playlist Turn</string>
+    <string name="loop_count_hint">1</string>
+    <string name="edit_wallpaper_settings">Edit wallpaper settings</string>
+    <string name="wallpaper_settings_title">Wallpaper Settings</string>
+    <string name="disabled_status">Disabled</string>
+    <string name="loop_count_summary">%1$d loops</string>
+    <string name="enable_wallpaper_prompt">Enable this wallpaper to use it.</string>
 
 </resources>

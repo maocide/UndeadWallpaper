@@ -22,25 +22,26 @@ class PreferencesManager(context: Context) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     companion object {
-        private const val PREFS_NAME = "DEFAULT"
-        private const val KEY_VIDEO_URI = "video_uri"
-        private const val KEY_VIDEO_AUDIO_ENABLED = "video_audio_enabled"
-        private const val KEY_VIDEO_START_MS = "video_start_ms"
-        private const val KEY_VIDEO_END_MS = "video_end_ms"
-        private const val KEY_PLAYBACK_MODE = "playback_mode"
-        private const val KEY_SCALING_MODE = "scaling_mode"
-        private const val KEY_POSITION_X = "video_position_x"
-        private const val KEY_POSITION_Y = "video_position_y"
-        private const val KEY_ZOOM = "video_zoom"
-        private const val KEY_BRIGHTNESS = "video_brightness"
-        private const val KEY_ROTATION = "video_rotation"
+        // Internal so the DataStore migration can reuse the same keys.
+        internal const val PREFS_NAME = "DEFAULT"
+        internal const val KEY_VIDEO_URI = "video_uri"
+        internal const val KEY_VIDEO_AUDIO_ENABLED = "video_audio_enabled"
+        internal const val KEY_VIDEO_START_MS = "video_start_ms"
+        internal const val KEY_VIDEO_END_MS = "video_end_ms"
+        internal const val KEY_PLAYBACK_MODE = "playback_mode"
+        internal const val KEY_SCALING_MODE = "scaling_mode"
+        internal const val KEY_POSITION_X = "video_position_x"
+        internal const val KEY_POSITION_Y = "video_position_y"
+        internal const val KEY_ZOOM = "video_zoom"
+        internal const val KEY_BRIGHTNESS = "video_brightness"
+        internal const val KEY_ROTATION = "video_rotation"
 
-        private const val KEY_STATUSBAR_COLOR = "statusbar_color"
+        internal const val KEY_STATUSBAR_COLOR = "statusbar_color"
 
-        private const val KEY_START_TIME = "start_time"
-        private const val KEY_SPEED = "video_speed"
+        internal const val KEY_START_TIME = "start_time"
+        internal const val KEY_SPEED = "video_speed"
 
-        private const val KEY_RECENT_FILES_LIST = "recent_files_list"
+        internal const val KEY_RECENT_FILES_LIST = "recent_files_list"
     }
 
     /**

@@ -30,8 +30,26 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_marginStart="8dp"
-            android:layout_marginEnd="8dp"
+            android:layout_marginEnd="4dp"
             android:textAppearance="?attr/textAppearanceBody1" />
+
+        <!-- Small row summary for disabled state and loop count. -->
+        <TextView
+            android:id="@+id/item_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:textAppearance="?attr/textAppearanceCaption"
+            android:visibility="gone" />
+
+        <!-- Opens per-wallpaper settings. -->
+        <ImageView
+            android:id="@+id/edit_item"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_marginStart="8dp"
+            android:contentDescription="@string/edit_wallpaper_settings"
+            android:src="@android:drawable/ic_menu_edit" />
 
         <ImageView
             android:id="@+id/drag_handle"
