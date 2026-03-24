@@ -557,6 +557,8 @@ class UndeadWallpaperService : WallpaperService() {
                                 isVisible
                             }
 
+                            FileLogger.i(TAG, "Setup complete. isVisible: $isVisible, playWhenReady: $playWhenReady, shouldPlay: $shouldPlay")
+
                             if (shouldPlay) {
                                 playWhenReady = true
                                 play()
