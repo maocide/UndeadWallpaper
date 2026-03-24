@@ -16,7 +16,7 @@ This isn't just a clever pun on "live" wallpaper. The name **UndeadWallpaper** i
 
 *   **The New Engine (OpenGL Power):** We ripped out the old guts and replaced them with a custom OpenGL pipeline. It's smoother, faster, and lets you do things standard Android wallpapers can't.
 *   **God-Mode Controls:** Don't just set a video; *own* it. Scale it with professional modes (Fit, Fill, Stretch), then zoom, rotate, and position your wallpaper exactly how you want it. Too dark? Crank the brightness. Need it faster? Adjust the playback speed. Can't read your clock? Force your Status Bar icons to be White, Black, or Auto. It's your screen, do what you want.
-*   **Interactive Playlist:** Your recent files are a fully drag-and-drop playground. Swipe to delete, reorder on the fly, and hit `Loop All` or `Shuffle` modes for endless, zero-flash transitions between your favorite clips. 
+*   **Interactive Playlist:** Your recent files are a fully drag-and-drop playground. Swipe to delete, reorder on the fly, tweak each wallpaper on its own, and hit `Loop All` or `Shuffle` modes for endless transitions between your favorite clips. 
 *   **Smart Start Times:** Customize exactly what your wallpaper does when you unlock your phone. Resume where you left off, restart for that dramatic intro, or jump to a random frame because chaos is fun.
 *   **One-Shot Mode:** Want a "Live Photo" vibe? Set your video to play once and freeze on the final frame. Perfect for cinematic intros.
 *   **Zombillie is Here:** Fresh install? We got you covered with a default Zombillie animation so your screen isn't naked while you look for your own clips.
@@ -25,10 +25,21 @@ This isn't just a clever pun on "live" wallpaper. The name **UndeadWallpaper** i
 *   **Audio On/Off Toggle:** Want your wallpaper to make some noise? Flip the switch. Want silent beauty? We got you.
 *   **100% Free & Open Source:** No ads, no bullshit, no microtransactions. Ever. This is a passion project, and the code is open for all you brilliant weirdos to see.
 
+## Recent Changes
+
+This fork adds a few bigger playlist and wallpaper-control changes on top of the original app:
+
+*   **Per-wallpaper settings:** Each wallpaper can now keep its own scaling mode, position, zoom, rotation, brightness, speed, enabled state, and loop count.
+*   **Smarter playlist control:** Wallpapers can be disabled without being removed, and `Loop All` can respect per-item loop counts.
+*   **Runtime cleanup:** Playlist playback now follows explicit item state instead of depending only on a saved URI and recent-files order.
+*   **Simpler main screen:** The old main-screen `Advanced` accordion was removed so wallpaper-specific controls live in one place: the item settings dialog.
+
+This set of changes was developed with assistance from OpenAI Codex.
+
 ## Getting Started (It's scary simple)
 
 1.  **Pick Your Poison:** Tap the "Pick Video" button and choose your masterpiece.
-2.  **Tweak It:** Use the new advanced settings to fit, fill, or stretch your video. Zoom in, move it around, make it perfect.
+2.  **Tweak It:** Open a wallpaper's settings from the playlist edit icon and make it fit, fill, stretch, zoom, rotate, or move exactly how you want.
 3.  **Smash the Button:** Like what you see in the preview? Hit that floating button and bring your screen to glorious un-life.
 
 ## Join the Horde! (Contribute & Connect)
