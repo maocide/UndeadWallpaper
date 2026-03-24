@@ -78,7 +78,7 @@ class UndeadWallpaperService : WallpaperService() {
         private var playheadTime: Long = 0L
         private val TAG: String = javaClass.simpleName
         private var isScalingModeSet = false
-        private var useFallbackSurface = false
+        private var useFallbackSurface = prefs.requiresFallback()
 
         private var currentPlaybackMode = PlaybackMode.LOOP
 
@@ -105,6 +105,7 @@ class UndeadWallpaperService : WallpaperService() {
                 watchdogHandler.postDelayed(this, 2000) // Check every 2 seconds
             }
         }
+        private var visibilityJob: kotlinx.coroutines.Job? = null
 
         /**
          * Checks if the player claims to be playing but isn't advancing.
@@ -302,6 +303,7 @@ class UndeadWallpaperService : WallpaperService() {
             }
 
             val player = ExoPlayer.Builder(baseContext, renderersFactory)
+                .setLooper(Looper.getMainLooper())
                 .setLoadControl(loadControl)
                 .setSeekParameters(SeekParameters.NEXT_SYNC)
                 .build()
@@ -317,8 +319,22 @@ class UndeadWallpaperService : WallpaperService() {
                     // Call the helper to load playlist
                     bindPlaylistToPlayer(this, keepCurrentPlayback = false)
 
-                    // Apply volume
-                    volume = if (isAudioEnabled) 1f else 0f
+                    // Apply volume & Track Selection
+                    val actualAudioEnabled = isAudioEnabled // Possible to add && !isPreview() to force mute previews
+
+                    if (!actualAudioEnabled) {
+                        // Explicitly disable the audio track if we don't need it.
+                        // This prevents OEM OS blocks from stalling the video clock.
+                        trackSelectionParameters = trackSelectionParameters.buildUpon()
+                            .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, true)
+                            .build()
+                    } else {
+                        trackSelectionParameters = trackSelectionParameters.buildUpon()
+                            .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false)
+                            .build()
+                    }
+
+                    volume = if (actualAudioEnabled) 1f else 0f
 
                     // Apply speed
                     setPlaybackSpeed(speed)
@@ -480,19 +496,29 @@ class UndeadWallpaperService : WallpaperService() {
                     })
 
                     // WAIT for the GL Surface, then attach
-                    // We need a coroutine here because waitForVideoSurface is suspend
                     playerSetupJob = kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
                         var finalSurface: android.view.Surface? = null
 
                         if (!useFallbackSurface) {
                             try {
-                                finalSurface = renderer?.waitForVideoSurface()
+                                // Give it 1.5 seconds to provide a surface, otherwise timeout
+                                finalSurface = kotlinx.coroutines.withTimeoutOrNull(1500L) {
+                                    renderer?.waitForVideoSurface()
+                                }
+
+                                // If it returns null, the timeout was hit
+                                if (finalSurface == null) {
+                                    FileLogger.w(TAG, "GL Surface timeout (1.5s)! OS blocked it. Triggering fallback.")
+                                    prefs.setRequiresFallback(true) // Save fallback requirement for next launches
+                                    throw java.util.concurrent.TimeoutException("Surface wait timed out")
+                                }
+
                             } catch (e: Exception) {
                                 FileLogger.e(TAG, "GL Renderer failed to provide surface, falling back to default surface", e)
                                 useFallbackSurface = true
                                 releasePlayer()
                                 releaseRenderer()
-                                initializePlayer()
+                                initializePlayer() // Restart immediately using the fallback
                                 return@launch
                             }
                         } else {
@@ -516,7 +542,15 @@ class UndeadWallpaperService : WallpaperService() {
                             }
                             setVideoSurface(finalSurface)
                             prepare()
-                            play()
+
+                            // Check visibility, fixes issues with phones firing visible events just upon creation
+                            if (isVisible) {
+                                playWhenReady = true
+                                play()
+                            } else {
+                                playWhenReady = false
+                                pause()
+                            }
                         }
                     }
 
@@ -668,64 +702,87 @@ class UndeadWallpaperService : WallpaperService() {
 
         override fun onVisibilityChanged(visible: Boolean) {
             super.onVisibilityChanged(visible)
-            val startTimePref = prefs.getStartTime()
 
-            FileLogger.i(TAG, "onVisibilityChanged: visible = $visible isPreview = $isPreview, playbackMode = $currentPlaybackMode, startTime = $startTimePref")
+            // Cancel any previous visibility commands that haven't executed yet
+            visibilityJob?.cancel()
 
-            if (visible) {
-                startStallWatchdog() // Monitor for playback running
+            // Launch a new command with a 150ms delay
+            visibilityJob = kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
+                kotlinx.coroutines.delay(150L) // Give Device 150ms to stop spamming
 
-                // Check if the URI in memory matches the one on disk/prefs
-                val currentUriOnDisk = getMediaUri().toString()
+                // If this job was cancelled by another rapid-fire event, stop here.
+                if (!isActive) return@launch
 
-                // If they don't match, or the player is missing, initialize it!
-                if (currentUriOnDisk != loadedVideoUriString || mediaPlayer == null) {
-                    if (currentUriOnDisk != loadedVideoUriString) {
-                        FileLogger.i(TAG, "WakeUp Check: URI changed while sleeping! Reloading.")
+                val startTimePref = prefs.getStartTime()
+                FileLogger.i(TAG, "onVisibilityChanged (Debounced): visible = $visible isPreview = $isPreview, playbackMode = $currentPlaybackMode")
+
+                if (visible) {
+                    startStallWatchdog() // Monitor for playback running
+
+                    val currentUriOnDisk = getMediaUri().toString()
+
+                    // If they don't match, or the player is missing, initialize it!
+                    if (currentUriOnDisk != loadedVideoUriString || mediaPlayer == null) {
+                        if (currentUriOnDisk != loadedVideoUriString) {
+                            FileLogger.i(TAG, "WakeUp Check: URI changed while sleeping! Reloading.")
+                        }
+                        initializePlayer()
                     }
-                    initializePlayer()
-                }
 
-                // Safely grab the player instance. If it's still null somehow, exit gracefully.
-                val player = mediaPlayer ?: return
+                    // Safely grab the player instance.
+                    val player = mediaPlayer ?: return@launch
 
-                // Apply timeline behavior
-                when (startTimePref) {
-                    StartTime.RESUME -> {
-                        if (currentPlaybackMode == PlaybackMode.ONE_SHOT && hasPlaybackCompleted && !isPreview()) {
-                            FileLogger.i(TAG, "One Shot completed previously, restarting from 0")
-                            playheadTime = 0L // Sync state
+                    // Apply timeline behavior
+                    when (startTimePref) {
+                        StartTime.RESUME -> {
+                            if (currentPlaybackMode == PlaybackMode.ONE_SHOT && hasPlaybackCompleted && !isPreview()) {
+                                playheadTime = 0L
+                                player.seekToDefaultPosition()
+                                hasPlaybackCompleted = false
+                            }
+                        }
+                        StartTime.RESTART -> {
+                            playheadTime = 0L
                             player.seekToDefaultPosition()
                             hasPlaybackCompleted = false
                         }
-                    }
-                    StartTime.RESTART -> {
-                        playheadTime = 0L // Sync state
-                        player.seekToDefaultPosition()
-                        hasPlaybackCompleted = false
-                    }
-                    StartTime.RANDOM -> {
-                        val duration = player.duration
-                        if (duration > 0 && duration != C.TIME_UNSET) {
-                            val randomPos = Random.nextLong(0, duration)
-                            FileLogger.d(TAG, "Seeking to random pos: $randomPos")
-                            playheadTime = randomPos // Sync state so coroutine to hook to GLRenderer doesn't overwrite it!
-                            player.seekTo(player.currentMediaItemIndex, randomPos)
-                        } else {
-                            playheadTime = 0L
-                            player.seekToDefaultPosition()
+                        StartTime.RANDOM -> {
+                            val duration = player.duration
+                            if (duration > 0 && duration != C.TIME_UNSET) {
+                                val randomPos = Random.nextLong(0, duration)
+                                playheadTime = randomPos
+                                player.seekTo(player.currentMediaItemIndex, randomPos)
+                            } else {
+                                playheadTime = 0L
+                                player.seekToDefaultPosition()
+                            }
+                            hasPlaybackCompleted = false
                         }
-                        hasPlaybackCompleted = false
+                    }
+
+                    // Only push play if the player is actually ready to receive it
+                    if (player.playbackState == Player.STATE_READY) {
+                        player.playWhenReady = true
+                        player.play()
+                    } else {
+                        // If it's not ready yet, just set the flag so the setup job catches it later
+                        player.playWhenReady = true
+                    }
+
+                } else {
+                    stopStallWatchdog()
+
+                    if (isPreview) {
+                        // Aggressively free the hardware decoder in the picker
+                        // to prevent OS memory exhaustion when swiping around.
+                        FileLogger.i(TAG, "Preview hidden. Releasing player to save decoders.")
+                        releasePlayer()
+                    } else {
+                        // Keep the Home Screen decoder warm for instant resume
+                        mediaPlayer?.pause()
+                        mediaPlayer?.playWhenReady = false
                     }
                 }
-
-                player.playWhenReady = true
-                player.play()
-
-            } else {
-                stopStallWatchdog() // Stop monitoring for playback running
-                mediaPlayer?.pause()
-                mediaPlayer?.playWhenReady = false
             }
         }
 

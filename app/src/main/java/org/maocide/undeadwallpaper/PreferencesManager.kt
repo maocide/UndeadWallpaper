@@ -282,11 +282,19 @@ class PreferencesManager(context: Context) {
     }
 
     fun saveLoggingEnabled(enabled: Boolean) {
-        sharedPrefs.edit().putBoolean(KEY_LOGGING_ENABLED, enabled).apply()
+        sharedPrefs.edit { putBoolean(KEY_LOGGING_ENABLED, enabled) }
     }
 
     fun isLoggingEnabled(): Boolean {
         return sharedPrefs.getBoolean(KEY_LOGGING_ENABLED, false)
+    }
+
+    fun setRequiresFallback(requires: Boolean) {
+        sharedPrefs.edit { putBoolean("REQUIRES_FALLBACK", requires) }
+    }
+
+    fun requiresFallback(): Boolean {
+        return sharedPrefs.getBoolean("REQUIRES_FALLBACK", false)
     }
 
 }
