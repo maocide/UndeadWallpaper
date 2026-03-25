@@ -8,8 +8,13 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.util.Log
+import org.maocide.undeadwallpaper.BuildConfig
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
@@ -47,7 +52,11 @@ class VideoFileManager(private val context: Context) {
             }
             outputFile
         } catch (e: Exception) {
-            Log.e(tag, "Failed to copy default resource: $fileName", e)
+            if (BuildConfig.DEBUG) {
+                Log.e(tag, "Failed to copy default resource: $fileName", e)
+            } else {
+                Log.e(tag, "Failed to copy default resource", e)
+            }
             null
         }
     }
@@ -73,24 +82,35 @@ class VideoFileManager(private val context: Context) {
                     }
                 }
             }
+            originalFileName = java.io.File(originalFileName).name
         } catch (e: Exception) {
             Log.w(tag, "Could not query file name, generating fallback.", e)
         }
 
-        // If name query failed or returned blank, generate a timestamp name
+        // Use UUID for the fallback
         if (originalFileName.isBlank()) {
-            originalFileName = "imported_video_${System.currentTimeMillis()}.mp4"
+            originalFileName = "imported_video_${java.util.UUID.randomUUID()}.mp4"
         }
 
         val outputDir = getAppSpecificAlbumStorageDir(context, "videos")
         val outputFile = File(outputDir, originalFileName)
+
+        // If the final path doesn't start with output folder, someone is tampering
+        if (!outputFile.canonicalPath.startsWith(outputDir.canonicalPath)) {
+            Log.e(tag, "Security Warning: Path traversal attempt detected!")
+            return null
+        }
 
         try {
             context.contentResolver.openInputStream(fileUri)?.use { iStream ->
                 copyStreamToFile(iStream, outputFile)
             }
         } catch (e: Exception) {
-            Log.e(tag, "Error copying file from URI: $fileUri", e)
+            if (BuildConfig.DEBUG) {
+                Log.e(tag, "Error copying file from URI: $fileUri", e)
+            } else {
+                Log.e(tag, "Error copying file from URI", e)
+            }
             return null
         }
 
@@ -124,16 +144,54 @@ class VideoFileManager(private val context: Context) {
     }
 
     /**
-     * Loads the list of recent video files from the app's storage.
+     * Loads the list of recent video files from the app's storage,
+     * synchronizing it with the persisted order.
      *
-     * @return A list of [RecentFile] objects.
+     * @return A list of [RecentFile] objects in the correct order.
      */
-    fun loadRecentFiles(): List<RecentFile> {
+    suspend fun loadRecentFiles(): List<RecentFile> = withContext(Dispatchers.IO) {
         val videosDir = getAppSpecificAlbumStorageDir(context, "videos")
-        return videosDir.listFiles()?.map { file ->
-            val thumbnail = createVideoThumbnail(file.path)
-            RecentFile(file, thumbnail)
-        } ?: emptyList()
+        val physicalFiles = videosDir.listFiles() ?: return@withContext emptyList()
+        val appStateRepository = AppStateRepository.getInstance(context)
+
+        // Let the repository sync disk state first.
+        appStateRepository.reconcileWithDisk()
+        val currentState = appStateRepository.ensureLoaded()
+        val physicalFileMap = physicalFiles.associateBy { it.name }
+
+        val semaphore = Semaphore(4) // Limit to 4 concurrent thumbnail generations
+
+        currentState.playlist.mapNotNull { playlistItem ->
+            val file = physicalFileMap[playlistItem.fileName]
+            if (file != null) {
+                // RecentFile carries the playlist state the row needs.
+                async {
+                    semaphore.withPermit {
+                        try {
+                            val thumbnail = createVideoThumbnail(file.path)
+                            RecentFile(
+                                itemId = playlistItem.id,
+                                file = file,
+                                thumbnail = thumbnail,
+                                enabled = playlistItem.enabled,
+                                loopCount = playlistItem.loopCount
+                            )
+                        } catch (e: Exception) {
+                            Log.e(tag, "Error loading thumbnail for ${file.name}", e)
+                            RecentFile(
+                                itemId = playlistItem.id,
+                                file = file,
+                                thumbnail = null,
+                                enabled = playlistItem.enabled,
+                                loopCount = playlistItem.loopCount
+                            )
+                        }
+                    }
+                }
+            } else {
+                null
+            }
+        }.awaitAll()
     }
 
     /**

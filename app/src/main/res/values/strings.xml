@@ -12,7 +12,9 @@
     <string name="trim_video">Trim Video</string>
     <string name="setting_audio_enabled">Enable Audio</string>
     <string name="playback_mode_setting">Playback Mode</string>
-    <string name="recent_files">Recent Files</string>
+    <string name="recent_files">Playlist / Recent Files</string>
+    <string name="playlist_instructions">Tap the edit icon for wallpaper settings. Long-press to reorder. Swipe left or right to delete.</string>
+    <string name="error_cannot_delete_last_video">Cannot delete the last video in the playlist.</string>
     <string name="apply_trim">Apply</string>
     <string name="wallpaper_description">A live wallpaper that plays video.</string>
     <string name="activating_wallpaper_message">Activating wallpaper…</string>
@@ -40,8 +42,10 @@
     <string name="about_feature_loops">• Silky-Smooth Loops: Turns any video on your phone into a seamless, stutter-free live wallpaper.</string>
     <string name="about_feature_freedom">• Total Freedom: No ads, no in-app purchases, no bullshit. Ever.</string>
     <string name="about_feature_control">• You\'re in Control: Supports audio toggles and keeps track of your recent videos for quick swaps.</string>
-    <string name="playback_mode_loop">Loop</string>
+    <string name="playback_mode_loop">Loop One</string>
     <string name="playback_mode_oneshot">One Shot</string>
+    <string name="playback_mode_loop_all">Loop All</string>
+    <string name="playback_mode_shuffle">Shuffle</string>
     <string name="scaling_mode">Scaling Mode</string>
     <string name="scaling_mode_fit">Fit</string>
     <string name="scaling_mode_fill">Fill</string>
@@ -51,6 +55,7 @@
     <string name="vertical_position">Vertical Position</string>
     <string name="zoom">Zoom</string>
     <string name="brightness">Brightness</string>
+    <string name="speed">Speed</string>
     <string name="reset">Reset</string>
     <string name="rotation">Rotation</string>
 
@@ -59,13 +64,35 @@
     <string name="warning_4k_video">Warning: 4K videos may crash or lag on some devices.</string>
     <string name="error_copy_failed">Failed to copy video file.</string>
     <string name="error_cannot_play_video">Cannot play this video file.</string>
-
+    <string name="warning_high_speed_stuttering">High speeds may cause stuttering on high-res videos.</string>
+    <string name="error_file_picker_not_available">File picker not available in the system!</string>
+    <string name="error_could_not_read_video_duration">Could not read video duration.</string>
+    <string name="warning_random_start_time_delay">Random might cause delay due to seek</string>
     <!-- Status Bar Icon Color Settings -->
     <string name="status_bar_icons_label">Status Bar Icons</string>
     <string name="status_bar_auto">Auto</string>
     <string name="status_bar_white_icons">White</string>
     <string name="status_bar_black_icons">Black</string>
 
+    <!-- Start Time Settings -->
+    <string name="start_time_label">On Visible</string>
+    <string name="start_time_resume">Resume</string>
+    <string name="start_time_restart">Restart</string>
+    <string name="start_time_random">Random</string>
 
+    <string name="delete_file_title">Delete Video</string>
+    <string name="delete_file_message">Are you sure you want to delete %s?</string>
+    <string name="delete">Delete</string>
+    <string name="cancel">Cancel</string>
+    <!-- Per-wallpaper settings and playlist-state labels. -->
+    <string name="save">Save</string>
+    <string name="enabled_label">Enabled</string>
+    <string name="loop_count_label">Loops Per Playlist Turn</string>
+    <string name="loop_count_hint">1</string>
+    <string name="edit_wallpaper_settings">Edit wallpaper settings</string>
+    <string name="wallpaper_settings_title">Wallpaper Settings</string>
+    <string name="disabled_status">Disabled</string>
+    <string name="loop_count_summary">%1$d loops</string>
+    <string name="enable_wallpaper_prompt">Enable this wallpaper to use it.</string>
 
 </resources>

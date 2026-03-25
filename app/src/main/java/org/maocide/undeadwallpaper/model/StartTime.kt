@@ -4,8 +4,8 @@ import kotlinx.serialization.Serializable
 
 // Stored in the app state now.
 @Serializable
-enum class StatusBarColor {
-    AUTO,     // Automatically chosen
-    LIGHT,    // Light forced
-    DARK  // Dark forced
+enum class StartTime {
+    RESUME,
+    RESTART,
+    RANDOM
 }

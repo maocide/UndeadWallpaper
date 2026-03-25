@@ -3,8 +3,11 @@ package org.maocide.undeadwallpaper
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.maocide.undeadwallpaper.model.PlaybackMode
 import org.maocide.undeadwallpaper.model.ScalingMode
+import org.maocide.undeadwallpaper.model.StartTime
 import org.maocide.undeadwallpaper.model.StatusBarColor
 
 /**
@@ -19,20 +22,26 @@ class PreferencesManager(context: Context) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     companion object {
-        private const val PREFS_NAME = "DEFAULT"
-        private const val KEY_VIDEO_URI = "video_uri"
-        private const val KEY_VIDEO_AUDIO_ENABLED = "video_audio_enabled"
-        private const val KEY_VIDEO_START_MS = "video_start_ms"
-        private const val KEY_VIDEO_END_MS = "video_end_ms"
-        private const val KEY_PLAYBACK_MODE = "playback_mode"
-        private const val KEY_SCALING_MODE = "scaling_mode"
-        private const val KEY_POSITION_X = "video_position_x"
-        private const val KEY_POSITION_Y = "video_position_y"
-        private const val KEY_ZOOM = "video_zoom"
-        private const val KEY_BRIGHTNESS = "video_brightness"
-        private const val KEY_ROTATION = "video_rotation"
+        // Internal so the DataStore migration can reuse the same keys.
+        internal const val PREFS_NAME = "DEFAULT"
+        internal const val KEY_VIDEO_URI = "video_uri"
+        internal const val KEY_VIDEO_AUDIO_ENABLED = "video_audio_enabled"
+        internal const val KEY_VIDEO_START_MS = "video_start_ms"
+        internal const val KEY_VIDEO_END_MS = "video_end_ms"
+        internal const val KEY_PLAYBACK_MODE = "playback_mode"
+        internal const val KEY_SCALING_MODE = "scaling_mode"
+        internal const val KEY_POSITION_X = "video_position_x"
+        internal const val KEY_POSITION_Y = "video_position_y"
+        internal const val KEY_ZOOM = "video_zoom"
+        internal const val KEY_BRIGHTNESS = "video_brightness"
+        internal const val KEY_ROTATION = "video_rotation"
 
-        private const val KEY_STATUSBAR_COLOR = "statusbar_color"
+        internal const val KEY_STATUSBAR_COLOR = "statusbar_color"
+
+        internal const val KEY_START_TIME = "start_time"
+        internal const val KEY_SPEED = "video_speed"
+
+        internal const val KEY_RECENT_FILES_LIST = "recent_files_list"
     }
 
     /**
@@ -218,7 +227,58 @@ class PreferencesManager(context: Context) {
         return StatusBarColor.entries.getOrElse(storedOrdinal) { StatusBarColor.AUTO }
     }
 
+    /**
+     * Saves the start time preference.
+     * Default is 0 Resume, Start is 1, Random is 2
+     */
+    fun saveStartTime(startTime: StartTime) {
+        sharedPrefs.edit { putInt(KEY_START_TIME, startTime.ordinal) }
+    }
+
+    fun getStartTime(): StartTime {
+        val storedOrdinal = sharedPrefs.getInt(KEY_START_TIME, StartTime.RESUME.ordinal)
+        return StartTime.entries.getOrElse(storedOrdinal) { StartTime.RESUME }
+    }
 
 
+    /**
+     * Saves the speed value.
+     * Default is 1.0f (Normal Playback).
+     */
+    fun saveSpeed(speed: Float) {
+        sharedPrefs.edit { putFloat(KEY_SPEED, speed) }
+    }
+
+    fun getSpeed(): Float {
+        // Default to 1.0 if not set
+        return sharedPrefs.getFloat(KEY_SPEED, 1.0f)
+    }
+
+    /**
+     * Saves the list of recent files to SharedPreferences as a JSON string.
+     *
+     * @param recentFilesList The list of file names.
+     */
+    fun saveRecentFilesList(recentFilesList: List<String>) {
+        val jsonString = Json.encodeToString(recentFilesList)
+        sharedPrefs.edit { putString(KEY_RECENT_FILES_LIST, jsonString) }
+    }
+
+    /**
+     * Retrieves the list of recent files from SharedPreferences.
+     *
+     * @return The list of file names, or an empty list if not found or on error.
+     */
+    fun getRecentFilesList(): List<String> {
+        val jsonString = sharedPrefs.getString(KEY_RECENT_FILES_LIST, null)
+        if (jsonString.isNullOrBlank()) {
+            return emptyList()
+        }
+        return try {
+            Json.decodeFromString<List<String>>(jsonString)
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
 
 }
