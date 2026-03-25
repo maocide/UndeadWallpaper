@@ -736,10 +736,15 @@ class UndeadWallpaperService : WallpaperService() {
 
                     val currentUriOnDisk = getMediaUri().toString()
 
+                    val isSurfaceDead = surfaceHolder?.surface?.isValid != true
+
                     // If they don't match, or the player is missing, initialize it!
-                    if (currentUriOnDisk != loadedVideoUriString || mediaPlayer == null) {
+                    // Also initialize if the surface died silently in the background (Funtouch OS quirk).
+                    if (currentUriOnDisk != loadedVideoUriString || mediaPlayer == null || isSurfaceDead) {
                         if (currentUriOnDisk != loadedVideoUriString) {
                             FileLogger.i(TAG, "WakeUp Check: URI changed while sleeping! Reloading.")
+                        } else if (isSurfaceDead) {
+                            FileLogger.w(TAG, "WakeUp Check: Surface died silently. Forcing restart.")
                         }
                         initializePlayer()
                     }
@@ -754,6 +759,11 @@ class UndeadWallpaperService : WallpaperService() {
                                 playheadTime = 0L
                                 player.seekToDefaultPosition()
                                 hasPlaybackCompleted = false
+                            } else {
+                                // Seek-to-Wake nudge:
+                                // Force the sleepy hardware decoder on aggressive OSes to output a fresh frame
+                                // by seeking to its exact current position.
+                                player.seekTo(player.currentMediaItemIndex, player.currentPosition)
                             }
                         }
                         StartTime.RESTART -> {
