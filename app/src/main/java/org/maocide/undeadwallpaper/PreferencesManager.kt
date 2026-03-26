@@ -289,12 +289,4 @@ class PreferencesManager(context: Context) {
         return sharedPrefs.getBoolean(KEY_LOGGING_ENABLED, false)
     }
 
-    fun setRequiresFallback(requires: Boolean) {
-        sharedPrefs.edit { putBoolean("REQUIRES_FALLBACK", requires) }
-    }
-
-    fun requiresFallback(): Boolean {
-        return sharedPrefs.getBoolean("REQUIRES_FALLBACK", false)
-    }
-
 }

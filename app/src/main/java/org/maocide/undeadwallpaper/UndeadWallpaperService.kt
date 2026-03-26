@@ -78,7 +78,7 @@ class UndeadWallpaperService : WallpaperService() {
         private var playheadTime: Long = 0L
         private val TAG: String = javaClass.simpleName
         private var isScalingModeSet = false
-        private var useFallbackSurface = prefs.requiresFallback()
+        private var useFallbackSurface = false
 
         private var currentPlaybackMode = PlaybackMode.LOOP
 
@@ -94,7 +94,6 @@ class UndeadWallpaperService : WallpaperService() {
         private val isVivoDevice = Build.MANUFACTURER.equals("vivo", ignoreCase = true)
 
         private var playerSetupJob: kotlinx.coroutines.Job? = null
-        private var vivoBounceState = 0 // 0: Not started, 1: Shrunk (waiting for callback), 2: Restored (waiting for callback), 3: Done
 
         // Stall Watchdog vars
         private var lastPosition: Long = 0
@@ -522,7 +521,6 @@ class UndeadWallpaperService : WallpaperService() {
                                 // If it returns null, the timeout was hit
                                 if (finalSurface == null) {
                                     FileLogger.w(TAG, "GL Surface timeout (1.5s)! OS blocked it. Triggering fallback.")
-                                    prefs.setRequiresFallback(true) // Save fallback requirement for next launches
                                     throw java.util.concurrent.TimeoutException("Surface wait timed out")
                                 }
 
@@ -682,15 +680,6 @@ class UndeadWallpaperService : WallpaperService() {
             FileLogger.i(TAG, "onSurfaceCreated")
             this.surfaceHolder = holder
 
-            // VIVO KICKSTART: Safe Size Bounce (Preview only)
-            // If it's a Vivo device in preview mode, and we haven't bounced the size yet,
-            // we DELAY initialization of the GL Renderer and Player to avoid crashes when
-            // we alter the surface dimensions in onSurfaceChanged.
-            if (isVivoDevice && isPreview && vivoBounceState == 0) {
-                FileLogger.i(TAG, "Vivo Preview: Deferring initialization to perform safe size bounce.")
-                return // Exit early
-            }
-
             if (!useFallbackSurface) {
                 // Start the GL Renderer
                 renderer = GLVideoRenderer(applicationContext)
@@ -708,41 +697,6 @@ class UndeadWallpaperService : WallpaperService() {
 
             this.surfaceHolder = holder
 
-            // VIVO KICKSTART: Execute the bounce safely relying on callbacks.
-            // Vivo's UI requires a layout size or format change to dismiss its loading overlay
-            // and enable the 'Set' button. We do this BEFORE the GL Renderer starts.
-            if (isVivoDevice && isPreview) {
-                if (vivoBounceState == 0) {
-                    vivoBounceState = 1
-                    FileLogger.i(TAG, "Vivo Preview: Shrinking surface by 1px to force layout change.")
-                    try {
-                        holder.setFixedSize(width, height - 1)
-                    } catch (e: Exception) {
-                        FileLogger.e(TAG, "Vivo size shrink failed", e)
-                    }
-                    return // Wait for the next onSurfaceChanged callback with the shrunk size
-                } else if (vivoBounceState == 1) {
-                    vivoBounceState = 2
-                    FileLogger.i(TAG, "Vivo Preview: Restoring surface layout size.")
-                    try {
-                        holder.setSizeFromLayout()
-                    } catch (e: Exception) {
-                        FileLogger.e(TAG, "Vivo size restore failed", e)
-                    }
-                    return // Wait for the final onSurfaceChanged callback with the correct size
-                } else if (vivoBounceState == 2) {
-                    // The final callback arrived!
-                    vivoBounceState = 3
-                    FileLogger.i(TAG, "Vivo Preview: Safe Size Bounce complete. Initializing Renderer and Player.")
-                    // Because we deferred in onSurfaceCreated, we must manually create the renderer here.
-                    if (!useFallbackSurface && renderer == null) {
-                        renderer = GLVideoRenderer(applicationContext)
-                        renderer?.onSurfaceCreated(holder)
-                    }
-                    // Now fall through to normally update the renderer's size and initialize the player
-                }
-            }
-
             if (!useFallbackSurface) {
                 renderer?.onSurfaceChanged(width, height)
             }
@@ -757,7 +711,6 @@ class UndeadWallpaperService : WallpaperService() {
         override fun onSurfaceDestroyed(holder: SurfaceHolder) {
             super.onSurfaceDestroyed(holder)
             FileLogger.i(TAG, "onSurfaceDestroyed")
-            vivoBounceState = 0
             releasePlayer()
             releaseRenderer()
             this.surfaceHolder = null
