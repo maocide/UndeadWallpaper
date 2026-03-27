@@ -12,8 +12,7 @@
     <string name="trim_video">ビデオをトリミング</string>
     <string name="setting_audio_enabled">オーディオを有効にする</string>
     <string name="playback_mode_setting">再生モード</string>
-    <string name="recent_files">プレイリスト / 最近のファイル</string>
-    <string name="playlist_instructions">長押しで順序変更、左右にスワイプで削除</string>
+    <string name="recent_files">最近のファイル</string>
     <string name="apply_trim">適用</string>
     <string name="wallpaper_description">ビデオを再生するライブ壁紙です。</string>
     <string name="activating_wallpaper_message">壁紙を有効にしています…</string>
@@ -30,10 +29,8 @@
     <string name="about_feature_loops">• スムーズなループ再生：お使いの携帯電話のどんなビデオも、シームレスで途切れないライブ壁紙に変えます。</string>
     <string name="about_feature_freedom">• 完全な自由：広告なし、アプリ内購入なし、くだらないもの一切なし。永久に。</string>
     <string name="about_feature_control">• あなたがコントロール：オーディオのオン/オフをサポートし、最近使用したビデオを記録して素早く切り替えられます。</string>
-    <string name="playback_mode_loop">単体ループ</string>
+    <string name="playback_mode_loop">ループ</string>
     <string name="playback_mode_oneshot">ワンショット</string>
-    <string name="playback_mode_loop_all">全ループ</string>
-    <string name="playback_mode_shuffle">シャッフル</string>
     <string name="scaling_mode">スケーリングモード</string>
     <string name="scaling_mode_fit">フィット</string>
     <string name="scaling_mode_fill">画面一杯</string>
@@ -43,7 +40,6 @@
     <string name="vertical_position">垂直位置</string>
     <string name="zoom">ズーム</string>
     <string name="brightness">明るさ</string>
-    <string name="speed">速度</string>
     <string name="reset">リセット</string>
     <string name="rotation">回転</string>
 
@@ -52,25 +48,10 @@
     <string name="warning_4k_video">警告: 4K動画は一部のデバイスでクラッシュまたは遅延する可能性があります。</string>
     <string name="error_copy_failed">ビデオファイルのコピーに失敗しました。</string>
     <string name="error_cannot_play_video">このビデオファイルは再生できません。</string>
-    <string name="warning_high_speed_stuttering">高速再生は高解像度動画でカクつきを引き起こす可能性があります。</string>
-    <string name="error_file_picker_not_available">ファイルピッカーがシステムで利用できません。</string>
-    <string name="error_could_not_read_video_duration">動画の長さを読み取れませんでした。</string>
-    <string name="warning_random_start_time_delay">ランダムはシークによる遅延を引き起こす可能性があります</string>
-    <string name="error_cannot_delete_last_video">プレイリストの最後の動画は削除できません</string>
+
     <!-- Status Bar Icon Color Settings -->
     <string name="status_bar_icons_label">ステータスバーのアイコン</string>
     <string name="status_bar_auto">自動</string>
     <string name="status_bar_white_icons">白</string>
     <string name="status_bar_black_icons">黒</string>
-
-    <!-- Start Time Settings -->
-    <string name="start_time_label">再生開始</string>
-    <string name="start_time_resume">続きから</string>
-    <string name="start_time_restart">最初から</string>
-    <string name="start_time_random">ランダム</string>
-
-    <string name="delete_file_title">動画を削除</string>
-    <string name="delete_file_message">%s を削除してもよろしいですか？</string>
-    <string name="delete">削除</string>
-    <string name="cancel">キャンセル</string>
 </resources>

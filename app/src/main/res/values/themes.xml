@@ -7,9 +7,4 @@
     </style>
 
     <style name="Theme.UndeadWallpaper" parent="Base.Theme.UndeadWallpaper" />
-
-    <style name="CornerStyle">
-        <item name="cornerFamily">rounded</item>
-        <item name="cornerSize">8dp</item>
-    </style>
 </resources>

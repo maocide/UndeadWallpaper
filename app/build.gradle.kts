@@ -1,7 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -12,8 +11,8 @@ android {
         applicationId = "org.maocide.undeadwallpaper"
         minSdk = 28
         targetSdk = 36
-        versionCode = 14
-        versionName = "1.3.0"
+        versionCode = 10
+        versionName = "1.1.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -57,7 +56,6 @@ android {
     }
     buildFeatures {
         viewBinding = true
-        buildConfig = true
     }
 }
 
@@ -76,10 +74,7 @@ dependencies {
 
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
-    implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.lifecycle.runtime.ktx)
-    // Playlist state is stored in DataStore now.
-    implementation(libs.androidx.datastore)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

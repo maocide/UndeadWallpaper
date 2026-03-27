@@ -6,12 +6,10 @@ import java.io.File
 /**
  * Data class representing a recent file.
  *
- * Row model for the playlist. It carries a little item state now too.
+ * @param file The file object.
+ * @param thumbnail The thumbnail of the file.
  */
 data class RecentFile(
-    val itemId: String,
     val file: File,
-    val thumbnail: Bitmap?,
-    val enabled: Boolean,
-    val loopCount: Int
+    val thumbnail: Bitmap?
 )

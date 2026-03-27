@@ -14,7 +14,6 @@
 .cxx
 local.properties
 /_mat
-/.kotlin
 
 # Generated build files
 /build
@@ -26,10 +25,3 @@ local.properties
 
 # Local configuration
 local.properties
-
-# Local Codex / planning artifacts
-.codex/
-.serena/
-HANDOFF_PROMPT.md
-profiling_runs/
-MAJOR_CHANGES_LOG.md

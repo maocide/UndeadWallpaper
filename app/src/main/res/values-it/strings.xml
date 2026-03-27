@@ -12,9 +12,7 @@
     <string name="trim_video">Taglia Video</string>
     <string name="setting_audio_enabled">Abilita Audio</string>
     <string name="playback_mode_setting">Modalita Playback</string>
-    <string name="recent_files">Playlist / File Recenti</string>
-    <string name="playlist_instructions">Tieni premuto per riordinare. Scorri a sinistra o a destra per eliminare.</string>
-    <string name="error_cannot_delete_last_video">Impossibile eliminare l\'ultimo video nella playlist.</string>
+    <string name="recent_files">File Recenti</string>
     <string name="apply_trim">Applica</string>
     <string name="wallpaper_description">Uno sfondo animato che riproduce video.</string>
     <string name="activating_wallpaper_message">Attivazione dello sfondo…</string>
@@ -31,10 +29,8 @@
     <string name="about_feature_loops">• Loop Perfetti: Trasforma qualsiasi video sul tuo telefono in uno sfondo animato fluido e senza interruzioni.</string>
     <string name="about_feature_freedom">• Libertà Totale: Niente pubblicità, niente acquisti in-app, nessuna fregatura. Mai.</string>
     <string name="about_feature_control">• Sei Tu al Comando: Supporta l\'attivazione/disattivazione dell\'audio e tiene traccia dei video recenti per cambi rapidi.</string>
-    <string name="playback_mode_loop">Ripeti Singolo</string>
+    <string name="playback_mode_loop">Loop</string>
     <string name="playback_mode_oneshot">Una Volta</string>
-    <string name="playback_mode_loop_all">Ripeti Tutti</string>
-    <string name="playback_mode_shuffle">Casuale</string>
     <string name="scaling_mode">Modalità scaling</string>
     <string name="scaling_mode_fit">Adatta</string>
     <string name="scaling_mode_fill">Riempi</string>
@@ -44,7 +40,6 @@
     <string name="vertical_position">Posizione Verticale</string>
     <string name="zoom">Zoom</string>
     <string name="brightness">Luminosità</string>
-    <string name="speed">Velocità</string>
     <string name="reset">Ripristina</string>
     <string name="rotation">Rotazione</string>
 
@@ -53,25 +48,11 @@
     <string name="warning_4k_video">Attenzione: i video 4K potrebbero causare crash o lag su alcuni dispositivi.</string>
     <string name="error_copy_failed">Impossibile copiare il file video.</string>
     <string name="error_cannot_play_video">Impossibile riprodurre questo file video.</string>
-    <string name="warning_high_speed_stuttering">Velocità elevate potrebbero causare scatti sui video ad alta risoluzione.</string>
-    <string name="error_file_picker_not_available">Il selettore file non è disponibile nel sistema!</string>
-    <string name="error_could_not_read_video_duration">Impossibile leggere la durata del video.</string>
-    <string name="warning_random_start_time_delay">Random potrebbe causare ritardi a causa della ricerca</string>
+
     <!-- Status Bar Icon Color Settings -->
     <string name="status_bar_icons_label">Icone Barra di Stato</string>
     <string name="status_bar_auto">Automatico</string>
     <string name="status_bar_white_icons">Bianche</string>
     <string name="status_bar_black_icons">Nere</string>
-
-    <!-- Start Time Settings -->
-    <string name="start_time_label">All\'avvio</string>
-    <string name="start_time_resume">Riprendi</string>
-    <string name="start_time_restart">Riavvia</string>
-    <string name="start_time_random">Casuale</string>
-
-    <string name="delete_file_title">Elimina Video</string>
-    <string name="delete_file_message">Sei sicuro di voler eliminare %s?</string>
-    <string name="delete">Elimina</string>
-    <string name="cancel">Annulla</string>
 
 </resources>
