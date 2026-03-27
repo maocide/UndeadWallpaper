@@ -10,7 +10,6 @@ import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.WindowManager
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.channels.Channel
@@ -45,7 +44,6 @@ class GLVideoRenderer(private val context: Context) {
     // Surface stuff
     private var surfaceTexture: SurfaceTexture? = null
     private var videoSurface: Surface? = null
-    private var videoSurfaceDeferred = CompletableDeferred<Surface?>()
     private var textureId: Int = 0
 
     private var videoWidth = 0
@@ -70,7 +68,6 @@ class GLVideoRenderer(private val context: Context) {
     // Add Projection/View Matrices for Ortho Math
     private val projectionMatrix = FloatArray(16)
     private val viewMatrix = FloatArray(16)
-
 
 
     private val vertexShaderCode = """
@@ -119,17 +116,12 @@ class GLVideoRenderer(private val context: Context) {
     private var userZoom = 1.0f
     private var userRotation = 0f
     private var userBrightness = 1.0f
-    @Volatile private var surfaceDrawTimestamp: Long = 0L
 
     init {
         triangleVertices = ByteBuffer.allocateDirect(triangleVerticesData.size * 4)
             .order(ByteOrder.nativeOrder()).asFloatBuffer()
         triangleVertices.put(triangleVerticesData).position(0)
         Matrix.setIdentityM(stMatrix, 0)
-    }
-
-    fun getSurfaceDrawTimestamp(): Long {
-        return surfaceDrawTimestamp
     }
 
     fun setScalingMode(mode: ScalingMode) {
@@ -154,13 +146,8 @@ class GLVideoRenderer(private val context: Context) {
 
     fun onSurfaceCreated(holder: SurfaceHolder) {
         renderScope.launch {
-            try {
-                initGL(holder)
-                renderLoop()
-            } catch (e: Exception) {
-                Log.e(tag, "Failed to initialize GL", e)
-                videoSurfaceDeferred.completeExceptionally(e)
-            }
+            initGL(holder)
+            renderLoop()
         }
     }
 
@@ -215,7 +202,12 @@ class GLVideoRenderer(private val context: Context) {
     }
 
     suspend fun waitForVideoSurface(): Surface? {
-        return videoSurfaceDeferred.await()
+        var limit = 80
+        while (videoSurface == null && limit > 0) {
+            kotlinx.coroutines.delay(100)
+            limit--
+        }
+        return videoSurface
     }
 
     private suspend fun renderLoop() {
@@ -273,9 +265,6 @@ class GLVideoRenderer(private val context: Context) {
                         } else {
                             Log.w(tag, "eglSwapBuffers failed: $error")
                         }
-                    } else {
-                        // Update surface timestamp for a successful draw call
-                        surfaceDrawTimestamp = System.currentTimeMillis()
                     }
                 } catch (t: Throwable) {
                     // CATCH EVERYTHING here.
@@ -397,77 +386,30 @@ class GLVideoRenderer(private val context: Context) {
         eglDisplay = egl!!.eglGetDisplay(EGL10.EGL_DEFAULT_DISPLAY)
 
         val version = IntArray(2)
-        if (!egl!!.eglInitialize(eglDisplay, version)) {
-            throw IllegalStateException("eglInitialize failed")
-        }
+        egl!!.eglInitialize(eglDisplay, version)
 
-        val configSpecRGBA8888Recordable = intArrayOf(
+        val configSpec = intArrayOf(
             EGL10.EGL_RED_SIZE, 8,
             EGL10.EGL_GREEN_SIZE, 8,
             EGL10.EGL_BLUE_SIZE, 8,
-            EGL10.EGL_ALPHA_SIZE, 8,
-            EGL10.EGL_DEPTH_SIZE, 0,
-            EGL10.EGL_STENCIL_SIZE, 0,
-            EGL10.EGL_RENDERABLE_TYPE, 4,
-            EGL_RECORDABLE_ANDROID, 1,
-            EGL10.EGL_NONE
-        )
-
-        val configSpecRGB565Recordable = intArrayOf(
-            EGL10.EGL_RED_SIZE, 5,
-            EGL10.EGL_GREEN_SIZE, 6,
-            EGL10.EGL_BLUE_SIZE, 5,
-            EGL10.EGL_ALPHA_SIZE, 0,
-            EGL10.EGL_DEPTH_SIZE, 0,
-            EGL10.EGL_STENCIL_SIZE, 0,
-            EGL10.EGL_RENDERABLE_TYPE, 4,
-            EGL_RECORDABLE_ANDROID, 1,
-            EGL10.EGL_NONE
-        )
-
-        val configSpecRGB565 = intArrayOf(
-            EGL10.EGL_RED_SIZE, 5,
-            EGL10.EGL_GREEN_SIZE, 6,
-            EGL10.EGL_BLUE_SIZE, 5,
-            EGL10.EGL_ALPHA_SIZE, 0,
-            EGL10.EGL_DEPTH_SIZE, 0,
-            EGL10.EGL_STENCIL_SIZE, 0,
-            EGL10.EGL_RENDERABLE_TYPE, 4,
+            EGL10.EGL_ALPHA_SIZE, 8, // MUST stay 8, because screen record function will freeze on android with 0
+            EGL10.EGL_DEPTH_SIZE, 0, // No Depth Buffer (Saves VRAM)
+            EGL10.EGL_STENCIL_SIZE, 0, // No Stencil
+            EGL10.EGL_RENDERABLE_TYPE, 4, // EGL_OPENGL_ES2_BIT
+            EGL_RECORDABLE_ANDROID, 1, // Required to let system record the surface
             EGL10.EGL_NONE
         )
 
         val configs = arrayOfNulls<EGLConfig>(1)
         val numConfig = IntArray(1)
-
-        var config: EGLConfig? = null
-
-        if (egl!!.eglChooseConfig(eglDisplay, configSpecRGBA8888Recordable, configs, 1, numConfig) && numConfig[0] > 0) {
-            config = configs[0]
-            Log.i(tag, "Using EGL_RGBA_8888_RECORDABLE config")
-        } else if (egl!!.eglChooseConfig(eglDisplay, configSpecRGB565Recordable, configs, 1, numConfig) && numConfig[0] > 0) {
-            config = configs[0]
-            Log.i(tag, "Using EGL_RGB_565_RECORDABLE config")
-        } else if (egl!!.eglChooseConfig(eglDisplay, configSpecRGB565, configs, 1, numConfig) && numConfig[0] > 0) {
-            config = configs[0]
-            Log.i(tag, "Using EGL_RGB_565 fallback config")
-        } else {
-            throw IllegalStateException("Unable to find a suitable EGL config")
-        }
+        egl!!.eglChooseConfig(eglDisplay, configSpec, configs, 1, numConfig)
+        val config = configs[0]
 
         val attribList = intArrayOf(0x3098, 2, EGL10.EGL_NONE)
         eglContext = egl!!.eglCreateContext(eglDisplay, config, EGL10.EGL_NO_CONTEXT, attribList)
-        if (eglContext == null || eglContext == EGL10.EGL_NO_CONTEXT) {
-            throw IllegalStateException("eglCreateContext failed")
-        }
-
         eglSurface = egl!!.eglCreateWindowSurface(eglDisplay, config, holder, null)
-        if (eglSurface == null || eglSurface == EGL10.EGL_NO_SURFACE) {
-            throw IllegalStateException("eglCreateWindowSurface failed")
-        }
 
-        if (!egl!!.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)) {
-            throw IllegalStateException("eglMakeCurrent failed")
-        }
+        egl!!.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)
 
         val textures = IntArray(1)
         GLES20.glGenTextures(1, textures, 0)
@@ -482,7 +424,6 @@ class GLVideoRenderer(private val context: Context) {
             renderSignal.trySend(Unit)
         }
         videoSurface = Surface(surfaceTexture)
-        videoSurfaceDeferred.complete(videoSurface)
 
         val vertexShader = loadShader(GLES20.GL_VERTEX_SHADER, vertexShaderCode)
         val fragmentShader = loadShader(GLES20.GL_FRAGMENT_SHADER, fragmentShaderCode)
@@ -500,22 +441,26 @@ class GLVideoRenderer(private val context: Context) {
         // Check compile status
         val compileStatus = IntArray(1)
         GLES20.glGetShaderiv(fragmentShader, GLES20.GL_COMPILE_STATUS, compileStatus, 0)
+        var failed = false
 
         if (compileStatus[0] == 0) {
             // Retrieve the error message
             val errorMsg = GLES20.glGetShaderInfoLog(fragmentShader)
+            failed = true
             Log.e(tag,"Fragment Shader compile error: $errorMsg")
-            throw IllegalStateException("Fragment Shader compile error: $errorMsg")
         }
 
         GLES20.glGetShaderiv(vertexShader, GLES20.GL_COMPILE_STATUS, compileStatus, 0)
         if (compileStatus[0] == 0) {
             // Retrieve the error message
-            val errorMsg = GLES20.glGetShaderInfoLog(vertexShader)
+            val errorMsg = GLES20.glGetShaderInfoLog(fragmentShader)
+            failed = true
             Log.e(tag,"Vertex Shader compile error: $errorMsg")
-            throw IllegalStateException("Vertex Shader compile error: $errorMsg")
         }
-        Log.i(tag, "GL Initialized!")
+        if(!failed)
+            Log.i(tag, "GL Initialized!")
+        else
+            Log.e(tag, "GL Error! ^^^")
 
     }
 
@@ -533,11 +478,6 @@ class GLVideoRenderer(private val context: Context) {
         surfaceTexture?.release() // Release texture explicitly
         videoSurface = null
         surfaceTexture = null
-
-        if (!videoSurfaceDeferred.isCompleted) {
-            videoSurfaceDeferred.complete(null)
-        }
-        videoSurfaceDeferred = CompletableDeferred()
     }
 
     private fun loadShader(type: Int, shaderCode: String): Int {
