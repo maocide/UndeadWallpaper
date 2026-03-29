@@ -289,15 +289,15 @@ class SettingsFragment : Fragment() {
                 val item = recentFilesAdapter.getItems()[position]
 
                 if (recentFilesAdapter.itemCount <= 1) {
-                    Toast.makeText(context, getString(R.string.error_cannot_delete_last_video), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, getString(R.string.error_cannot_remove_last_video), Toast.LENGTH_SHORT).show()
                     recentFilesAdapter.notifyItemChanged(position)
                     return
                 }
 
                 MaterialAlertDialogBuilder(requireContext())
-                    .setTitle(getString(R.string.delete_file_title))
-                    .setMessage(getString(R.string.delete_file_message, item.file.name))
-                    .setPositiveButton(getString(R.string.delete)) { _, _ ->
+                    .setTitle(getString(R.string.remove_file_title))
+                    .setMessage(getString(R.string.remove_file_message, item.file.name))
+                    .setPositiveButton(getString(R.string.remove_action)) { _, _ ->
                         val deletedUriString = Uri.fromFile(item.file).toString()
                         val currentUriString = sharedViewModel.selectedVideoUri?.toString() ?: preferencesManager.getVideoUri()
 
