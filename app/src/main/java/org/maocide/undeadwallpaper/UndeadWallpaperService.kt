@@ -513,8 +513,8 @@ class UndeadWallpaperService : WallpaperService() {
 
                         if (!useFallbackSurface) {
                             try {
-                                // Give it 1.5 seconds to provide a surface, otherwise timeout
-                                finalSurface = kotlinx.coroutines.withTimeoutOrNull(1500L) {
+                                // Give it 3.0 seconds to provide a surface, otherwise timeout
+                                finalSurface = kotlinx.coroutines.withTimeoutOrNull(3000L) {
                                     renderer?.waitForVideoSurface()
                                 }
 
@@ -547,7 +547,7 @@ class UndeadWallpaperService : WallpaperService() {
 
                         if (finalSurface != null) {
 
-                            // VIVO PROTECT: Don't attach if the surface exists but has no dimensions yet
+                            /* Avoid canceling the launch
                             val width = surfaceHolder?.surfaceFrame?.width() ?: 0
                             val height = surfaceHolder?.surfaceFrame?.height() ?: 0
 
@@ -555,6 +555,7 @@ class UndeadWallpaperService : WallpaperService() {
                                 FileLogger.w(TAG, "Surface dimensions are 0x0. Deferring attachment.")
                                 return@launch // Exit here to prevent hardware decoder crash
                             }
+                            */
 
                             // Apply starting position
                             if (currentPlaybackMode == PlaybackMode.LOOP_ALL || currentPlaybackMode == PlaybackMode.SHUFFLE) {
@@ -701,16 +702,19 @@ class UndeadWallpaperService : WallpaperService() {
                 renderer?.onSurfaceChanged(width, height)
             }
 
+            /*
             // If the player isn't set up yet (because it was deferred by the 0x0 check),
             // kick off initialization now that we have real dimensions.
             if (mediaPlayer?.playbackState == Player.STATE_IDLE || mediaPlayer == null) {
                 initializePlayer()
             }
+            */
         }
 
         override fun onSurfaceDestroyed(holder: SurfaceHolder) {
             super.onSurfaceDestroyed(holder)
             FileLogger.i(TAG, "onSurfaceDestroyed")
+            visibilityJob?.cancel()
             releasePlayer()
             releaseRenderer()
             this.surfaceHolder = null
@@ -719,6 +723,7 @@ class UndeadWallpaperService : WallpaperService() {
         override fun onDestroy() {
             super.onDestroy()
             FileLogger.i(TAG, "Engine onDestroy")
+            visibilityJob?.cancel()
             stopStallWatchdog() // Kill the playback watchdog
             releasePlayer()
             releaseRenderer()
