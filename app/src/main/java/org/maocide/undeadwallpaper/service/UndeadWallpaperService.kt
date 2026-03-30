@@ -76,14 +76,18 @@ class UndeadWallpaperService : WallpaperService() {
 
 
 
-    private inner class MyWallpaperEngine : Engine() {
+    private inner class MyWallpaperEngine : Engine(), WallpaperPlayerListener {
 
         // Lazy instantiation for performance reuse
         private val prefs by lazy { PreferencesManager(baseContext) }
         private val playlistManager by lazy { PlaylistManager(baseContext, prefs) }
         private var isAudioEnabled: Boolean = false
         private lateinit var currentScalingMode: ScalingMode
-        private var mediaPlayer: ExoPlayer? = null
+
+        private val wallpaperPlayer = WallpaperPlayer(baseContext, this)
+        private val isPlayerInitialized: Boolean
+            get() = wallpaperPlayer.getPlayerInstance() != null
+
         private var surfaceHolder: SurfaceHolder? = null
         private var playheadTime: Long = 0L
         private val TAG: String = javaClass.simpleName
@@ -98,80 +102,21 @@ class UndeadWallpaperService : WallpaperService() {
         private var hasPlaybackCompleted = false
 
         private var renderer: GLVideoRenderer? = null
-        private var recoveryAttempts = 0 // Counter for error recovery retry attempts
 
         // Hardware Info
         private val isVivoDevice = Build.MANUFACTURER.equals("vivo", ignoreCase = true)
 
         private var playerSetupJob: kotlinx.coroutines.Job? = null
 
-        // Stall Watchdog vars
-        private var lastPosition: Long = 0
-        private var lastRenderTimestamp: Long = 0
-        private var stallCount: Int = 0
-        private val watchdogHandler = Handler(Looper.getMainLooper())
-        private val watchdogRunnable = object : Runnable {
-            override fun run() {
-                checkPlaybackStall()
-                // Re-run continuously while visible
-                watchdogHandler.postDelayed(this, 2000) // Check every 2 seconds
-            }
+        private val playbackWatchdog = PlaybackWatchdog {
+            FileLogger.e(TAG, "Watchdog: STALL CONFIRMED. Restarting player.")
+            initializePlayer() // Force restart
         }
+
         private var visibilityJob: kotlinx.coroutines.Job? = null
 
-        /**
-         * Checks if the player claims to be playing but isn't advancing.
-         * Used by the Stall Watchdog
-         */
-        private fun checkPlaybackStall() {
-            val player = mediaPlayer ?: return
-            val renderer = renderer ?: return
-
-            // We only care if we SHOULD be playing
-            if (player.isPlaying && player.playbackState == Player.STATE_READY) {
-                val currentPos = player.currentPosition
-                val currentRenderTime = renderer.getSurfaceDrawTimestamp()
-
-                val isPlayerStuck = (currentPos == lastPosition)
-                val isScreenFrozen = (currentRenderTime == lastRenderTimestamp)
-
-                // If EITHER is true, the player is stuck with no error.
-                if ((isPlayerStuck || isScreenFrozen) && player.duration > 2000) {
-                    stallCount++
-                    FileLogger.w(TAG, "Watchdog: Stall detected! PlayerStuck=$isPlayerStuck, ScreenFrozen=$isScreenFrozen ($stallCount/2)")
-
-
-                    if (stallCount >= 2) { // Stalled for ~4 seconds
-                        FileLogger.e(TAG, "Watchdog: STALL CONFIRMED. Restarting player.")
-                        stallCount = 0
-                        initializePlayer() // Force restart
-                    }
-                } else {
-                    // It moved! Reset counters.
-                    stallCount = 0
-                    lastPosition = currentPos
-                    lastRenderTimestamp = currentRenderTime
-                }
-            } else {
-                // If not playing or not ready, reset the watchdog counters to avoid false positives.
-                stallCount = 0
-                lastPosition = player.currentPosition
-                lastRenderTimestamp = renderer.getSurfaceDrawTimestamp()
-            }
-        }
-
-        private fun startStallWatchdog() {
-            stopStallWatchdog() // Ensure we don't double-post
-            watchdogHandler.post(watchdogRunnable)
-        }
-
-        private fun stopStallWatchdog() {
-            watchdogHandler.removeCallbacks(watchdogRunnable)
-            stallCount = 0
-        }
-
         @OptIn(UnstableApi::class)
-        private fun bindPlaylistToPlayer(player: ExoPlayer, keepCurrentPlayback: Boolean) {
+        private fun bindPlaylistToPlayer(keepCurrentPlayback: Boolean) {
             val dataSourceFactory = DefaultDataSource.Factory(baseContext)
             val mediaSourceFactory = ProgressiveMediaSource.Factory(dataSourceFactory)
 
@@ -191,23 +136,23 @@ class UndeadWallpaperService : WallpaperService() {
                     if (targetIndex == -1) targetIndex = 0
 
                     // If we are just reordering, keep the exact millisecond we are currently at
-                    val targetPosition = if (keepCurrentPlayback) player.currentPosition else playheadTime
+                    val targetPosition = if (keepCurrentPlayback) wallpaperPlayer.currentPosition else playheadTime
 
-                    player.setMediaSources(mediaSources)
-                    player.seekTo(targetIndex, targetPosition)
+                    wallpaperPlayer.setMediaSources(mediaSources)
+                    wallpaperPlayer.seekTo(targetIndex, targetPosition)
                 } else {
                     // Fallback for empty list
                     val mediaUri = getMediaUri() ?: return
                     val mediaItem = MediaItem.Builder().setUri(mediaUri).setMediaId(loadedVideoUriString).build()
-                    player.setMediaSource(mediaSourceFactory.createMediaSource(mediaItem))
-                    player.seekTo(if (keepCurrentPlayback) player.currentPosition else playheadTime)
+                    wallpaperPlayer.setMediaSource(mediaSourceFactory.createMediaSource(mediaItem))
+                    wallpaperPlayer.seekTo(if (keepCurrentPlayback) wallpaperPlayer.currentPosition else playheadTime)
                 }
             } else {
                 // Single file modes
                 val mediaUri = getMediaUri() ?: return
                 val mediaItem = MediaItem.Builder().setUri(mediaUri).setMediaId(loadedVideoUriString).build()
-                player.setMediaSource(mediaSourceFactory.createMediaSource(mediaItem))
-                player.seekTo(if (keepCurrentPlayback) player.currentPosition else playheadTime)
+                wallpaperPlayer.setMediaSource(mediaSourceFactory.createMediaSource(mediaItem))
+                wallpaperPlayer.seekTo(if (keepCurrentPlayback) wallpaperPlayer.currentPosition else playheadTime)
             }
         }
 
@@ -241,9 +186,9 @@ class UndeadWallpaperService : WallpaperService() {
 
                     ACTION_PLAYLIST_REORDERED -> {
                         FileLogger.i(TAG, "Playlist reordered. Syncing ExoPlayer timeline.")
-                        mediaPlayer?.let {
+                        if (isPlayerInitialized) {
                             // Call the helper (Keep playing seamlessly)
-                            bindPlaylistToPlayer(it, keepCurrentPlayback = true)
+                            bindPlaylistToPlayer(keepCurrentPlayback = true)
                         }
                     }
                 }
@@ -264,12 +209,94 @@ class UndeadWallpaperService : WallpaperService() {
             renderer?.setBrightness(prefs.getBrightness())
         }
 
+        // WallpaperPlayerListener implementations
+
+        override fun onPlayerError(error: PlaybackException) {
+            // Handled mostly by WallpaperPlayer, this is just for non-hardware errors or restart triggers
+            Handler(Looper.getMainLooper()).post {
+                Toast.makeText(baseContext, "Error: ${error.errorCodeName}", Toast.LENGTH_LONG).show()
+            }
+
+            // Re-initialize if visible and retry limit not reached (retries handled by wallpaperPlayer but triggering re-init here)
+            // If the wallpaperPlayer triggers a generic error, we just notify user.
+            // If it triggered an auto-recovering hardware error, we might need to recreate the surface/player.
+            // But wallpaperPlayer handles the retry delay internally and calls this. We actually need to initializePlayer here.
+            val isDecoderError = error.errorCode == PlaybackException.ERROR_CODE_DECODER_INIT_FAILED ||
+                    error.errorCode == PlaybackException.ERROR_CODE_DECODER_QUERY_FAILED ||
+                    error.errorCode == PlaybackException.ERROR_CODE_DECODING_RESOURCES_RECLAIMED
+
+            if (isDecoderError) {
+                 if (isVisible) {
+                     initializePlayer()
+                 }
+            }
+        }
+
+        override fun onHardwareFailure(reason: String) {
+            handleCriticalError(reason)
+        }
+
+        override fun onVideoSizeChanged(width: Int, height: Int) {
+            // Send video size to Renderer for Matrix Calculation
+            renderer?.setVideoSize(width, height)
+
+            // refresh all user values to renderer
+            refreshRenderer()
+
+            // Use ExoPlayer's scaling only if fallback surface is used
+            if (useFallbackSurface) {
+                if (!isScalingModeSet) {
+                    FileLogger.i(TAG, "Valid video size detected: ${width}x${height}. Setting scaling mode ONCE for fallback surface.")
+
+                    val videoAspectRatio = width.toFloat() / height.toFloat()
+                    val isHorizontalVideo = videoAspectRatio > 1.0
+
+                    wallpaperPlayer.videoScalingMode = if (isHorizontalVideo) {
+                        VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
+                    } else {
+                        VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
+                    }
+
+                    isScalingModeSet = true // SET THE FLAG SO THIS DOESN'T RUN AGAIN
+                }
+            }
+        }
+
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            // detecting one shot playback and pausing
+            if (currentPlaybackMode == PlaybackMode.ONE_SHOT) {
+                when (playbackState) {
+                    Player.STATE_ENDED -> {
+                        FileLogger.i(TAG, "Playback ended!")
+                        hasPlaybackCompleted = true
+                        wallpaperPlayer.pause()
+                    }
+                    Player.STATE_READY -> {
+                        if (hasPlaybackCompleted) wallpaperPlayer.pause()
+                    }
+                }
+            }
+        }
+
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            val nextUriString = mediaItem?.mediaId
+            if (nextUriString != null && nextUriString != loadedVideoUriString) {
+                FileLogger.i(TAG, "Transitioning to next video in playlist: $nextUriString")
+                loadedVideoUriString = nextUriString
+                prefs.saveVideoUri(nextUriString)
+            }
+        }
+
+        override fun onRenderedFirstFrame() {
+            FileLogger.i(TAG, "SUCCESS: onRenderedFirstFrame called. Decoder actually pushed a frame to the screen!")
+        }
+
         @OptIn(UnstableApi::class)
         private fun initializePlayer() {
             // Cancel any startup issued, avoid race conditions
             playerSetupJob?.cancel()
 
-            if (mediaPlayer != null) {
+            if (isPlayerInitialized) {
                 releasePlayer()
             }
 
@@ -282,12 +309,10 @@ class UndeadWallpaperService : WallpaperService() {
 
             FileLogger.i(TAG, "Initializing ExoPlayer...")
 
-
             // Load prefs
             isAudioEnabled = prefs.isAudioEnabled()
             currentPlaybackMode = prefs.getPlaybackMode()
             speed = prefs.getSpeed()
-
 
             hasPlaybackCompleted = false
 
@@ -296,319 +321,83 @@ class UndeadWallpaperService : WallpaperService() {
                 notifyColorsChanged()
             }
 
-            // Define a 32MB Memory Cap
-            val targetBufferBytes = 32 * 1024 * 1024
+            val mediaUri = getMediaUri()
+            loadedVideoUriString = mediaUri?.toString() ?: ""
 
-            // Configure the LoadControl
-            // Force the buffer duration defaults (50 is default for network streams)
-            val loadControl = DefaultLoadControl.Builder()
-                .setAllocator(DefaultAllocator(true, C.DEFAULT_BUFFER_SEGMENT_SIZE))
-                .setBufferDurationsMs(
-                    15_000, // Min buffer 15 // lowered from default 50
-                    30_000, // Max buffer 30
-                    2_500,  // Buffer to start playback
-                    5_000   // Buffer for rebuffer
-                )
-                .setTargetBufferBytes(targetBufferBytes)
-                .setPrioritizeTimeOverSizeThresholds(false) // !! Enforce the 32MB cap strictly, otherwise time is priority. The Above size will be the limit.
-                .build()
-
-            // Factory to give on creation to enable a fallback for non standard res, possible very hi res.
-            val renderersFactory = DefaultRenderersFactory(baseContext).apply {
-                setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF)
-                setEnableDecoderFallback(true) // Crucial for non-standard resolutions
+            if (mediaUri == null) {
+                FileLogger.e(TAG, "Media URI is null, cannot play video.")
+                return
             }
 
-            val player = ExoPlayer.Builder(baseContext, renderersFactory)
-                .setLooper(Looper.getMainLooper())
-                .setLoadControl(loadControl)
-                .setSeekParameters(SeekParameters.NEXT_SYNC)
-                .build()
-                .apply {
-                    val mediaUri = getMediaUri()
-                    loadedVideoUriString = mediaUri.toString()
+            wallpaperPlayer.initialize(null, isAudioEnabled, speed, currentPlaybackMode)
 
-                    if (mediaUri == null) {
-                        FileLogger.e(TAG, "Media URI is null, cannot play video.")
-                        return
+            if (!isPlayerInitialized) return
+
+            // Call the helper to load playlist
+            bindPlaylistToPlayer(keepCurrentPlayback = false)
+
+            // Send all values to renderer updating it, will be used for matrix calc.
+            refreshRenderer()
+
+            // WAIT for the GL Surface, then attach
+            playerSetupJob = kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
+                var finalSurface: android.view.Surface? = null
+
+                if (!useFallbackSurface) {
+                    try {
+                        // Give it 3.0 seconds to provide a surface, otherwise timeout
+                        finalSurface = kotlinx.coroutines.withTimeoutOrNull(3000L) {
+                            renderer?.waitForVideoSurface()
+                        }
+
+                        // If it returns null, the timeout was hit
+                        if (finalSurface == null) {
+                            FileLogger.w(TAG, "GL Surface timeout (1.5s)! OS blocked it. Triggering fallback.")
+                            throw java.util.concurrent.TimeoutException("Surface wait timed out")
+                        }
+
+                    } catch (e: Exception) {
+                        FileLogger.e(TAG, "GL Renderer failed to provide surface, falling back to default surface", e)
+                        useFallbackSurface = true
+                        releasePlayer()
+                        releaseRenderer()
+                        initializePlayer() // Restart immediately using the fallback
+                        return@launch
                     }
-
-                    // Call the helper to load playlist
-                    bindPlaylistToPlayer(this, keepCurrentPlayback = false)
-
-                    // Apply volume & Track Selection
-                    val actualAudioEnabled = isAudioEnabled // Possible to add && !isPreview() to force mute previews
-
-                    if (!actualAudioEnabled) {
-                        // Explicitly disable the audio track if we don't need it.
-                        // This prevents OEM OS blocks from stalling the video clock.
-                        trackSelectionParameters = trackSelectionParameters.buildUpon()
-                            .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, true)
-                            .build()
-                    } else {
-                        trackSelectionParameters = trackSelectionParameters.buildUpon()
-                            .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false)
-                            .build()
-                    }
-
-                    volume = if (actualAudioEnabled) 1f else 0f
-
-                    // Apply speed
-                    setPlaybackSpeed(speed)
-
-                    // Configure Repeat & Shuffle Modes
-                    when (currentPlaybackMode) {
-                        PlaybackMode.LOOP -> {
-                            repeatMode = Player.REPEAT_MODE_ONE
-                            shuffleModeEnabled = false
-                        }
-                        PlaybackMode.ONE_SHOT -> {
-                            repeatMode = Player.REPEAT_MODE_OFF
-                            shuffleModeEnabled = false
-                        }
-                        PlaybackMode.LOOP_ALL -> {
-                            repeatMode = Player.REPEAT_MODE_ALL
-                            shuffleModeEnabled = false
-                        }
-                        PlaybackMode.SHUFFLE -> {
-                            repeatMode = Player.REPEAT_MODE_ALL
-                            shuffleModeEnabled = true
-                        }
-                    }
-
-                    FileLogger.d(TAG, "repeatMode: $repeatMode, shuffleModeEnabled: $shuffleModeEnabled")
-
-                    // Send all values to renderer updating it, will be used for matrix calc.
-                    refreshRenderer()
-
-                    // Listen for size changes and errors
-                    addListener(object : Player.Listener {
-
-                        // Listener for error recovery
-                        override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                            FileLogger.e(TAG, "ExoPlayer Error: ${error.errorCodeName} - ${error.message}")
-
-                            // Identify if this is a Decoder/Hardware issue
-                            val isDecoderError = error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_DECODER_INIT_FAILED ||
-                                    error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_DECODER_QUERY_FAILED ||
-                                    error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_DECODING_RESOURCES_RECLAIMED
-
-                            if (isDecoderError) {
-                                // Check for strings that confirm NO_MEMORY
-                                val msg = error.message ?: ""
-                                val causeMsg = error.cause?.message ?: ""
-                                if (msg.contains("NO_MEMORY") || causeMsg.contains("NO_MEMORY")) {
-                                    handleCriticalError("Memory limit exceeded.")
-                                    return
-                                }
-
-                                // RETRY ATTEMPT
-                                if (recoveryAttempts < 3) {
-                                    recoveryAttempts++
-                                    FileLogger.w(TAG, "Hardware Decoder lost (Attempt $recoveryAttempts/3). Auto-recovering...")
-
-                                    releasePlayer()
-
-                                    // Wait 2 seconds, then try again
-                                    kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
-                                        kotlinx.coroutines.delay(2000)
-                                        if (isVisible) {
-                                            initializePlayer()
-                                        }
-                                    }
-                                } else {
-                                    // WE TRIED 3 TIMES AND FAILED -> IT'S A BAD FILE
-                                    recoveryAttempts = 0
-                                    handleCriticalError("Persistent hardware failure (Loop detected).")
-                                }
-                            } else {
-                                // Generic non-hardware error
-                                Handler(Looper.getMainLooper()).post {
-                                    Toast.makeText(baseContext, "Error: ${error.errorCodeName}", Toast.LENGTH_LONG).show()
-                                }
-                            }
-                        }
-
-                        // Handle size changes
-                        override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
-                            super.onVideoSizeChanged(videoSize)
-
-                            // Check for 0x0 size
-                            if (videoSize.width == 0 || videoSize.height == 0) {
-                                FileLogger.w(TAG, "Ignoring invalid 0x0 video size change.")
-                                return
-                            }
-
-                            // Send video size to Renderer for Matrix Calculation
-                            renderer?.setVideoSize(videoSize.width, videoSize.height)
-
-                            // refresh all user values to renderer
-                            refreshRenderer()
-
-                            // Use ExoPlayer's scaling only if fallback surface is used
-                            if (useFallbackSurface) {
-                                if (!isScalingModeSet) {
-                                    FileLogger.i(TAG, "Valid video size detected: ${videoSize.width}x${videoSize.height}. Setting scaling mode ONCE for fallback surface.")
-
-                                    val videoAspectRatio = videoSize.width.toFloat() / videoSize.height.toFloat()
-                                    val isHorizontalVideo = videoAspectRatio > 1.0
-
-                                    this@apply.videoScalingMode = if (isHorizontalVideo) {
-                                        VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
-                                    } else {
-                                        VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
-                                    }
-
-                                    isScalingModeSet = true // SET THE FLAG SO THIS DOESN'T RUN AGAIN
-                                }
-                            }
-                        }
-
-                        // Listener for status change
-                        override fun onPlaybackStateChanged(playbackState: Int) {
-                            super.onPlaybackStateChanged(playbackState)
-
-                            // If the player actually gets STATE_READY, reset recovery attempts counter.
-                            if (playbackState == Player.STATE_READY) {
-                                recoveryAttempts = 0
-                            }
-
-                            // detecting one shot playback and pausing
-                            if (currentPlaybackMode == PlaybackMode.ONE_SHOT) {
-                                when (playbackState) {
-                                    Player.STATE_ENDED -> {
-                                        FileLogger.i(TAG, "Playback ended!")
-                                        hasPlaybackCompleted = true
-                                        pause()
-                                    }
-                                    Player.STATE_READY -> {
-                                        if (hasPlaybackCompleted) pause()
-                                    }
-                                }
-                            }
-                        }
-
-                        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                            super.onMediaItemTransition(mediaItem, reason)
-                            val nextUriString = mediaItem?.mediaId
-                            if (nextUriString != null && nextUriString != loadedVideoUriString) {
-                                FileLogger.i(TAG, "Transitioning to next video in playlist: $nextUriString")
-                                loadedVideoUriString = nextUriString
-                                prefs.saveVideoUri(nextUriString)
-                            }
-
-                            // If we hit the end of the shuffled playlist and it repeats, generate a new random order.
-                            val isWrapAround = reason == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT ||
-                                    (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO &&
-                                            currentMediaItemIndex == currentTimeline.getFirstWindowIndex(shuffleModeEnabled))
-
-                            if (isWrapAround && currentPlaybackMode == PlaybackMode.SHUFFLE) {
-                                FileLogger.i(TAG, "Playlist repeated. Generating new shuffle order.")
-                                if (mediaItemCount > 0) {
-                                    val newOrder = DefaultShuffleOrder(mediaItemCount, Random.nextLong())
-                                    (this@apply).setShuffleOrder(newOrder)
-                                }
-                            }
-                        }
-
-                        override fun onRenderedFirstFrame() {
-                            super.onRenderedFirstFrame()
-                            FileLogger.i(TAG, "SUCCESS: onRenderedFirstFrame called. Decoder actually pushed a frame to the screen!")
-                        }
-                    })
-
-                    // WAIT for the GL Surface, then attach
-                    playerSetupJob = kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
-                        var finalSurface: android.view.Surface? = null
-
-                        if (!useFallbackSurface) {
-                            try {
-                                // Give it 3.0 seconds to provide a surface, otherwise timeout
-                                finalSurface = kotlinx.coroutines.withTimeoutOrNull(3000L) {
-                                    renderer?.waitForVideoSurface()
-                                }
-
-                                // If it returns null, the timeout was hit
-                                if (finalSurface == null) {
-                                    FileLogger.w(TAG, "GL Surface timeout (1.5s)! OS blocked it. Triggering fallback.")
-                                    throw java.util.concurrent.TimeoutException("Surface wait timed out")
-                                }
-
-                            } catch (e: Exception) {
-                                FileLogger.e(TAG, "GL Renderer failed to provide surface, falling back to default surface", e)
-                                useFallbackSurface = true
-                                releasePlayer()
-                                releaseRenderer()
-                                initializePlayer() // Restart immediately using the fallback
-                                return@launch
-                            }
-                        } else {
-                            finalSurface = surfaceHolder?.surface
-                        }
-
-                        // If this job was cancelled, video switch or anything, STOP.
-                        if (!isActive) return@launch
-
-                        // Check if player is alive, surface is valid, surface is ready.
-                        if (mediaPlayer == null || surfaceHolder == null || surfaceHolder?.surface == null || !surfaceHolder?.surface?.isValid!!) {
-                            FileLogger.w(TAG, "Engine destroyed or surface invalid before player setup completed. Aborting.")
-                            return@launch
-                        }
-
-                        if (finalSurface != null) {
-
-                            /* Avoid canceling the launch
-                            val width = surfaceHolder?.surfaceFrame?.width() ?: 0
-                            val height = surfaceHolder?.surfaceFrame?.height() ?: 0
-
-                            if (width == 0 || height == 0) {
-                                FileLogger.w(TAG, "Surface dimensions are 0x0. Deferring attachment.")
-                                return@launch // Exit here to prevent hardware decoder crash
-                            }
-                            */
-
-                            // Apply starting position
-                            if (currentPlaybackMode == PlaybackMode.LOOP_ALL || currentPlaybackMode == PlaybackMode.SHUFFLE) {
-                                seekTo(currentMediaItemIndex, playheadTime)
-                            } else {
-                                seekTo(playheadTime)
-                            }
-
-                            setVideoSurface(finalSurface)
-                            prepare()
-
-                            // DO NOT call play() here.
-                            // Just sync the playWhenReady flag with the current visibility state.
-                            val shouldPlay = if (playWhenReady) true else isVisible
-
-                            FileLogger.i(TAG, "Setup complete. isVisible: $isVisible, playWhenReady: $playWhenReady, shouldPlay: $shouldPlay")
-
-                            playWhenReady = shouldPlay
-                        }
-                    }
-
-
-                    /* Old launch code, might cause race condition, changed with coroutine above
-                    val currentScope = kotlinx.coroutines.CoroutineScope(Dispatchers.Main)
-                    currentScope.launch {
-                        val glSurface = renderer?.waitForVideoSurface()
-                        if (glSurface != null) {
-                            seekTo(playheadTime)
-                            setVideoSurface(glSurface) // <--- glSurface is actually set and becomes effective
-                            prepare()
-                            play()
-                        }
-                    } */
-
-
-                    /* Old ExoPlayer surface code
-                    seekTo(playheadTime)
-                    setVideoSurface(holder.surface)
-                    prepare()
-                    play() */
+                } else {
+                    finalSurface = surfaceHolder?.surface
                 }
 
-            mediaPlayer = player
+                // If this job was cancelled, video switch or anything, STOP.
+                if (!isActive) return@launch
+
+                // Check if player is alive, surface is valid, surface is ready.
+                if (!isPlayerInitialized || surfaceHolder == null || surfaceHolder?.surface == null || !surfaceHolder?.surface?.isValid!!) {
+                    FileLogger.w(TAG, "Engine destroyed or surface invalid before player setup completed. Aborting.")
+                    return@launch
+                }
+
+                if (finalSurface != null) {
+
+                    // Apply starting position
+                    if (currentPlaybackMode == PlaybackMode.LOOP_ALL || currentPlaybackMode == PlaybackMode.SHUFFLE) {
+                        wallpaperPlayer.seekTo(wallpaperPlayer.currentMediaItemIndex, playheadTime)
+                    } else {
+                        wallpaperPlayer.seekTo(playheadTime)
+                    }
+
+                    wallpaperPlayer.setVideoSurface(finalSurface)
+                    wallpaperPlayer.prepare()
+
+                    // DO NOT call play() here.
+                    // Just sync the playWhenReady flag with the current visibility state.
+                    val shouldPlay = if (wallpaperPlayer.playWhenReady) true else isVisible
+
+                    FileLogger.i(TAG, "Setup complete. isVisible: $isVisible, playWhenReady: ${wallpaperPlayer.playWhenReady}, shouldPlay: $shouldPlay")
+
+                    wallpaperPlayer.playWhenReady = shouldPlay
+                }
+            }
         }
 
         /**
@@ -623,13 +412,10 @@ class UndeadWallpaperService : WallpaperService() {
             // Stop any startup jobs
             playerSetupJob?.cancel()
 
-            mediaPlayer?.let { player ->
-                FileLogger.i(TAG, "Releasing ExoPlayer...")
-                playheadTime = player.currentPosition
-                player.clearMediaItems()
-                player.release()
+            if (isPlayerInitialized) {
+                playheadTime = wallpaperPlayer.currentPosition
             }
-            mediaPlayer = null
+            wallpaperPlayer.release()
             isScalingModeSet = false
         }
 
@@ -725,6 +511,7 @@ class UndeadWallpaperService : WallpaperService() {
             super.onSurfaceDestroyed(holder)
             FileLogger.i(TAG, "onSurfaceDestroyed")
             visibilityJob?.cancel()
+            playbackWatchdog.stop()
             releasePlayer()
             releaseRenderer()
             this.surfaceHolder = null
@@ -734,7 +521,7 @@ class UndeadWallpaperService : WallpaperService() {
             super.onDestroy()
             FileLogger.i(TAG, "Engine onDestroy")
             visibilityJob?.cancel()
-            stopStallWatchdog() // Kill the playback watchdog
+            playbackWatchdog.stop() // Kill the playback watchdog
             releasePlayer()
             releaseRenderer()
             unregisterReceiver(videoChangeReceiver)
@@ -757,14 +544,12 @@ class UndeadWallpaperService : WallpaperService() {
                 FileLogger.i(TAG, "onVisibilityChanged (Debounced): visible = $visible isPreview = $isPreview, playbackMode = $currentPlaybackMode")
 
                 if (visible) {
-                    startStallWatchdog() // Monitor for playback running
-
                     val currentUriOnDisk = getMediaUri().toString()
                     val isSurfaceDead = surfaceHolder?.surface?.isValid != true
                     var wasJustInitialized = false
 
                     // Check if we need to (re)initialize
-                    if (currentUriOnDisk != loadedVideoUriString || mediaPlayer == null || isSurfaceDead) {
+                    if (currentUriOnDisk != loadedVideoUriString || !isPlayerInitialized || isSurfaceDead) {
                         if (currentUriOnDisk != loadedVideoUriString) {
                             FileLogger.i(TAG, "WakeUp Check: URI changed while sleeping! Reloading.")
                         } else if (isSurfaceDead) {
@@ -782,9 +567,6 @@ class UndeadWallpaperService : WallpaperService() {
                         wasJustInitialized = true
                     }
 
-                    // Safely grab the player instance.
-                    val player = mediaPlayer ?: return@launch
-
                     // Handle Timeline
                     // We only apply timeline manipulations if the player wasn't just freshly initialized.
                     if (!wasJustInitialized) {
@@ -793,24 +575,24 @@ class UndeadWallpaperService : WallpaperService() {
                             StartTime.RESUME -> {
                                 if (currentPlaybackMode == PlaybackMode.ONE_SHOT && hasPlaybackCompleted && !isPreview()) {
                                     playheadTime = 0L
-                                    player.seekToDefaultPosition()
+                                    wallpaperPlayer.seekToDefaultPosition()
                                     hasPlaybackCompleted = false
                                 }
                             }
                             StartTime.RESTART -> {
                                 playheadTime = 0L
-                                player.seekToDefaultPosition()
+                                wallpaperPlayer.seekToDefaultPosition()
                                 hasPlaybackCompleted = false
                             }
                             StartTime.RANDOM -> {
-                                val duration = player.duration
+                                val duration = wallpaperPlayer.duration
                                 if (duration > 0 && duration != C.TIME_UNSET) {
                                     val randomPos = Random.nextLong(0, duration)
                                     playheadTime = randomPos
-                                    player.seekTo(player.currentMediaItemIndex, randomPos)
+                                    wallpaperPlayer.seekTo(wallpaperPlayer.currentMediaItemIndex, randomPos)
                                 } else {
                                     playheadTime = 0L
-                                    player.seekToDefaultPosition()
+                                    wallpaperPlayer.seekToDefaultPosition()
                                 }
                                 hasPlaybackCompleted = false
                             }
@@ -819,17 +601,21 @@ class UndeadWallpaperService : WallpaperService() {
 
                     // The "Play" Command: Just set the flag.
                     // ExoPlayer will start natively as soon as it reaches STATE_READY.
-                    player.playWhenReady = true
+                    wallpaperPlayer.playWhenReady = true
+
+                    wallpaperPlayer.getPlayerInstance()?.let { playerInstance ->
+                        playbackWatchdog.start(playerInstance, renderer) // Monitor for playback running
+                    }
 
                 } else {
-                    stopStallWatchdog()
+                    playbackWatchdog.stop()
 
                     if (isPreview) {
                         FileLogger.i(TAG, "Preview hidden. Releasing player to save decoders.")
                         releasePlayer()
                     } else {
-                        mediaPlayer?.pause()
-                        mediaPlayer?.playWhenReady = false
+                        wallpaperPlayer.pause()
+                        wallpaperPlayer.playWhenReady = false
                     }
                 }
             }
@@ -908,8 +694,8 @@ class UndeadWallpaperService : WallpaperService() {
 
                 FileLogger.i(TAG, "Command received -> Playlist reordered. Syncing silently.")
 
-                mediaPlayer?.let {
-                    bindPlaylistToPlayer(it, keepCurrentPlayback = true)
+                if (isPlayerInitialized) {
+                    bindPlaylistToPlayer(keepCurrentPlayback = true)
                 }
 
             }
