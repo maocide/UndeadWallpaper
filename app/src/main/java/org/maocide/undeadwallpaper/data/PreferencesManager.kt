@@ -1,14 +1,19 @@
-package org.maocide.undeadwallpaper
+package org.maocide.undeadwallpaper.data
+
+import org.maocide.undeadwallpaper.model.PlaybackMode
+import org.maocide.undeadwallpaper.model.ScalingMode
+import org.maocide.undeadwallpaper.model.StartTime
+import org.maocide.undeadwallpaper.model.StatusBarColor
 
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import org.maocide.undeadwallpaper.model.PlaybackMode
-import org.maocide.undeadwallpaper.model.ScalingMode
-import org.maocide.undeadwallpaper.model.StartTime
-import org.maocide.undeadwallpaper.model.StatusBarColor
+
+
+
+
 
 /**
  * Manages SharedPreferences for the application.

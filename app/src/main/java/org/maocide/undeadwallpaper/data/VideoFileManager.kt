@@ -1,4 +1,9 @@
-package org.maocide.undeadwallpaper
+package org.maocide.undeadwallpaper.data
+
+import org.maocide.undeadwallpaper.R
+import org.maocide.undeadwallpaper.BuildConfig
+
+import org.maocide.undeadwallpaper.model.RecentFile
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -8,7 +13,7 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.util.Log
-import org.maocide.undeadwallpaper.BuildConfig
+
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll

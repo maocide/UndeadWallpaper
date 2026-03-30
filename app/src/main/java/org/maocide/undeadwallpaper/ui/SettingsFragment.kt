@@ -1,4 +1,19 @@
-package org.maocide.undeadwallpaper
+package org.maocide.undeadwallpaper.ui
+
+import org.maocide.undeadwallpaper.databinding.FragmentSettingsBinding
+
+import org.maocide.undeadwallpaper.R
+import org.maocide.undeadwallpaper.BuildConfig
+
+import org.maocide.undeadwallpaper.data.PreferencesManager
+import org.maocide.undeadwallpaper.data.VideoFileManager
+import org.maocide.undeadwallpaper.model.PlaybackMode
+import org.maocide.undeadwallpaper.model.RecentFile
+import org.maocide.undeadwallpaper.model.ScalingMode
+import org.maocide.undeadwallpaper.model.StartTime
+import org.maocide.undeadwallpaper.model.StatusBarColor
+import org.maocide.undeadwallpaper.service.UndeadWallpaperService
+import org.maocide.undeadwallpaper.utils.FileLogger
 
 import android.Manifest
 import android.app.Activity
@@ -11,8 +26,8 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
-import org.maocide.undeadwallpaper.FileLogger
-import org.maocide.undeadwallpaper.BuildConfig
+
+
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -33,13 +48,13 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.maocide.undeadwallpaper.databinding.FragmentSettingsBinding
-import org.maocide.undeadwallpaper.model.PlaybackMode
-import org.maocide.undeadwallpaper.model.ScalingMode
+
+
+
 import androidx.core.view.isVisible
 import com.google.android.material.slider.Slider
-import org.maocide.undeadwallpaper.model.StartTime
-import org.maocide.undeadwallpaper.model.StatusBarColor
+
+
 import kotlin.math.roundToInt
 
 /**

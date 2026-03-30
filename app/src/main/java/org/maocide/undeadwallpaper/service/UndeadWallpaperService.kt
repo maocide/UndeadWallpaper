@@ -1,4 +1,14 @@
-package org.maocide.undeadwallpaper
+package org.maocide.undeadwallpaper.service
+
+import org.maocide.undeadwallpaper.BuildConfig
+
+import org.maocide.undeadwallpaper.data.PlaylistManager
+import org.maocide.undeadwallpaper.data.PreferencesManager
+import org.maocide.undeadwallpaper.model.PlaybackMode
+import org.maocide.undeadwallpaper.model.ScalingMode
+import org.maocide.undeadwallpaper.model.StartTime
+import org.maocide.undeadwallpaper.model.StatusBarColor
+import org.maocide.undeadwallpaper.utils.FileLogger
 
 import android.app.WallpaperColors
 import android.content.BroadcastReceiver
@@ -14,8 +24,8 @@ import android.os.Handler
 import android.os.Looper
 import android.service.wallpaper.WallpaperService
 import android.util.Log
-import org.maocide.undeadwallpaper.FileLogger
-import org.maocide.undeadwallpaper.BuildConfig
+
+
 import android.view.SurfaceHolder
 import androidx.core.content.ContextCompat
 import android.widget.Toast
@@ -39,10 +49,10 @@ import androidx.media3.exoplayer.upstream.DefaultAllocator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import org.maocide.undeadwallpaper.model.PlaybackMode
-import org.maocide.undeadwallpaper.model.ScalingMode
-import org.maocide.undeadwallpaper.model.StartTime
-import org.maocide.undeadwallpaper.model.StatusBarColor
+
+
+
+
 import kotlin.math.log
 import kotlin.random.Random
 

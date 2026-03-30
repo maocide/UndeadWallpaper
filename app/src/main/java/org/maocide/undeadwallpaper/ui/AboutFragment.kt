@@ -1,4 +1,9 @@
-package org.maocide.undeadwallpaper
+package org.maocide.undeadwallpaper.ui
+
+import org.maocide.undeadwallpaper.databinding.FragmentAboutBinding
+
+import org.maocide.undeadwallpaper.data.PreferencesManager
+import org.maocide.undeadwallpaper.utils.FileLogger
 
 import android.content.Intent
 import android.os.Bundle
@@ -8,7 +13,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.fragment.app.Fragment
-import org.maocide.undeadwallpaper.databinding.FragmentAboutBinding
+
 
 /**
  * A simple [Fragment] subclass as the second destination in the navigation, the about page.

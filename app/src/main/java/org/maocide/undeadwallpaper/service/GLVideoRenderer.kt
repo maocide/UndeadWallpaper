@@ -1,4 +1,7 @@
-package org.maocide.undeadwallpaper
+package org.maocide.undeadwallpaper.service
+
+import org.maocide.undeadwallpaper.model.ScalingMode
+import org.maocide.undeadwallpaper.utils.FileLogger
 
 import android.content.Context
 import android.graphics.SurfaceTexture
@@ -6,7 +9,7 @@ import android.opengl.EGLExt.EGL_RECORDABLE_ANDROID
 import android.opengl.GLES20
 import android.opengl.Matrix
 import android.util.Log
-import org.maocide.undeadwallpaper.FileLogger
+
 import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.WindowManager
@@ -16,7 +19,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
-import org.maocide.undeadwallpaper.model.ScalingMode
+
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer

@@ -1,4 +1,4 @@
-package org.maocide.undeadwallpaper
+package org.maocide.undeadwallpaper.model
 
 import android.graphics.Bitmap
 import java.io.File

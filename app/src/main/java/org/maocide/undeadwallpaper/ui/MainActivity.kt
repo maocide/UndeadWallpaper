@@ -1,4 +1,11 @@
-package org.maocide.undeadwallpaper
+package org.maocide.undeadwallpaper.ui
+
+import org.maocide.undeadwallpaper.databinding.ActivityMainBinding
+
+import org.maocide.undeadwallpaper.R
+
+import org.maocide.undeadwallpaper.data.PreferencesManager
+import org.maocide.undeadwallpaper.service.UndeadWallpaperService
 
 import android.app.WallpaperManager
 import android.content.ComponentName
@@ -14,7 +21,7 @@ import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.navigateUp
 import androidx.navigation.ui.setupActionBarWithNavController
 import com.google.android.material.snackbar.Snackbar
-import org.maocide.undeadwallpaper.databinding.ActivityMainBinding
+
 
 
 

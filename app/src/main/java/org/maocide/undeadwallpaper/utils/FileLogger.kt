@@ -1,4 +1,4 @@
-package org.maocide.undeadwallpaper
+package org.maocide.undeadwallpaper.utils
 
 import android.content.Context
 import android.util.Log

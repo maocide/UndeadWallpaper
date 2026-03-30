@@ -1,5 +1,8 @@
 package org.maocide.undeadwallpaper
 
+import org.maocide.undeadwallpaper.data.PreferencesManager
+import org.maocide.undeadwallpaper.utils.FileLogger
+
 import android.app.Application
 import android.util.Log
 

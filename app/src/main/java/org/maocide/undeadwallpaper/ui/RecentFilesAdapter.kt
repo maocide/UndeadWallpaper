@@ -1,4 +1,8 @@
-package org.maocide.undeadwallpaper
+package org.maocide.undeadwallpaper.ui
+
+import org.maocide.undeadwallpaper.R
+
+import org.maocide.undeadwallpaper.model.RecentFile
 
 import android.graphics.Bitmap
 import android.graphics.Color

@@ -1,9 +1,11 @@
-package org.maocide.undeadwallpaper
+package org.maocide.undeadwallpaper.data
+
+import org.maocide.undeadwallpaper.model.PlaybackMode
 
 import android.content.Context
 import android.net.Uri
 import android.util.Log
-import org.maocide.undeadwallpaper.model.PlaybackMode
+
 import java.io.File
 import kotlin.random.Random
 
