@@ -787,8 +787,8 @@ class SettingsFragment : Fragment() {
                     // Calculate total pixels
                     val pixelCount = width * height
 
-                    // Hard cap at 9 Million to allow DCI 4K but block 5K/8K or "Long 4K" files.
-                    val maxPixels = 9_000_000
+                    // Hard cap at 12 Million to allow DCI 4K but block 5K/8K.
+                    val maxPixels = 12_000_000
 
                     FileLogger.i(
                         tag,
