@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Undead Wallpaper</string>
+    <string name="action_settings">Acerca de</string>
+
+    <!-- Strings used for fragments for navigation -->
+    <string name="first_fragment_label">Ajustes del Fondo de Pantalla</string>
+    <string name="second_fragment_label">Acerca de</string>
+    <string name="previous">Anterior</string>
+
+    <!-- UI Strings -->
+    <string name="pick_video">Seleccionar Video</string>
+    <string name="trim_video">Recortar Video</string>
+    <string name="setting_audio_enabled">Habilitar Audio</string>
+    <string name="playback_mode_setting">Modo de Reproducción</string>
+    <string name="recent_files">Lista de Reproducción / Archivos Recientes</string>
+    <string name="playlist_instructions">Mantén presionado para reordenar. Desliza a la izquierda o derecha para remover.</string>
+    <string name="error_cannot_remove_last_video">No se puede remover el último video en la lista de reproducción.</string>
+    <string name="apply_trim">Aplicar</string>
+    <string name="wallpaper_description">Un fondo de pantalla animado que reproduce video.</string>
+    <string name="activating_wallpaper_message">Activando fondo de pantalla…</string>
+    <string name="select_video_first_message">Por favor, selecciona un video primero</string>
+
+    <string name="profile_image_content_description">Foto de perfil del desarrollador</string>
+    <string name="github_profile_text"><![CDATA[<a href="https://github.com/maocide/">GitHub: maocide</a>]]></string>
+    <string name="license_text"><![CDATA[<a href="https://www.gnu.org/licenses/gpl-3.0.en.html">Licencia: GNU GPL v3.0</a>]]></string>
+
+    <!-- About Page Strings -->
+    <string name="about_header_story">La Historia Detrás del Nombre</string>
+    <string name="about_story_content">Esto no es solo un ingenioso juego de palabras con fondo de pantalla <b>vivo</b> (animado). El nombre <b>UndeadWallpaper</b> es personal. Después de una larga y forzada pausa de la programación, este proyecto fue la primera señal de vida—el momento en que una pasión que estaba enterrada regresó con fuerza a la superficie. Esta aplicación no solo está <b>viva</b>; es el símbolo de un creador que regresa de entre los muertos. Es <b>no muerto</b>, porque algunas cosas son simplemente demasiado tercas para morir.</string>
+    <string name="about_header_features">Lo que Hace</string>
+    <string name="about_feature_loops">• Bucles Perfectos: Convierte cualquier video de tu teléfono en un fondo de pantalla animado, fluido y sin interrupciones.</string>
+    <string name="about_feature_freedom">• Libertad Total: Sin anuncios, sin compras dentro de la aplicación, sin tonterías. Nunca.</string>
+    <string name="about_feature_control">• Tú Tienes el Control: Soporta opciones de audio y realiza un seguimiento de tus videos recientes para cambios rápidos.</string>
+    <string name="playback_mode_loop">Repetir Uno</string>
+    <string name="playback_mode_oneshot">Una Sola Vez</string>
+    <string name="playback_mode_loop_all">Repetir Todos</string>
+    <string name="playback_mode_shuffle">Aleatorio</string>
+    <string name="scaling_mode">Modo de Escalado</string>
+    <string name="scaling_mode_fit">Ajustar</string>
+    <string name="scaling_mode_fill">Rellenar</string>
+    <string name="scaling_mode_stretch">Estirar</string>
+    <string name="advanced">Avanzado</string>
+    <string name="horizontal_position">Posición Horizontal</string>
+    <string name="vertical_position">Posición Vertical</string>
+    <string name="zoom">Acercar</string>
+    <string name="brightness">Brillo</string>
+    <string name="speed">Velocidad</string>
+    <string name="reset">Restablecer</string>
+    <string name="rotation">Rotación</string>
+
+    <!-- Error and Warning Messages -->
+    <string name="error_permission_failed">No se pudo obtener el permiso para el archivo seleccionado.</string>
+    <string name="warning_4k_video">Advertencia: los videos en 4K pueden causar cierres inesperados o lentitud en algunos dispositivos.</string>
+    <string name="error_copy_failed">No se pudo copiar el archivo de video.</string>
+    <string name="error_cannot_play_video">No se puede reproducir este archivo de video.</string>
+    <string name="warning_high_speed_stuttering">Las altas velocidades pueden causar interrupciones en videos de alta resolución.</string>
+    <string name="error_file_picker_not_available">¡El selector de archivos no está disponible en el sistema!</string>
+    <string name="error_could_not_read_video_duration">No se pudo leer la duración del video.</string>
+    <string name="warning_random_start_time_delay">Aleatorio puede causar retrasos debido a la búsqueda</string>
+    <!-- Status Bar Icon Color Settings -->
+    <string name="status_bar_icons_label">Íconos de la Barra de Estado</string>
+    <string name="status_bar_auto">Automático</string>
+    <string name="status_bar_white_icons">Blanco</string>
+    <string name="status_bar_black_icons">Negro</string>
+
+    <!-- Start Time Settings -->
+    <string name="start_time_label">Al Ser Visible</string>
+    <string name="start_time_resume">Continuar</string>
+    <string name="start_time_restart">Reiniciar</string>
+    <string name="start_time_random">Aleatorio</string>
+
+    <string name="remove_file_title">Remover Video</string>
+    <string name="remove_file_message">¿Estás seguro de que deseas remover %s de la aplicación?</string>
+    <string name="remove_action">Remover</string>
+    <string name="cancel">Cancelar</string>
+
+</resources>

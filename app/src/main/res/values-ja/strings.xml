@@ -13,7 +13,7 @@
     <string name="setting_audio_enabled">オーディオを有効にする</string>
     <string name="playback_mode_setting">再生モード</string>
     <string name="recent_files">プレイリスト / 最近のファイル</string>
-    <string name="playlist_instructions">長押しで順序変更、左右にスワイプで削除</string>
+    <string name="playlist_instructions">長押しで順序変更、左右にスワイプで外す</string>
     <string name="apply_trim">適用</string>
     <string name="wallpaper_description">ビデオを再生するライブ壁紙です。</string>
     <string name="activating_wallpaper_message">壁紙を有効にしています…</string>
@@ -56,7 +56,7 @@
     <string name="error_file_picker_not_available">ファイルピッカーがシステムで利用できません。</string>
     <string name="error_could_not_read_video_duration">動画の長さを読み取れませんでした。</string>
     <string name="warning_random_start_time_delay">ランダムはシークによる遅延を引き起こす可能性があります</string>
-    <string name="error_cannot_delete_last_video">プレイリストの最後の動画は削除できません</string>
+    <string name="error_cannot_remove_last_video">プレイリストの最後の動画は外せません</string>
     <!-- Status Bar Icon Color Settings -->
     <string name="status_bar_icons_label">ステータスバーのアイコン</string>
     <string name="status_bar_auto">自動</string>
@@ -69,8 +69,8 @@
     <string name="start_time_restart">最初から</string>
     <string name="start_time_random">ランダム</string>
 
-    <string name="delete_file_title">動画を削除</string>
-    <string name="delete_file_message">%s を削除してもよろしいですか？</string>
-    <string name="delete">削除</string>
+    <string name="remove_file_title">動画を外す</string>
+    <string name="remove_file_message">アプリから %s を外してもよろしいですか？</string>
+    <string name="remove_action">外す</string>
     <string name="cancel">キャンセル</string>
 </resources>
