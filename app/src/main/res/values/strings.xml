@@ -13,8 +13,8 @@
     <string name="setting_audio_enabled">Enable Audio</string>
     <string name="playback_mode_setting">Playback Mode</string>
     <string name="recent_files">Playlist / Recent Files</string>
-    <string name="playlist_instructions">Long-press to reorder. Swipe left or right to delete.</string>
-    <string name="error_cannot_delete_last_video">Cannot delete the last video in the playlist.</string>
+    <string name="playlist_instructions">Long-press to reorder. Swipe left or right to remove.</string>
+    <string name="error_cannot_remove_last_video">Cannot remove the last video in the playlist.</string>
     <string name="apply_trim">Apply</string>
     <string name="wallpaper_description">A live wallpaper that plays video.</string>
     <string name="activating_wallpaper_message">Activating wallpaper…</string>
@@ -80,9 +80,9 @@
     <string name="start_time_restart">Restart</string>
     <string name="start_time_random">Random</string>
 
-    <string name="delete_file_title">Delete Video</string>
-    <string name="delete_file_message">Are you sure you want to delete %s?</string>
-    <string name="delete">Delete</string>
+    <string name="remove_file_title">Remove Video</string>
+    <string name="remove_file_message">Are you sure you want to remove %s from the app?</string>
+    <string name="remove_action">Remove</string>
     <string name="cancel">Cancel</string>
 
 </resources>

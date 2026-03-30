@@ -13,8 +13,8 @@
     <string name="setting_audio_enabled">Abilita Audio</string>
     <string name="playback_mode_setting">Modalita Playback</string>
     <string name="recent_files">Playlist / File Recenti</string>
-    <string name="playlist_instructions">Tieni premuto per riordinare. Scorri a sinistra o a destra per eliminare.</string>
-    <string name="error_cannot_delete_last_video">Impossibile eliminare l\'ultimo video nella playlist.</string>
+    <string name="playlist_instructions">Tieni premuto per riordinare. Scorri a sinistra o a destra per rimuovere.</string>
+    <string name="error_cannot_remove_last_video">Impossibile rimuovere l\'ultimo video nella playlist.</string>
     <string name="apply_trim">Applica</string>
     <string name="wallpaper_description">Uno sfondo animato che riproduce video.</string>
     <string name="activating_wallpaper_message">Attivazione dello sfondo…</string>
@@ -69,9 +69,9 @@
     <string name="start_time_restart">Riavvia</string>
     <string name="start_time_random">Casuale</string>
 
-    <string name="delete_file_title">Elimina Video</string>
-    <string name="delete_file_message">Sei sicuro di voler eliminare %s?</string>
-    <string name="delete">Elimina</string>
+    <string name="remove_file_title">Rimuovi Video</string>
+    <string name="remove_file_message">Sei sicuro di voler rimuovere %s dall\'app?</string>
+    <string name="remove_action">Rimuovi</string>
     <string name="cancel">Annulla</string>
 
 </resources>

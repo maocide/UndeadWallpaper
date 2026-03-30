@@ -6,6 +6,7 @@ import android.opengl.EGLExt.EGL_RECORDABLE_ANDROID
 import android.opengl.GLES20
 import android.opengl.Matrix
 import android.util.Log
+import org.maocide.undeadwallpaper.FileLogger
 import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.WindowManager
@@ -134,7 +135,7 @@ class GLVideoRenderer(private val context: Context) {
 
     fun setScalingMode(mode: ScalingMode) {
         if (currentScalingMode != mode) {
-            Log.i(tag, "Scaling Mode changed to: $mode")
+            FileLogger.i(tag, "Scaling Mode changed to: $mode")
             currentScalingMode = mode
             updateMatrix()
         }
@@ -158,14 +159,14 @@ class GLVideoRenderer(private val context: Context) {
                 initGL(holder)
                 renderLoop()
             } catch (e: Exception) {
-                Log.e(tag, "Failed to initialize GL", e)
+                FileLogger.e(tag, "Failed to initialize GL", e)
                 videoSurfaceDeferred.completeExceptionally(e)
             }
         }
     }
 
     fun release() {
-        Log.i(tag, "Renderer Release Signal Received.")
+        FileLogger.i(tag, "Renderer Release Signal Received.")
         renderSignal.close()
         glExecutor.shutdown()
         // We do NOT call releaseGL here directly, we let the loop finish and clean up itself
@@ -195,7 +196,7 @@ class GLVideoRenderer(private val context: Context) {
             // Mismatch detected! Swap dimensions to match Viewport.
             screenWidth = metrics.heightPixels
             screenHeight = metrics.widthPixels
-            Log.w(tag, "Orientation Mismatch! Swapped metrics to: ${screenWidth}x${screenHeight}")
+            FileLogger.w(tag, "Orientation Mismatch! Swapped metrics to: ${screenWidth}x${screenHeight}")
         } else {
             screenWidth = metrics.widthPixels
             screenHeight = metrics.heightPixels
@@ -205,7 +206,7 @@ class GLVideoRenderer(private val context: Context) {
         viewportChanged = true
         renderSignal.trySend(Unit)
 
-        Log.i(tag, "Surface Changed: Viewport=${width}x${height}, LogicalScreen=${screenWidth}x${screenHeight}")
+        FileLogger.i(tag, "Surface Changed: Viewport=${width}x${height}, LogicalScreen=${screenWidth}x${screenHeight}")
     }
 
     fun setVideoSize(width: Int, height: Int) {
@@ -233,7 +234,7 @@ class GLVideoRenderer(private val context: Context) {
 
                 // Re-initialization Check... Recover from error
                 if (needsReinit) {
-                    Log.w(tag, "Attempting to recover GL Context...")
+                    FileLogger.w(tag, "Attempting to recover GL Context...")
                     /* Might need to call initGL logic here or just
                     continue and hope the surface is valid.
                     usually, just skipping the frame can be safe... */
@@ -247,7 +248,7 @@ class GLVideoRenderer(private val context: Context) {
                 } catch (e: Exception) {
                     // This often happens when the video player is stopped/released
                     // but a frame signal was already in the pipe. Safe to ignore.
-                    Log.w(tag, "SurfaceTexture update failed (Context lost?): ${e.message}")
+                    FileLogger.w(tag, "SurfaceTexture update failed (Context lost?): ${e.message}")
                     continue
                 }
 
@@ -267,11 +268,11 @@ class GLVideoRenderer(private val context: Context) {
                     if (swapResult == false) {
                         val error = egl?.eglGetError()
                         if (error == EGL11.EGL_CONTEXT_LOST) {
-                            Log.e(tag, "GL Context Lost! triggering re-init.")
+                            FileLogger.e(tag, "GL Context Lost! triggering re-init.")
                             needsReinit = true
                             // Possibly releaseGL() -> initGL() here to make a full restart
                         } else {
-                            Log.w(tag, "eglSwapBuffers failed: $error")
+                            FileLogger.w(tag, "eglSwapBuffers failed: $error")
                         }
                     } else {
                         // Update surface timestamp for a successful draw call
@@ -280,11 +281,11 @@ class GLVideoRenderer(private val context: Context) {
                 } catch (t: Throwable) {
                     // CATCH EVERYTHING here.
                     // Prevents a render error from crashing the whole service
-                    Log.e(tag, "Critical Render Error: ${t.message}")
+                    FileLogger.e(tag, "Critical Render Error: ${t.message}")
                 }
             }
         } finally {
-            Log.i(tag, "Render loop finished. Cleaning up GL on renderer thread.")
+            FileLogger.i(tag, "Render loop finished. Cleaning up GL on renderer thread.")
             releaseGL()
         }
     }
@@ -443,13 +444,13 @@ class GLVideoRenderer(private val context: Context) {
 
         if (egl!!.eglChooseConfig(eglDisplay, configSpecRGBA8888Recordable, configs, 1, numConfig) && numConfig[0] > 0) {
             config = configs[0]
-            Log.i(tag, "Using EGL_RGBA_8888_RECORDABLE config")
+            FileLogger.i(tag, "Using EGL_RGBA_8888_RECORDABLE config")
         } else if (egl!!.eglChooseConfig(eglDisplay, configSpecRGB565Recordable, configs, 1, numConfig) && numConfig[0] > 0) {
             config = configs[0]
-            Log.i(tag, "Using EGL_RGB_565_RECORDABLE config")
+            FileLogger.i(tag, "Using EGL_RGB_565_RECORDABLE config")
         } else if (egl!!.eglChooseConfig(eglDisplay, configSpecRGB565, configs, 1, numConfig) && numConfig[0] > 0) {
             config = configs[0]
-            Log.i(tag, "Using EGL_RGB_565 fallback config")
+            FileLogger.i(tag, "Using EGL_RGB_565 fallback config")
         } else {
             throw IllegalStateException("Unable to find a suitable EGL config")
         }
@@ -504,7 +505,7 @@ class GLVideoRenderer(private val context: Context) {
         if (compileStatus[0] == 0) {
             // Retrieve the error message
             val errorMsg = GLES20.glGetShaderInfoLog(fragmentShader)
-            Log.e(tag,"Fragment Shader compile error: $errorMsg")
+            FileLogger.e(tag,"Fragment Shader compile error: $errorMsg")
             throw IllegalStateException("Fragment Shader compile error: $errorMsg")
         }
 
@@ -512,10 +513,10 @@ class GLVideoRenderer(private val context: Context) {
         if (compileStatus[0] == 0) {
             // Retrieve the error message
             val errorMsg = GLES20.glGetShaderInfoLog(vertexShader)
-            Log.e(tag,"Vertex Shader compile error: $errorMsg")
+            FileLogger.e(tag,"Vertex Shader compile error: $errorMsg")
             throw IllegalStateException("Vertex Shader compile error: $errorMsg")
         }
-        Log.i(tag, "GL Initialized!")
+        FileLogger.i(tag, "GL Initialized!")
 
     }
 
