@@ -55,6 +55,11 @@ class PreferencesManager(context: Context) {
     }
 
     private fun migrateToPerVideoSettings() {
+        // If the new playlist settings already exist, migration is complete.
+        if (sharedPrefs.contains(KEY_PLAYLIST_SETTINGS)) {
+            return
+        }
+
         val legacyListString = sharedPrefs.getString(KEY_RECENT_FILES_LIST, null)
         val legacyUri = sharedPrefs.getString(KEY_VIDEO_URI, null)
 
@@ -162,8 +167,10 @@ class PreferencesManager(context: Context) {
         val index = currentList.indexOfFirst { it.fileName == fileName }
         if (index != -1) {
             currentList[index] = updater(currentList[index])
-            savePlaylistSettings(currentList)
+        } else {
+            currentList.add(updater(VideoSettings(fileName)))
         }
+        savePlaylistSettings(currentList)
     }
 
     fun getVideoSettings(fileName: String): VideoSettings {
