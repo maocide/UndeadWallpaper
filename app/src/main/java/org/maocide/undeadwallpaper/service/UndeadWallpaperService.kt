@@ -307,7 +307,7 @@ class UndeadWallpaperService : WallpaperService() {
             if (nextUriString != null && nextUriString != loadedVideoUriString) {
                 FileLogger.i(TAG, "Transitioning to next video in playlist: $nextUriString")
                 loadedVideoUriString = nextUriString
-                prefs.saveVideoUri(nextUriString)
+                prefs.saveActiveVideoUri(nextUriString)
             }
             // Apply per-video settings dynamically on transition
             refreshRenderer()
@@ -476,7 +476,7 @@ class UndeadWallpaperService : WallpaperService() {
         }
 
         private fun getMediaUri(): Uri? {
-            val uriString = prefs.getVideoUri()
+            val uriString = prefs.getActiveVideoUri()
 
             return if (uriString.isNullOrEmpty()) {
                 FileLogger.w(TAG, "Video URI is null or empty.")
@@ -503,7 +503,7 @@ class UndeadWallpaperService : WallpaperService() {
             }
 
             // Clear the Preference so it doesn't try to load again on restart
-            prefs.saveVideoUri("")
+            prefs.saveActiveVideoUri("")
 
             // Kill the player and DO NOT restart it.
             releasePlayer()

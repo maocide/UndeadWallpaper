@@ -213,7 +213,7 @@ class SettingsFragment : Fragment() {
 
         // Save the preference and notify the service to reload the video from that value
         if(forceChange) {
-            preferencesManager.saveVideoUri(uri.toString())
+            preferencesManager.saveActiveVideoUri(uri.toString())
             val intent = Intent(UndeadWallpaperService.ACTION_VIDEO_URI_CHANGED).apply {
                 setPackage(context?.packageName)
             }
@@ -230,7 +230,7 @@ class SettingsFragment : Fragment() {
      * Sets up the RecyclerView for displaying recent files.
      */
     private fun setupRecyclerView() {
-        val currentUri = sharedViewModel.selectedVideoUri?.toString() ?: preferencesManager.getVideoUri()
+        val currentUri = sharedViewModel.selectedVideoUri?.toString() ?: preferencesManager.getActiveVideoUri()
         recentFilesAdapter = RecentFilesAdapter(
             recentFiles,
             currentVideoUriString = currentUri,
@@ -278,7 +278,7 @@ class SettingsFragment : Fragment() {
                     .setMessage(getString(R.string.remove_file_message, item.file.name))
                     .setPositiveButton(getString(R.string.remove_action)) { _, _ ->
                         val deletedUriString = Uri.fromFile(item.file).toString()
-                        val currentUriString = sharedViewModel.selectedVideoUri?.toString() ?: preferencesManager.getVideoUri()
+                        val currentUriString = sharedViewModel.selectedVideoUri?.toString() ?: preferencesManager.getActiveVideoUri()
 
                         // Remove from adapter
                         recentFilesAdapter.onItemDismiss(position)
@@ -303,7 +303,7 @@ class SettingsFragment : Fragment() {
                                 // Fallback if list is entirely empty (shouldn't happen due to 1 video at least enforced)
                                 viewLifecycleOwner.lifecycleScope.launch {
                                     ensureDefaultVideoExists()
-                                    val defaultUri = preferencesManager.getVideoUri()
+                                    val defaultUri = preferencesManager.getActiveVideoUri()
                                     if (defaultUri != null) {
                                         updateVideoSource(defaultUri.toUri(), true)
                                     }
@@ -380,7 +380,7 @@ class SettingsFragment : Fragment() {
      * specific to Dispatchers.IO to keep UI smooth.
      */
     private suspend fun ensureDefaultVideoExists() = withContext(Dispatchers.IO) {
-        if (preferencesManager.getVideoUri() == null) {
+        if (preferencesManager.getActiveVideoUri() == null) {
             val defaultFile = videoFileManager.createDefaultFileFromResource(
                 R.raw.zombillie_default,
                 getString(R.string.default_video_filename)
@@ -390,7 +390,7 @@ class SettingsFragment : Fragment() {
                 val defaultUri = Uri.fromFile(defaultFile)
                 // Switch back to Main thread to update Prefs safely
                 withContext(Dispatchers.Main) {
-                    preferencesManager.saveVideoUri(defaultUri.toString())
+                    preferencesManager.saveActiveVideoUri(defaultUri.toString())
                 }
             }
         }
@@ -424,7 +424,7 @@ class SettingsFragment : Fragment() {
             }
 
             // Load Video Preview and set the video as selected
-            val savedUri = preferencesManager.getVideoUri()
+            val savedUri = preferencesManager.getActiveVideoUri()
             if (savedUri != null) {
                 //setupVideoPreview(uriString.toUri())
                 updateVideoSource(savedUri.toUri(), false)
@@ -467,8 +467,8 @@ class SettingsFragment : Fragment() {
 
             preferencesManager.setPlaybackMode(newMode)
             // Forcing an update to current uri in case we switch back from playlist to single video
-            val currentSelectedUri = sharedViewModel.selectedVideoUri?.toString() ?: preferencesManager.getVideoUri()
-            preferencesManager.saveVideoUri(currentSelectedUri.toString())
+            val currentSelectedUri = sharedViewModel.selectedVideoUri?.toString() ?: preferencesManager.getActiveVideoUri()
+            preferencesManager.saveActiveVideoUri(currentSelectedUri.toString())
             notifySettingsChanged()
         }
 

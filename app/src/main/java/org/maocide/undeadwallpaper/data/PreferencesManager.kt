@@ -24,6 +24,8 @@ class PreferencesManager(context: Context) {
     private val sharedPrefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
+    private val jsonParser = Json { ignoreUnknownKeys = true }
+
     companion object {
         private const val PREFS_NAME = "DEFAULT"
         private const val KEY_VIDEO_URI = "video_uri"
@@ -79,7 +81,7 @@ class PreferencesManager(context: Context) {
 
         if (legacyListString != null) {
             try {
-                val fileNames = Json.decodeFromString<List<String>>(legacyListString)
+                val fileNames = jsonParser.decodeFromString<List<String>>(legacyListString)
                 for (fileName in fileNames) {
                     newPlaylistSettings.add(
                         VideoSettings(
@@ -146,14 +148,14 @@ class PreferencesManager(context: Context) {
             return emptyList()
         }
         return try {
-            Json.decodeFromString<List<VideoSettings>>(jsonString)
+            jsonParser.decodeFromString<List<VideoSettings>>(jsonString)
         } catch (e: Exception) {
             emptyList()
         }
     }
 
     fun savePlaylistSettings(playlist: List<VideoSettings>) {
-        val jsonString = Json.encodeToString(playlist)
+        val jsonString = jsonParser.encodeToString(playlist)
         sharedPrefs.edit { putString(KEY_PLAYLIST_SETTINGS, jsonString) }
     }
 
@@ -171,22 +173,22 @@ class PreferencesManager(context: Context) {
     }
 
     /**
-     * Saves the video URI to SharedPreferences.
+     * Saves the active video URI to SharedPreferences.
      *
      * @param uri The URI of the video to save.
      */
-    fun saveVideoUri(uri: String) {
+    fun saveActiveVideoUri(uri: String) {
         sharedPrefs.edit {
             putString(KEY_VIDEO_URI, uri)
         }
     }
 
     /**
-     * Retrieves the video URI from SharedPreferences.
+     * Retrieves the active video URI from SharedPreferences.
      *
      * @return The saved video URI, or null if not found.
      */
-    fun getVideoUri(): String? {
+    fun getActiveVideoUri(): String? {
         return sharedPrefs.getString(KEY_VIDEO_URI, null)
     }
 

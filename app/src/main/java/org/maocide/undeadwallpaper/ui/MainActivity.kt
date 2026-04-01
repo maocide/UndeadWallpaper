@@ -50,8 +50,8 @@ class MainActivity : AppCompatActivity() {
         binding.fabSetWallpaper.setOnClickListener { view ->
             // Retrieve and save the uri for the wallpaper service to use
             val videoUri = sharedViewModel.selectedVideoUri
-            preferencesManager.saveVideoUri(videoUri.toString())
-            //val videoUri = preferencesManager.getVideoUri()
+            preferencesManager.saveActiveVideoUri(videoUri.toString())
+            //val videoUri = preferencesManager.getActiveVideoUri()
 
             if (videoUri != null) {
                 // Changed from hardcoded string to string resource
