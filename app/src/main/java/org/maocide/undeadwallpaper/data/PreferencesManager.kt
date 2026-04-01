@@ -93,8 +93,7 @@ class PreferencesManager(context: Context) {
                             rotation = rotation,
                             brightness = brightness,
                             speed = speed,
-                            volume = volume,
-                            startTime = startTime
+                            volume = volume
                         )
                     )
                 }
@@ -116,8 +115,7 @@ class PreferencesManager(context: Context) {
                         rotation = rotation,
                         brightness = brightness,
                         speed = speed,
-                        volume = volume,
-                        startTime = startTime
+                        volume = volume
                     )
                 )
             }
@@ -244,6 +242,19 @@ class PreferencesManager(context: Context) {
         sharedPrefs.edit {
             putInt(KEY_PLAYBACK_MODE, mode.ordinal)
         }
+    }
+
+    /**
+     * Saves the start time preference.
+     * Default is 0 Resume, Start is 1, Random is 2
+     */
+    fun saveStartTime(startTime: StartTime) {
+        sharedPrefs.edit { putInt(KEY_START_TIME, startTime.ordinal) }
+    }
+
+    fun getStartTime(): StartTime {
+        val storedOrdinal = sharedPrefs.getInt(KEY_START_TIME, StartTime.RESUME.ordinal)
+        return StartTime.entries.getOrElse(storedOrdinal) { StartTime.RESUME }
     }
 
     /**

@@ -596,11 +596,7 @@ class UndeadWallpaperService : WallpaperService() {
 
                         // If the user wants a restart, reset playhead BEFORE init
                         // so bindPlaylistToPlayer doesn't seek to the old paused position.
-                        val activeUri = Uri.parse(currentUriOnDisk)
-                        val fileName = activeUri.lastPathSegment ?: ""
-                        val activeSettings = prefs.getVideoSettings(fileName)
-
-                        if (activeSettings.startTime == StartTime.RESTART) {
+                        if (prefs.getStartTime() == StartTime.RESTART) {
                             playheadTime = 0L
                             hasPlaybackCompleted = false
                         }
@@ -612,11 +608,7 @@ class UndeadWallpaperService : WallpaperService() {
                     // Handle Timeline
                     // We only apply timeline manipulations if the player wasn't just freshly initialized.
                     if (!wasJustInitialized) {
-                        val activeUri = Uri.parse(currentUriOnDisk)
-                        val fileName = activeUri.lastPathSegment ?: ""
-                        val activeSettings = prefs.getVideoSettings(fileName)
-
-                        val startTimePref = activeSettings.startTime
+                        val startTimePref = prefs.getStartTime()
                         when (startTimePref) {
                             StartTime.RESUME -> {
                                 if (currentPlaybackMode == PlaybackMode.ONE_SHOT && hasPlaybackCompleted && !isPreview()) {

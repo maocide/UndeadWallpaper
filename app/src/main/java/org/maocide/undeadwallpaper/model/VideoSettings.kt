@@ -12,6 +12,5 @@ data class VideoSettings(
     val rotation: Float = 0.0f,
     val brightness: Float = 1.0f,
     val speed: Float = 1.0f,
-    val volume: Float = 0.0f, // Replaces boolean `audioEnabled` with a float [0.0 - 1.0]
-    val startTime: StartTime = StartTime.RESUME
+    val volume: Float = 0.0f // Replaces boolean `audioEnabled` with a float [0.0 - 1.0]
 )

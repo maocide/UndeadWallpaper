@@ -190,46 +190,6 @@
             android:value="0.0"
             android:stepSize="0.1" />
 
-        <!-- Start Time -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/start_time_label"
-            android:textAppearance="?attr/textAppearanceBody1" />
-
-        <com.google.android.material.chip.ChipGroup
-            android:id="@+id/start_time_group"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            app:singleSelection="true"
-            app:selectionRequired="true"
-            app:chipSpacingHorizontal="8dp">
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/start_time_resume"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:checked="true"
-                android:text="@string/start_time_resume" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/start_time_restart"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/start_time_restart" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/start_time_random"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/start_time_random" />
-        </com.google.android.material.chip.ChipGroup>
-
         <com.google.android.material.button.MaterialButton
             android:id="@+id/button_reset_advanced"
             style="@style/Widget.MaterialComponents.Button.OutlinedButton"

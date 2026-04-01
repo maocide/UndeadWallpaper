@@ -95,12 +95,6 @@ class VideoSettingsBottomSheetFragment : BottomSheetDialogFragment() {
                 ScalingMode.STRETCH -> binding.scalingModeGroup.check(binding.scalingModeStretch.id)
             }
 
-            when (settings.startTime) {
-                StartTime.RESUME -> binding.startTimeGroup.check(binding.startTimeResume.id)
-                StartTime.RESTART -> binding.startTimeGroup.check(binding.startTimeRestart.id)
-                StartTime.RANDOM -> binding.startTimeGroup.check(binding.startTimeRandom.id)
-            }
-
             binding.positionXSlider.setValueSafe(settings.positionX)
             binding.positionYSlider.setValueSafe(settings.positionY)
             binding.zoomSlider.setValueSafe(settings.zoom)
@@ -145,16 +139,6 @@ class VideoSettingsBottomSheetFragment : BottomSheetDialogFragment() {
                 else -> ScalingMode.FILL
             }
             updateSettings { it.copy(scalingMode = newMode) }
-        }
-
-        binding.startTimeGroup.setOnCheckedStateChangeListener { _, checkedIds ->
-            if (checkedIds.isEmpty() || isUpdatingUi) return@setOnCheckedStateChangeListener
-            val newMode = when (checkedIds[0]) {
-                binding.startTimeRestart.id -> StartTime.RESTART
-                binding.startTimeRandom.id -> StartTime.RANDOM
-                else -> StartTime.RESUME
-            }
-            updateSettings { it.copy(startTime = newMode) }
         }
 
         setupSafeSlider(binding.positionXSlider) { value -> updateSettings { it.copy(positionX = value) } }

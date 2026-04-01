@@ -416,6 +416,13 @@ class SettingsFragment : Fragment() {
                 PlaybackMode.SHUFFLE -> binding.playbackModeGroup.check(binding.playbackModeShuffle.id)
             }
 
+            // Start Time
+            when (preferencesManager.getStartTime()) {
+                StartTime.RESUME -> binding.startTimeGroup.check(binding.startTimeResume.id)
+                StartTime.RESTART -> binding.startTimeGroup.check(binding.startTimeRestart.id)
+                StartTime.RANDOM -> binding.startTimeGroup.check(binding.startTimeRandom.id)
+            }
+
             // StatusBar Color
             when (preferencesManager.getStatusBarColor()) {
                 StatusBarColor.AUTO -> binding.statusBarColorGroup.check(binding.statusBarAuto.id)
@@ -470,6 +477,31 @@ class SettingsFragment : Fragment() {
             val currentSelectedUri = sharedViewModel.selectedVideoUri?.toString() ?: preferencesManager.getActiveVideoUri()
             preferencesManager.saveActiveVideoUri(currentSelectedUri.toString())
             notifySettingsChanged()
+        }
+
+        // StartTime preference
+        binding.startTimeGroup.setOnCheckedStateChangeListener { group, checkedIds ->
+            if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
+
+            val checkedId = checkedIds[0] // Get the single selected ID
+
+            val newMode = when (checkedId) {
+                binding.startTimeRestart.id -> StartTime.RESTART
+                binding.startTimeRandom.id -> StartTime.RANDOM
+                else -> StartTime.RESUME
+            }
+            preferencesManager.saveStartTime(newMode)
+
+            if (newMode == StartTime.RANDOM && !randomStartTimeWarned) {
+                Toast.makeText(requireContext(), R.string.warning_random_start_time_delay, Toast.LENGTH_LONG).show()
+                randomStartTimeWarned = true
+            }
+
+            // Specific intent sent to apply
+            val intent = Intent(UndeadWallpaperService.ACTION_PLAYBACK_MODE_CHANGED).apply {
+                setPackage(requireContext().packageName)
+            }
+            requireContext().applicationContext.sendBroadcast(intent)
         }
 
         // StatusBar Color
