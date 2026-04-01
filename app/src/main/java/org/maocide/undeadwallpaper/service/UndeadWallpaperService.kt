@@ -236,6 +236,7 @@ class UndeadWallpaperService : WallpaperService() {
             handleCriticalError(reason)
         }
 
+        @OptIn(UnstableApi::class)
         override fun onVideoSizeChanged(width: Int, height: Int) {
             // Send video size to Renderer for Matrix Calculation
             renderer?.setVideoSize(width, height)

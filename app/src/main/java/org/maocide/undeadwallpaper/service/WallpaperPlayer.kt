@@ -63,15 +63,19 @@ class WallpaperPlayer(
         }
 
     var videoScalingMode: Int
+        @OptIn(UnstableApi::class)
         get() = player?.videoScalingMode ?: C.VIDEO_SCALING_MODE_DEFAULT
+        @OptIn(UnstableApi::class)
         set(value) {
             player?.videoScalingMode = value
         }
 
+    @OptIn(UnstableApi::class)
     fun setMediaSources(mediaSources: List<MediaSource>) {
         player?.setMediaSources(mediaSources)
     }
 
+    @OptIn(UnstableApi::class)
     fun setMediaSource(mediaSource: MediaSource) {
         player?.setMediaSource(mediaSource)
     }
