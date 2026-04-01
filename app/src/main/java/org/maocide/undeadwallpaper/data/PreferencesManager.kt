@@ -8,12 +8,10 @@ import org.maocide.undeadwallpaper.model.StatusBarColor
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
+import org.maocide.undeadwallpaper.model.VideoSettings
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-
-
-
-
+import android.net.Uri
 
 /**
  * Manages SharedPreferences for the application.
@@ -47,6 +45,129 @@ class PreferencesManager(context: Context) {
         private const val KEY_SPEED = "video_speed"
 
         private const val KEY_RECENT_FILES_LIST = "recent_files_list"
+        private const val KEY_PLAYLIST_SETTINGS = "playlist_settings"
+    }
+
+    init {
+        migrateToPerVideoSettings()
+    }
+
+    private fun migrateToPerVideoSettings() {
+        val legacyListString = sharedPrefs.getString(KEY_RECENT_FILES_LIST, null)
+        val legacyUri = sharedPrefs.getString(KEY_VIDEO_URI, null)
+
+        if (legacyListString == null && legacyUri == null) {
+            // Nothing to migrate
+            return
+        }
+
+        // Read global settings
+        val scalingModeOrdinal = sharedPrefs.getInt(KEY_SCALING_MODE, ScalingMode.FILL.ordinal)
+        val scalingMode = ScalingMode.entries.getOrElse(scalingModeOrdinal) { ScalingMode.FILL }
+        val positionX = sharedPrefs.getFloat(KEY_POSITION_X, 0.0f)
+        val positionY = sharedPrefs.getFloat(KEY_POSITION_Y, 0.0f)
+        val zoom = sharedPrefs.getFloat(KEY_ZOOM, 1.0f)
+        val rotation = sharedPrefs.getFloat(KEY_ROTATION, 0.0f)
+        val brightness = sharedPrefs.getFloat(KEY_BRIGHTNESS, 1.0f)
+        val speed = sharedPrefs.getFloat(KEY_SPEED, 1.0f)
+        val audioEnabled = sharedPrefs.getBoolean(KEY_VIDEO_AUDIO_ENABLED, false)
+        val volume = if (audioEnabled) 1.0f else 0.0f
+        val startTimeOrdinal = sharedPrefs.getInt(KEY_START_TIME, StartTime.RESUME.ordinal)
+        val startTime = StartTime.entries.getOrElse(startTimeOrdinal) { StartTime.RESUME }
+
+        val newPlaylistSettings = mutableListOf<VideoSettings>()
+
+        if (legacyListString != null) {
+            try {
+                val fileNames = Json.decodeFromString<List<String>>(legacyListString)
+                for (fileName in fileNames) {
+                    newPlaylistSettings.add(
+                        VideoSettings(
+                            fileName = fileName,
+                            scalingMode = scalingMode,
+                            positionX = positionX,
+                            positionY = positionY,
+                            zoom = zoom,
+                            rotation = rotation,
+                            brightness = brightness,
+                            speed = speed,
+                            volume = volume,
+                            startTime = startTime
+                        )
+                    )
+                }
+            } catch (e: Exception) {
+                // Ignore parsing errors and fall back to single URI if applicable
+            }
+        }
+
+        if (newPlaylistSettings.isEmpty() && legacyUri != null) {
+            val fileName = Uri.parse(legacyUri).lastPathSegment
+            if (fileName != null) {
+                newPlaylistSettings.add(
+                    VideoSettings(
+                        fileName = fileName,
+                        scalingMode = scalingMode,
+                        positionX = positionX,
+                        positionY = positionY,
+                        zoom = zoom,
+                        rotation = rotation,
+                        brightness = brightness,
+                        speed = speed,
+                        volume = volume,
+                        startTime = startTime
+                    )
+                )
+            }
+        }
+
+        // Save new format
+        savePlaylistSettings(newPlaylistSettings)
+
+        // Cleanup old keys
+        sharedPrefs.edit {
+            remove(KEY_RECENT_FILES_LIST)
+            // Do NOT remove KEY_VIDEO_URI since it tracks the active video!
+            remove(KEY_SCALING_MODE)
+            remove(KEY_POSITION_X)
+            remove(KEY_POSITION_Y)
+            remove(KEY_ZOOM)
+            remove(KEY_ROTATION)
+            remove(KEY_BRIGHTNESS)
+            remove(KEY_SPEED)
+            remove(KEY_VIDEO_AUDIO_ENABLED)
+            remove(KEY_START_TIME)
+        }
+    }
+
+    fun getPlaylistSettings(): List<VideoSettings> {
+        val jsonString = sharedPrefs.getString(KEY_PLAYLIST_SETTINGS, null)
+        if (jsonString.isNullOrBlank()) {
+            return emptyList()
+        }
+        return try {
+            Json.decodeFromString<List<VideoSettings>>(jsonString)
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    fun savePlaylistSettings(playlist: List<VideoSettings>) {
+        val jsonString = Json.encodeToString(playlist)
+        sharedPrefs.edit { putString(KEY_PLAYLIST_SETTINGS, jsonString) }
+    }
+
+    fun updateVideoSettings(fileName: String, updater: (VideoSettings) -> VideoSettings) {
+        val currentList = getPlaylistSettings().toMutableList()
+        val index = currentList.indexOfFirst { it.fileName == fileName }
+        if (index != -1) {
+            currentList[index] = updater(currentList[index])
+            savePlaylistSettings(currentList)
+        }
+    }
+
+    fun getVideoSettings(fileName: String): VideoSettings {
+        return getPlaylistSettings().find { it.fileName == fileName } ?: VideoSettings(fileName)
     }
 
     /**
@@ -67,26 +188,6 @@ class PreferencesManager(context: Context) {
      */
     fun getVideoUri(): String? {
         return sharedPrefs.getString(KEY_VIDEO_URI, null)
-    }
-
-    /**
-     * Saves the audio enabled status to SharedPreferences.
-     *
-     * @param isEnabled Whether the audio is enabled.
-     */
-    fun saveAudioEnabled(isEnabled: Boolean) {
-        sharedPrefs.edit {
-            putBoolean(KEY_VIDEO_AUDIO_ENABLED, isEnabled)
-        }
-    }
-
-    /**
-     * Retrieves the audio enabled status from SharedPreferences.
-     *
-     * @return True if audio is enabled, false otherwise.
-     */
-    fun isAudioEnabled(): Boolean {
-        return sharedPrefs.getBoolean(KEY_VIDEO_AUDIO_ENABLED, false)
     }
 
     /**
@@ -144,82 +245,6 @@ class PreferencesManager(context: Context) {
     }
 
     /**
-     * Gets the current scaling mode from SharedPreferences.
-     * @return The current scaling mode.
-     */
-    fun getScalingMode(): ScalingMode {
-        val storedOrdinal = sharedPrefs.getInt(KEY_SCALING_MODE, ScalingMode.FILL.ordinal)
-        return ScalingMode.entries.getOrElse(storedOrdinal) { ScalingMode.FILL }
-    }
-
-    /**
-     * Sets the scaling mode in SharedPreferences.
-     * @param mode The new scaling mode.
-     */
-    fun setScalingMode(mode: ScalingMode) {
-        sharedPrefs.edit {
-            putInt(KEY_SCALING_MODE, mode.ordinal)
-        }
-    }
-
-    /**
-     * Saves the horizontal/vertical position offsets.
-     * Default is 0.0f (Centered).
-     */
-    fun savePositionX(x: Float) {
-        sharedPrefs.edit { putFloat(KEY_POSITION_X, x) }
-    }
-
-    fun getPositionX(): Float {
-        return sharedPrefs.getFloat(KEY_POSITION_X, 0.0f)
-    }
-
-    fun savePositionY(y: Float) {
-        sharedPrefs.edit { putFloat(KEY_POSITION_Y, y) }
-    }
-
-    fun getPositionY(): Float {
-        return sharedPrefs.getFloat(KEY_POSITION_Y, 0.0f)
-    }
-
-    /**
-     * Saves the video zoom level.
-     * Default is 1.0f (No Zoom).
-     */
-    fun saveZoom(zoom: Float) {
-        sharedPrefs.edit { putFloat(KEY_ZOOM, zoom) }
-    }
-
-    fun getZoom(): Float {
-        return sharedPrefs.getFloat(KEY_ZOOM, 1.0f)
-    }
-
-    /**
-     * Saves the video rotation.
-     * Default is 0.0f (flat).
-     */
-    fun saveRotation(rotation: Float) {
-        sharedPrefs.edit { putFloat(KEY_ROTATION, rotation) }
-    }
-
-    fun getRotation(): Float {
-        return sharedPrefs.getFloat(KEY_ROTATION, 0.0f)
-    }
-
-    /**
-     * Saves the brightness level.
-     * Default is 1.0f (Normal Brightness).
-     */
-    fun saveBrightness(brightness: Float) {
-        sharedPrefs.edit { putFloat(KEY_BRIGHTNESS, brightness) }
-    }
-
-    fun getBrightness(): Float {
-        // Default to 1.0 if not set
-        return sharedPrefs.getFloat(KEY_BRIGHTNESS, 1.0f)
-    }
-
-    /**
      * Saves the status bar color.
      * Default is 0, Light is 1, Dark is 2
      */
@@ -230,60 +255,6 @@ class PreferencesManager(context: Context) {
     fun getStatusBarColor(): StatusBarColor {
         val storedOrdinal = sharedPrefs.getInt(KEY_STATUSBAR_COLOR, StatusBarColor.AUTO.ordinal)
         return StatusBarColor.entries.getOrElse(storedOrdinal) { StatusBarColor.AUTO }
-    }
-
-    /**
-     * Saves the start time preference.
-     * Default is 0 Resume, Start is 1, Random is 2
-     */
-    fun saveStartTime(startTime: StartTime) {
-        sharedPrefs.edit { putInt(KEY_START_TIME, startTime.ordinal) }
-    }
-
-    fun getStartTime(): StartTime {
-        val storedOrdinal = sharedPrefs.getInt(KEY_START_TIME, StartTime.RESUME.ordinal)
-        return StartTime.entries.getOrElse(storedOrdinal) { StartTime.RESUME }
-    }
-
-
-    /**
-     * Saves the speed value.
-     * Default is 1.0f (Normal Playback).
-     */
-    fun saveSpeed(speed: Float) {
-        sharedPrefs.edit { putFloat(KEY_SPEED, speed) }
-    }
-
-    fun getSpeed(): Float {
-        // Default to 1.0 if not set
-        return sharedPrefs.getFloat(KEY_SPEED, 1.0f)
-    }
-
-    /**
-     * Saves the list of recent files to SharedPreferences as a JSON string.
-     *
-     * @param recentFilesList The list of file names.
-     */
-    fun saveRecentFilesList(recentFilesList: List<String>) {
-        val jsonString = Json.encodeToString(recentFilesList)
-        sharedPrefs.edit { putString(KEY_RECENT_FILES_LIST, jsonString) }
-    }
-
-    /**
-     * Retrieves the list of recent files from SharedPreferences.
-     *
-     * @return The list of file names, or an empty list if not found or on error.
-     */
-    fun getRecentFilesList(): List<String> {
-        val jsonString = sharedPrefs.getString(KEY_RECENT_FILES_LIST, null)
-        if (jsonString.isNullOrBlank()) {
-            return emptyList()
-        }
-        return try {
-            Json.decodeFromString<List<String>>(jsonString)
-        } catch (e: Exception) {
-            emptyList()
-        }
     }
 
     fun saveLoggingEnabled(enabled: Boolean) {

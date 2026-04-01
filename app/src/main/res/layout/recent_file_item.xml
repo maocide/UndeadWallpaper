@@ -34,6 +34,15 @@
             android:textAppearance="?attr/textAppearanceBody1" />
 
         <ImageView
+            android:id="@+id/button_settings"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_marginStart="8dp"
+            android:src="@drawable/baseline_settings_24"
+            app:tint="?attr/colorControlNormal"
+            android:contentDescription="Settings" />
+
+        <ImageView
             android:id="@+id/drag_handle"
             android:layout_width="24dp"
             android:layout_height="24dp"

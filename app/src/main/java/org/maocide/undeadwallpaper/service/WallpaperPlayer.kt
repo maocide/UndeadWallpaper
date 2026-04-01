@@ -115,7 +115,7 @@ class WallpaperPlayer(
     @OptIn(UnstableApi::class)
     fun initialize(
         surface: Surface?,
-        isAudioEnabled: Boolean,
+        initialVolume: Float,
         speed: Float,
         playbackMode: PlaybackMode
     ) {
@@ -153,7 +153,7 @@ class WallpaperPlayer(
             .setSeekParameters(SeekParameters.NEXT_SYNC)
             .build()
             .apply {
-                if (!isAudioEnabled) {
+                if (initialVolume <= 0.0f) {
                     trackSelectionParameters = trackSelectionParameters.buildUpon()
                         .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, true)
                         .build()
@@ -163,7 +163,7 @@ class WallpaperPlayer(
                         .build()
                 }
 
-                volume = if (isAudioEnabled) 1f else 0f
+                volume = initialVolume
                 setPlaybackSpeed(speed)
 
                 when (playbackMode) {

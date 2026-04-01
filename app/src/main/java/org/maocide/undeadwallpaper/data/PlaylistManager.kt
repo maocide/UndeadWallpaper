@@ -24,8 +24,8 @@ class PlaylistManager(
      * If a file does not exist on disk, it is excluded.
      */
     fun getPlaylistUris(): List<String> {
-        val playlistFileNames = prefs.getRecentFilesList()
-        if (playlistFileNames.isEmpty()) {
+        val playlistSettings = prefs.getPlaylistSettings()
+        if (playlistSettings.isEmpty()) {
             return emptyList()
         }
 
@@ -33,12 +33,12 @@ class PlaylistManager(
         if (videosDir == null) return emptyList()
 
         val validUris = mutableListOf<String>()
-        for (fileName in playlistFileNames) {
-            val file = File(videosDir, fileName)
+        for (setting in playlistSettings) {
+            val file = File(videosDir, setting.fileName)
             if (file.exists()) {
                 validUris.add(Uri.fromFile(file).toString())
             } else {
-                Log.w(TAG, "File in playlist not found on disk: $fileName")
+                Log.w(TAG, "File in playlist not found on disk: ${setting.fileName}")
             }
         }
         return validUris

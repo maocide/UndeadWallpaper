@@ -159,8 +159,9 @@ class VideoFileManager(private val context: Context) {
         val physicalFiles = videosDir.listFiles() ?: return@withContext emptyList()
         val preferencesManager = PreferencesManager(context)
 
-        // 1. Get the persisted list of filenames
-        val persistedFileNames = preferencesManager.getRecentFilesList().toMutableList()
+        // 1. Get the persisted list of settings
+        val persistedSettings = preferencesManager.getPlaylistSettings().toMutableList()
+        val persistedFileNames = persistedSettings.map { it.fileName }.toMutableList()
 
         // 2. Identify physical files that are NOT in the persisted list (e.g., newly imported)
         val physicalFileNames = physicalFiles.map { it.name }.toSet()
@@ -172,15 +173,19 @@ class VideoFileManager(private val context: Context) {
 
         // 4. Identify files in the persisted list that no longer exist physically
         persistedFileNames.retainAll(physicalFileNames)
+        persistedSettings.retainAll { it.fileName in physicalFileNames }
 
         // 5. Prepend new files to the beginning of the persisted list (to maintain "recent" behavior)
         if (sortedNewFileNames.isNotEmpty()) {
             persistedFileNames.addAll(0, sortedNewFileNames)
+            // Add corresponding default VideoSettings
+            val newSettings = sortedNewFileNames.map { org.maocide.undeadwallpaper.model.VideoSettings(fileName = it) }
+            persistedSettings.addAll(0, newSettings)
         }
 
         // 6. Save the synchronized list back to SharedPreferences if it was changed
-        if (sortedNewFileNames.isNotEmpty() || persistedFileNames.size != physicalFiles.size) {
-            preferencesManager.saveRecentFilesList(persistedFileNames)
+        if (sortedNewFileNames.isNotEmpty() || persistedSettings.size != physicalFiles.size) {
+            preferencesManager.savePlaylistSettings(persistedSettings)
         }
 
         // 7. Create a lookup map for physical files to maintain O(1) access

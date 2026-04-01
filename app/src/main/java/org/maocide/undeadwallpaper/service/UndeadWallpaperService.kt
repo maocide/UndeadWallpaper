@@ -67,6 +67,7 @@ class UndeadWallpaperService : WallpaperService() {
         const val ACTION_TRIM_TIMES_CHANGED = "org.maocide.undeadwallpaper.TRIM_TIMES_CHANGED"
         const val ACTION_STATUS_BAR_COLOR_CHANGED = "org.maocide.undeadwallpaper.STATUS_BAR_COLOR_CHANGED"
         const val ACTION_PLAYLIST_REORDERED = "org.maocide.undeadwallpaper.PLAYLIST_REORDERED"
+        const val ACTION_VIDEO_SETTINGS_CHANGED = "org.maocide.undeadwallpaper.VIDEO_SETTINGS_CHANGED"
     }
 
     override fun onCreateEngine(): Engine {
@@ -81,7 +82,6 @@ class UndeadWallpaperService : WallpaperService() {
         // Lazy instantiation for performance reuse
         private val prefs by lazy { PreferencesManager(baseContext) }
         private val playlistManager by lazy { PlaylistManager(baseContext, prefs) }
-        private var isAudioEnabled: Boolean = false
         private lateinit var currentScalingMode: ScalingMode
 
         private val wallpaperPlayer = WallpaperPlayer(baseContext, this)
@@ -191,22 +191,45 @@ class UndeadWallpaperService : WallpaperService() {
                             bindPlaylistToPlayer(keepCurrentPlayback = true)
                         }
                     }
+
+                    ACTION_VIDEO_SETTINGS_CHANGED -> {
+                        FileLogger.i(TAG, "Broadcast received: Video settings changed.")
+                        if (isPlayerInitialized) {
+                            refreshRenderer()
+
+                            // Re-apply speed and volume for the active video
+                            val activeUri = Uri.parse(loadedVideoUriString)
+                            val fileName = activeUri.lastPathSegment ?: ""
+                            val activeSettings = prefs.getVideoSettings(fileName)
+
+                            wallpaperPlayer.getPlayerInstance()?.let { player ->
+                                player.volume = activeSettings.volume
+                                player.setPlaybackSpeed(activeSettings.speed)
+                            }
+                        }
+                    }
                 }
 
             }
         }
 
         private fun refreshRenderer() {
+            if (loadedVideoUriString.isBlank()) return
+
+            val activeUri = Uri.parse(loadedVideoUriString)
+            val fileName = activeUri.lastPathSegment ?: ""
+            val activeSettings = prefs.getVideoSettings(fileName)
+
             // Send the whole package to the renderer
-            currentScalingMode = prefs.getScalingMode()
+            currentScalingMode = activeSettings.scalingMode
             renderer?.setScalingMode(currentScalingMode)
             renderer?.setTransforms(
-                x = prefs.getPositionX(),
-                y = prefs.getPositionY(),
-                zoom = prefs.getZoom(),
-                rotation = prefs.getRotation()
+                x = activeSettings.positionX,
+                y = activeSettings.positionY,
+                zoom = activeSettings.zoom,
+                rotation = activeSettings.rotation
             )
-            renderer?.setBrightness(prefs.getBrightness())
+            renderer?.setBrightness(activeSettings.brightness)
         }
 
         // WallpaperPlayerListener implementations
@@ -286,6 +309,17 @@ class UndeadWallpaperService : WallpaperService() {
                 loadedVideoUriString = nextUriString
                 prefs.saveVideoUri(nextUriString)
             }
+            // Apply per-video settings dynamically on transition
+            refreshRenderer()
+
+            val activeUri = Uri.parse(loadedVideoUriString)
+            val fileName = activeUri.lastPathSegment ?: ""
+            val activeSettings = prefs.getVideoSettings(fileName)
+
+            wallpaperPlayer.getPlayerInstance()?.let { player ->
+                player.volume = activeSettings.volume
+                player.setPlaybackSpeed(activeSettings.speed)
+            }
         }
 
         override fun onRenderedFirstFrame() {
@@ -311,9 +345,7 @@ class UndeadWallpaperService : WallpaperService() {
             FileLogger.i(TAG, "Initializing ExoPlayer...")
 
             // Load prefs
-            isAudioEnabled = prefs.isAudioEnabled()
             currentPlaybackMode = prefs.getPlaybackMode()
-            speed = prefs.getSpeed()
 
             hasPlaybackCompleted = false
 
@@ -330,7 +362,12 @@ class UndeadWallpaperService : WallpaperService() {
                 return
             }
 
-            wallpaperPlayer.initialize(null, isAudioEnabled, speed, currentPlaybackMode)
+            val fileName = mediaUri.lastPathSegment ?: ""
+            val activeSettings = prefs.getVideoSettings(fileName)
+            val initialVolume = activeSettings.volume
+            speed = activeSettings.speed
+
+            wallpaperPlayer.initialize(null, initialVolume, speed, currentPlaybackMode)
 
             if (!isPlayerInitialized) return
 
@@ -559,7 +596,11 @@ class UndeadWallpaperService : WallpaperService() {
 
                         // If the user wants a restart, reset playhead BEFORE init
                         // so bindPlaylistToPlayer doesn't seek to the old paused position.
-                        if (prefs.getStartTime() == StartTime.RESTART) {
+                        val activeUri = Uri.parse(currentUriOnDisk)
+                        val fileName = activeUri.lastPathSegment ?: ""
+                        val activeSettings = prefs.getVideoSettings(fileName)
+
+                        if (activeSettings.startTime == StartTime.RESTART) {
                             playheadTime = 0L
                             hasPlaybackCompleted = false
                         }
@@ -571,7 +612,11 @@ class UndeadWallpaperService : WallpaperService() {
                     // Handle Timeline
                     // We only apply timeline manipulations if the player wasn't just freshly initialized.
                     if (!wasJustInitialized) {
-                        val startTimePref = prefs.getStartTime()
+                        val activeUri = Uri.parse(currentUriOnDisk)
+                        val fileName = activeUri.lastPathSegment ?: ""
+                        val activeSettings = prefs.getVideoSettings(fileName)
+
+                        val startTimePref = activeSettings.startTime
                         when (startTimePref) {
                             StartTime.RESUME -> {
                                 if (currentPlaybackMode == PlaybackMode.ONE_SHOT && hasPlaybackCompleted && !isPreview()) {

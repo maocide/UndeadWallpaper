@@ -84,16 +84,6 @@ class SettingsFragment : Fragment() {
         private const val KEY_ADVANCED_EXPANDED = "key_advanced_expanded"
     }
 
-    override fun onSaveInstanceState(outState: Bundle) {
-        super.onSaveInstanceState(outState)
-
-        // Check if the binding is initialized and the view exists
-        if (_binding != null) {
-            val isVisible = binding.advancedOptionsContainer.isVisible
-            // Save the state of the accordion
-            outState.putBoolean(KEY_ADVANCED_EXPANDED, isVisible)
-        }
-    }
 
     /**
      * Launcher for picking media from the file system.
@@ -156,17 +146,7 @@ class SettingsFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         // UI SETUP this first
-        savedInstanceState?.let { restoreState(it) }
         setupRecyclerView()
-
-
-        // DISABLE VIEW STATE SAVING FOR SLIDERS, it might overwrite syncUiState
-        binding.positionXSlider.isSaveEnabled = false
-        binding.positionYSlider.isSaveEnabled = false
-        binding.zoomSlider.isSaveEnabled = false
-        binding.rotationSlider.isSaveEnabled = false
-        binding.brightnessSlider.isSaveEnabled = false
-        binding.speedSlider.isSaveEnabled = false
 
         // ASYNC TASKS (Data Loading)
         lifecycleScope.launch {
@@ -178,26 +158,6 @@ class SettingsFragment : Fragment() {
             setupListeners()
         }
 
-    }
-
-    /**
-     * Restores the state of the UI after a configuration change (e.g., screen rotation).
-     * Specifically, this handles the expanded/collapsed state of the "Advanced Options" accordion.
-     *
-     * @param savedInstanceState The bundle containing the saved state, typically from `onSaveInstanceState`.
-     */
-    private fun restoreState(savedInstanceState: Bundle) {
-        // RESTORE ACCORDION STATE
-        val isExpanded = savedInstanceState.getBoolean(KEY_ADVANCED_EXPANDED, false)
-
-        if (isExpanded) {
-            // Show the container
-            binding.advancedOptionsContainer.visibility = View.VISIBLE
-            binding.imageArrow.rotation = 180f
-        } else {
-            binding.advancedOptionsContainer.visibility = View.GONE
-            binding.imageArrow.rotation = 0f
-        }
     }
 
     private suspend fun setPreviewVideo(uri: Uri) {
@@ -279,6 +239,10 @@ class SettingsFragment : Fragment() {
                 viewLifecycleOwner.lifecycleScope.launch {
                     updateVideoSource(fileUri, true)
                 }
+            },
+            onSettingsClick = { recentFile ->
+                val bottomSheet = VideoSettingsBottomSheetFragment.newInstance(recentFile.file.name)
+                bottomSheet.show(childFragmentManager, "VideoSettingsBottomSheet")
             }
         )
         binding.recyclerViewRecentFiles.layoutManager = LinearLayoutManager(context)
@@ -384,7 +348,17 @@ class SettingsFragment : Fragment() {
      */
     private fun saveCurrentPlaylistOrder() {
         val currentFileNames = recentFilesAdapter.getItems().map { it.file.name }
-        preferencesManager.saveRecentFilesList(currentFileNames)
+        val currentSettings = preferencesManager.getPlaylistSettings()
+
+        // Reorder the settings to match the new file name order
+        val newSettingsList = mutableListOf<org.maocide.undeadwallpaper.model.VideoSettings>()
+        for (fileName in currentFileNames) {
+            val setting = currentSettings.find { it.fileName == fileName }
+            if (setting != null) {
+                newSettingsList.add(setting)
+            }
+        }
+        preferencesManager.savePlaylistSettings(newSettingsList)
     }
 
     /**
@@ -434,9 +408,6 @@ class SettingsFragment : Fragment() {
 
         try {
 
-            // Audio
-            binding.switchAudio.isChecked = preferencesManager.isAudioEnabled()
-
             // Playback Mode
             when (preferencesManager.getPlaybackMode()) {
                 PlaybackMode.LOOP -> binding.playbackModeGroup.check(binding.playbackModeLoop.id)
@@ -445,34 +416,12 @@ class SettingsFragment : Fragment() {
                 PlaybackMode.SHUFFLE -> binding.playbackModeGroup.check(binding.playbackModeShuffle.id)
             }
 
-            // Scaling Mode
-            when (preferencesManager.getScalingMode()) {
-                ScalingMode.FIT -> binding.scalingModeGroup.check(binding.scalingModeFit.id)
-                ScalingMode.FILL -> binding.scalingModeGroup.check(binding.scalingModeFill.id)
-                ScalingMode.STRETCH -> binding.scalingModeGroup.check(binding.scalingModeStretch.id)
-            }
-
-            // Start Time
-            when (preferencesManager.getStartTime()) {
-                StartTime.RESUME -> binding.startTimeGroup.check(binding.startTimeResume.id)
-                StartTime.RESTART -> binding.startTimeGroup.check(binding.startTimeRestart.id)
-                StartTime.RANDOM -> binding.startTimeGroup.check(binding.startTimeRandom.id)
-            }
-
             // StatusBar Color
             when (preferencesManager.getStatusBarColor()) {
                 StatusBarColor.AUTO -> binding.statusBarColorGroup.check(binding.statusBarAuto.id)
                 StatusBarColor.DARK -> binding.statusBarColorGroup.check(binding.statusBarDark.id)
                 StatusBarColor.LIGHT -> binding.statusBarColorGroup.check(binding.statusBarLight.id)
             }
-
-            // Load sliders for advanced (using safe loading)
-            binding.positionXSlider.setValueSafe(preferencesManager.getPositionX())
-            binding.positionYSlider.setValueSafe(preferencesManager.getPositionY())
-            binding.zoomSlider.setValueSafe(preferencesManager.getZoom())
-            binding.rotationSlider.setValueSafe(preferencesManager.getRotation())
-            binding.brightnessSlider.setValueSafe(preferencesManager.getBrightness())
-            binding.speedSlider.setValueSafe(preferencesManager.getSpeed())
 
             // Load Video Preview and set the video as selected
             val savedUri = preferencesManager.getVideoUri()
@@ -489,18 +438,6 @@ class SettingsFragment : Fragment() {
 
     }
 
-    private fun resetPreferencesToDefaults() {
-        preferencesManager.apply {
-            setScalingMode(ScalingMode.FILL)
-            savePositionX(0.0f)
-            savePositionY(0.0f)
-            saveZoom(1.0f)
-            saveRotation(0f)
-            saveBrightness(1.0f)
-            saveSpeed(1.0f)
-        }
-    }
-
 
     /**
      * Sets up all the listeners for controls.
@@ -512,24 +449,6 @@ class SettingsFragment : Fragment() {
                 setPackage(requireContext().packageName)
             }
             requireContext().applicationContext.sendBroadcast(intent)
-        }
-
-        // Helper to setup slider safe listeners, to avoid sending too many
-        fun setupSafeSlider(slider: Slider, saveAction: (Float) -> Unit) {
-            slider.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
-                override fun onStartTrackingTouch(slider: Slider) {
-                    // Do nothing when touch starts
-                }
-
-                override fun onStopTrackingTouch(slider: Slider) {
-                    // If is updating skip this event to not override
-                    if (isUpdatingUi) return
-
-                    // Only save and broadcast when the user lifts their finger
-                    saveAction(slider.value)
-                    notifySettingsChanged()
-                }
-            })
         }
 
         // Playback Mode
@@ -553,31 +472,6 @@ class SettingsFragment : Fragment() {
             notifySettingsChanged()
         }
 
-        // StartTime preference
-        binding.startTimeGroup.setOnCheckedStateChangeListener { group, checkedIds ->
-            if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
-
-            val checkedId = checkedIds[0] // Get the single selected ID
-
-            val newMode = when (checkedId) {
-                binding.startTimeRestart.id -> StartTime.RESTART
-                binding.startTimeRandom.id -> StartTime.RANDOM
-                else -> StartTime.RESUME
-            }
-            preferencesManager.saveStartTime(newMode)
-
-            if (newMode == StartTime.RANDOM && !randomStartTimeWarned) {
-                Toast.makeText(requireContext(), R.string.warning_random_start_time_delay, Toast.LENGTH_LONG).show()
-                randomStartTimeWarned = true
-            }
-
-            // Specific intent sent to apply
-            val intent = Intent(UndeadWallpaperService.ACTION_PLAYBACK_MODE_CHANGED).apply {
-                setPackage(requireContext().packageName)
-            }
-            requireContext().applicationContext.sendBroadcast(intent)
-        }
-
         // StatusBar Color
         binding.statusBarColorGroup.setOnCheckedStateChangeListener { group, checkedIds ->
             if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
@@ -598,96 +492,11 @@ class SettingsFragment : Fragment() {
             requireContext().applicationContext.sendBroadcast(intent)
         }
 
-        // Audio Switch
-        binding.switchAudio.setOnCheckedChangeListener { _, isChecked ->
-            preferencesManager.saveAudioEnabled(isChecked)
-            // Update local preview immediately
-            previewMediaPlayer?.setVolume(if (isChecked) 1f else 0f, if (isChecked) 1f else 0f)
-            notifySettingsChanged()
-        }
-
-        // Accordion Logic and animation
-        binding.layoutHeader.setOnClickListener {
-            val advancedOptionsContainer = binding.advancedOptionsContainer
-            val isVisible = advancedOptionsContainer.isVisible
-
-            TransitionManager.beginDelayedTransition(binding.accordionCard as ViewGroup, AutoTransition())
-            advancedOptionsContainer.visibility = if (isVisible) View.GONE else View.VISIBLE
-
-            val rotation = if (!isVisible) 180f else 0f
-            binding.imageArrow.animate().rotation(rotation).setDuration(200).start()
-        }
-
-        // Scaling Mode
-        binding.scalingModeGroup.setOnCheckedStateChangeListener { group, checkedIds ->
-            if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
-
-            val checkedId = checkedIds[0] // Get the single selected ID
-
-            val newMode = when (checkedId) {
-                binding.scalingModeFit.id -> ScalingMode.FIT
-                binding.scalingModeStretch.id -> ScalingMode.STRETCH
-                else -> ScalingMode.FILL
-            }
-            preferencesManager.setScalingMode(newMode)
-            notifySettingsChanged()
-        }
-
         // Video Picker
         binding.buttonPickVideo.setOnClickListener {
             checkPermissionAndOpenFilePicker()
         }
 
-        // Advanced Settings
-        // Brightness
-        setupSafeSlider(binding.brightnessSlider) { value ->
-            preferencesManager.saveBrightness(value)
-        }
-
-        // Horizontal Position (X)
-        setupSafeSlider(binding.positionXSlider) { value ->
-            preferencesManager.savePositionX(value)
-        }
-
-        // Vertical Position (Y)
-        setupSafeSlider(binding.positionYSlider) { value ->
-            preferencesManager.savePositionY(value)
-        }
-
-        // Zoom
-        setupSafeSlider(binding.zoomSlider) { value ->
-            preferencesManager.saveZoom(value)
-        }
-
-        // Rotation
-        setupSafeSlider(binding.rotationSlider) { value ->
-            preferencesManager.saveRotation(value)
-        }
-
-        // Speed
-        setupSafeSlider(binding.speedSlider) { value ->
-            preferencesManager.saveSpeed(value)
-
-            // If not sent a warning, but speed is high, warn about possible hardware bottleneck
-            if (value > 1.0f && !speedValueWarned) {
-                Toast.makeText(context, R.string.warning_high_speed_stuttering, Toast.LENGTH_LONG).show()
-                speedValueWarned = true
-            }
-        }
-
-        // Reset Values in UI
-        binding.buttonResetAdvanced.setOnClickListener {
-            // Reset and save values
-            resetPreferencesToDefaults()
-
-            // Reload UI (Warning!! might refire listeners of controls! Should be ok...)
-            viewLifecycleOwner.lifecycleScope.launch {
-                syncUiState()
-            }
-
-            // Notify wallpaper service
-            notifySettingsChanged()
-        }
     }
 
     /**
@@ -881,8 +690,9 @@ class SettingsFragment : Fragment() {
             it.isLooping = true
             previewMediaPlayer = it
             binding.videoPreview.start()
-            if(binding.switchAudio.isChecked) it.setVolume(1f, 1f)
-            else it.setVolume(0f, 0f)
+
+            // Audio is muted in preview by default, since the global toggle is gone
+            it.setVolume(0f, 0f)
         }
         binding.videoPreview.setOnErrorListener { _, _, _ ->
             Toast.makeText(context, getString(R.string.error_cannot_play_video), Toast.LENGTH_SHORT).show()

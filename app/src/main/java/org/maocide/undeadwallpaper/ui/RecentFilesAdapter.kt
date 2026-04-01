@@ -21,7 +21,8 @@ import java.util.Collections
 class RecentFilesAdapter(
     private val recentFiles: MutableList<RecentFile>,
     var currentVideoUriString: String?,
-    private val onItemClick: (RecentFile) -> Unit
+    private val onItemClick: (RecentFile) -> Unit,
+    private val onSettingsClick: (RecentFile) -> Unit
 ) : RecyclerView.Adapter<RecentFilesAdapter.ViewHolder>() {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -68,12 +69,20 @@ class RecentFilesAdapter(
     inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val thumbnail: ImageView = itemView.findViewById(R.id.thumbnail)
         private val fileName: TextView = itemView.findViewById(R.id.file_name)
+        private val settingsButton: ImageView = itemView.findViewById(R.id.button_settings)
 
         init {
             itemView.setOnClickListener {
                 val position = bindingAdapterPosition
                 if (position != RecyclerView.NO_POSITION) {
                     onItemClick(recentFiles[position])
+                }
+            }
+
+            settingsButton.setOnClickListener {
+                val position = bindingAdapterPosition
+                if (position != RecyclerView.NO_POSITION) {
+                    onSettingsClick(recentFiles[position])
                 }
             }
         }
