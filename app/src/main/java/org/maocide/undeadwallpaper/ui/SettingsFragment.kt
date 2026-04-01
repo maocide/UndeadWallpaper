@@ -220,9 +220,6 @@ class SettingsFragment : Fragment() {
             context?.sendBroadcast(intent)
         }
 
-        // Refresh the recent files list
-        loadRecentFiles()
-
     }
 
 
@@ -435,10 +432,11 @@ class SettingsFragment : Fragment() {
             if (savedUri != null) {
                 //setupVideoPreview(uriString.toUri())
                 updateVideoSource(savedUri.toUri(), false)
-            } else {
-                // Fallback: If no video is selected, still load recent files
-                loadRecentFiles()
             }
+
+            // Regardless of having a selected video or not, we need to load the recent files
+            // into the RecyclerView adapter ONCE during UI initialization.
+            loadRecentFiles()
         } finally {
             isUpdatingUi = false
         }
@@ -687,7 +685,10 @@ class SettingsFragment : Fragment() {
                     FileLogger.d(tag, "File copied to local storage")
                 }
 
-                // Update the current video
+                // Load the new file into the RecyclerView
+                loadRecentFiles()
+
+                // Update the current video (now that the file is in the adapter)
                 updateVideoSource(savedFileUri, false) // Centralized update logic
 
                 // Notifies the service of a change in the playlist
