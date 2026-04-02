@@ -177,6 +177,16 @@ class GLVideoRenderer(private val context: Context) {
         // or we risk thread collision.
     }
 
+    /**
+     * Forces the GL thread to render a frame immediately.
+     * This is useful when visual settings (like zoom or position) are changed
+     * while the video player is paused, preventing the screen from appearing stuck
+     * on old settings until the video resumes playback.
+     */
+    fun requestRender() {
+        renderSignal.trySend(Unit)
+    }
+
     fun onSurfaceChanged(width: Int, height: Int) {
         // Store Viewport (The Source of Truth for Orientation)
         viewportWidth = width

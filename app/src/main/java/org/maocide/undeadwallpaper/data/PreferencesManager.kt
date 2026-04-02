@@ -159,7 +159,8 @@ class PreferencesManager(context: Context) {
 
     fun savePlaylistSettings(playlist: List<VideoSettings>) {
         val jsonString = jsonParser.encodeToString(playlist)
-        sharedPrefs.edit { putString(KEY_PLAYLIST_SETTINGS, jsonString) }
+        sharedPrefs.edit(commit = true)
+            { putString(KEY_PLAYLIST_SETTINGS, jsonString) }
     }
 
     fun updateVideoSettings(fileName: String, updater: (VideoSettings) -> VideoSettings) {

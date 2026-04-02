@@ -180,6 +180,12 @@ class UndeadWallpaperService : WallpaperService() {
                         if (isPlayerInitialized) {
                             refreshRenderer()
 
+                            // If the wallpaper is paused (e.g. app is open), force a render instantly
+                            // to display the slider changes live.
+                            if (!isVisible || wallpaperPlayer.getPlayerInstance()?.playWhenReady == false) {
+                                renderer?.requestRender()
+                            }
+
                             // Re-apply speed and volume for the active video
                             val activeUri = Uri.parse(loadedVideoUriString)
                             val fileName = activeUri.lastPathSegment ?: ""
@@ -651,6 +657,10 @@ class UndeadWallpaperService : WallpaperService() {
                             }
                         }
                     }
+
+                    // Always refresh the renderer settings before resuming playback in case
+                    // the user edited them in the UI while the wallpaper was hidden.
+                    refreshRenderer()
 
                     // The "Play" Command: Just set the flag.
                     // ExoPlayer will start natively as soon as it reaches STATE_READY.
