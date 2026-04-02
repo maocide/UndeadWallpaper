@@ -471,9 +471,19 @@ class SettingsFragment : Fragment() {
             }
 
             preferencesManager.setPlaybackMode(newMode)
-            // Forcing an update to current uri in case we switch back from playlist to single video
-            val currentSelectedUri = sharedViewModel.selectedVideoUri?.toString() ?: preferencesManager.getActiveVideoUri()
-            preferencesManager.saveActiveVideoUri(currentSelectedUri.toString())
+
+            // Forcing an update to current uri in case we switch back from playlist to single video.
+            // We use the adapter's highlighted URI to guarantee the background service plays
+            // the exact video the user is currently looking at in the UI list.
+            if (::recentFilesAdapter.isInitialized && recentFilesAdapter.currentVideoUriString?.isNotEmpty() == true) {
+                val highlightedUri = recentFilesAdapter.currentVideoUriString!!
+                sharedViewModel.selectedVideoUri = Uri.parse(highlightedUri)
+                preferencesManager.saveActiveVideoUri(highlightedUri)
+            } else {
+                val currentSelectedUri = sharedViewModel.selectedVideoUri?.toString() ?: preferencesManager.getActiveVideoUri()
+                preferencesManager.saveActiveVideoUri(currentSelectedUri.toString())
+            }
+
             notifySettingsChanged()
         }
 

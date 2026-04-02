@@ -18,6 +18,7 @@ import androidx.media3.exoplayer.SeekParameters
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder
 import androidx.media3.exoplayer.upstream.DefaultAllocator
+import androidx.media3.exoplayer.video.VideoFrameMetadataListener
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -42,6 +43,7 @@ class WallpaperPlayer(
     private val TAG: String = javaClass.simpleName
 
     private var player: ExoPlayer? = null
+    private var playerListener: Player.Listener? = null
 
     private var recoveryAttempts = 0
 
@@ -176,16 +178,16 @@ class WallpaperPlayer(
                         shuffleModeEnabled = false
                     }
                     PlaybackMode.LOOP_ALL -> {
-                        repeatMode = Player.REPEAT_MODE_ALL
+                        repeatMode = Player.REPEAT_MODE_OFF // We handle looping manually via chunking
                         shuffleModeEnabled = false
                     }
                     PlaybackMode.SHUFFLE -> {
-                        repeatMode = Player.REPEAT_MODE_ALL
-                        shuffleModeEnabled = true
+                        repeatMode = Player.REPEAT_MODE_OFF // We handle shuffling manually via chunking
+                        shuffleModeEnabled = false
                     }
                 }
 
-                addListener(object : Player.Listener {
+                playerListener = object : Player.Listener {
                     override fun onPlayerError(error: PlaybackException) {
                         FileLogger.e(TAG, "ExoPlayer Error: ${error.errorCodeName} - ${error.message}")
 
@@ -241,25 +243,14 @@ class WallpaperPlayer(
                     override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                         super.onMediaItemTransition(mediaItem, reason)
                         listener.onMediaItemTransition(mediaItem, reason)
-
-                        val isWrapAround = reason == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT ||
-                                (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO &&
-                                        currentMediaItemIndex == currentTimeline.getFirstWindowIndex(shuffleModeEnabled))
-
-                        if (isWrapAround && playbackMode == PlaybackMode.SHUFFLE) {
-                            FileLogger.i(TAG, "Playlist repeated. Generating new shuffle order.")
-                            if (mediaItemCount > 0) {
-                                val newOrder = DefaultShuffleOrder(mediaItemCount, Random.nextLong())
-                                this@apply.setShuffleOrder(newOrder)
-                            }
-                        }
                     }
 
                     override fun onRenderedFirstFrame() {
                         super.onRenderedFirstFrame()
                         listener.onRenderedFirstFrame()
                     }
-                })
+                }
+                addListener(playerListener!!)
 
                 if (surface != null) {
                     setVideoSurface(surface)
@@ -271,7 +262,14 @@ class WallpaperPlayer(
     fun release() {
         player?.let { p ->
             FileLogger.i(TAG, "Releasing ExoPlayer...")
-            p.clearMediaItems()
+
+            // Detach listeners before destroying the pipeline so we don't fire false STATE_ENDED events
+            // and artificially trigger playlist transitions during UI mode changes.
+            playerListener?.let { p.removeListener(it) }
+            playerListener = null
+
+            // Do NOT call clearMediaItems(). It triggers STATE_ENDED on the listener synchronously if we didn't remove it.
+            // p.release() handles all cleanup internally.
             p.release()
         }
         player = null

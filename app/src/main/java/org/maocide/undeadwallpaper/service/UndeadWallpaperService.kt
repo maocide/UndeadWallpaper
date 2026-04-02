@@ -120,40 +120,23 @@ class UndeadWallpaperService : WallpaperService() {
             val dataSourceFactory = DefaultDataSource.Factory(baseContext)
             val mediaSourceFactory = ProgressiveMediaSource.Factory(dataSourceFactory)
 
-            if (currentPlaybackMode == PlaybackMode.LOOP_ALL || currentPlaybackMode == PlaybackMode.SHUFFLE) {
-                val playlistUris = playlistManager.getPlaylistUris()
+            val mediaUri = getMediaUri() ?: return
 
-                if (playlistUris.isNotEmpty()) {
-                    val mediaSources = playlistUris.map { uriStr ->
-                        val mediaItem = MediaItem.Builder()
-                            .setUri(uriStr)
-                            .setMediaId(uriStr)
-                            .build()
-                        mediaSourceFactory.createMediaSource(mediaItem)
-                    }
+            // Hybrid Gapless Batching:
+            // Fetch the chunk of consecutive URIs that share identical visual settings.
+            val chunkUris = playlistManager.getGaplessChunkUris(loadedVideoUriString, currentPlaybackMode)
 
-                    var targetIndex = playlistUris.indexOf(loadedVideoUriString)
-                    if (targetIndex == -1) targetIndex = 0
+            // If the chunk is empty for some reason, fallback to the single mediaUri
+            val urisToLoad = if (chunkUris.isNotEmpty()) chunkUris else listOf(loadedVideoUriString)
 
-                    // If we are just reordering, keep the exact millisecond we are currently at
-                    val targetPosition = if (keepCurrentPlayback) wallpaperPlayer.currentPosition else playheadTime
-
-                    wallpaperPlayer.setMediaSources(mediaSources)
-                    wallpaperPlayer.seekTo(targetIndex, targetPosition)
-                } else {
-                    // Fallback for empty list
-                    val mediaUri = getMediaUri() ?: return
-                    val mediaItem = MediaItem.Builder().setUri(mediaUri).setMediaId(loadedVideoUriString).build()
-                    wallpaperPlayer.setMediaSource(mediaSourceFactory.createMediaSource(mediaItem))
-                    wallpaperPlayer.seekTo(if (keepCurrentPlayback) wallpaperPlayer.currentPosition else playheadTime)
-                }
-            } else {
-                // Single file modes
-                val mediaUri = getMediaUri() ?: return
-                val mediaItem = MediaItem.Builder().setUri(mediaUri).setMediaId(loadedVideoUriString).build()
-                wallpaperPlayer.setMediaSource(mediaSourceFactory.createMediaSource(mediaItem))
-                wallpaperPlayer.seekTo(if (keepCurrentPlayback) wallpaperPlayer.currentPosition else playheadTime)
+            val mediaSources = urisToLoad.map { uriStr ->
+                val parsedUri = Uri.parse(uriStr)
+                val mediaItem = MediaItem.Builder().setUri(parsedUri).setMediaId(uriStr).build()
+                mediaSourceFactory.createMediaSource(mediaItem)
             }
+
+            wallpaperPlayer.setMediaSources(mediaSources)
+            wallpaperPlayer.seekTo(0, if (keepCurrentPlayback) wallpaperPlayer.currentPosition else playheadTime)
         }
 
 
@@ -249,9 +232,9 @@ class UndeadWallpaperService : WallpaperService() {
                     error.errorCode == PlaybackException.ERROR_CODE_DECODING_RESOURCES_RECLAIMED
 
             if (isDecoderError) {
-                 if (isVisible) {
-                     initializePlayer()
-                 }
+                if (isVisible) {
+                    initializePlayer()
+                }
             }
         }
 
@@ -287,31 +270,63 @@ class UndeadWallpaperService : WallpaperService() {
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
-            // detecting one shot playback and pausing
-            if (currentPlaybackMode == PlaybackMode.ONE_SHOT) {
-                when (playbackState) {
-                    Player.STATE_ENDED -> {
-                        FileLogger.i(TAG, "Playback ended!")
+            when (playbackState) {
+                Player.STATE_ENDED -> {
+                    FileLogger.i(TAG, "Playback ended!")
+
+                    if (currentPlaybackMode == PlaybackMode.ONE_SHOT) {
                         hasPlaybackCompleted = true
                         wallpaperPlayer.pause()
+                    } else if (currentPlaybackMode == PlaybackMode.LOOP_ALL || currentPlaybackMode == PlaybackMode.SHUFFLE) {
+                        // Manual playlist boundary handling
+                        // The playback ended because we reached the end of a chunk of identical-settings videos.
+                        // We must load the NEXT chunk starting from the video after the one that just finished.
+                        val nextUriString = playlistManager.getNextUri(loadedVideoUriString, currentPlaybackMode)
+                        if (nextUriString != null) {
+                            FileLogger.i(TAG, "Manually transitioning across settings boundary to: $nextUriString")
+
+                            loadedVideoUriString = nextUriString
+                            prefs.saveActiveVideoUri(nextUriString)
+
+                            playheadTime = 0L
+                            hasPlaybackCompleted = false
+
+                            // Load the next chunk and flush the player
+                            bindPlaylistToPlayer(keepCurrentPlayback = false)
+                            refreshRenderer()
+
+                            val activeUri = Uri.parse(loadedVideoUriString)
+                            val fileName = activeUri.lastPathSegment ?: ""
+                            val activeSettings = prefs.getVideoSettings(fileName)
+                            wallpaperPlayer.getPlayerInstance()?.let { player ->
+                                player.volume = activeSettings.volume
+                                player.setPlaybackSpeed(activeSettings.speed)
+                            }
+
+                            wallpaperPlayer.prepare()
+                            wallpaperPlayer.playWhenReady = true
+                        }
                     }
-                    Player.STATE_READY -> {
-                        if (hasPlaybackCompleted) wallpaperPlayer.pause()
+                }
+                Player.STATE_READY -> {
+                    if (currentPlaybackMode == PlaybackMode.ONE_SHOT && hasPlaybackCompleted) {
+                        wallpaperPlayer.pause()
                     }
                 }
             }
         }
 
+        @OptIn(UnstableApi::class)
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            // Track chunk advancement internally
             val nextUriString = mediaItem?.mediaId
             if (nextUriString != null && nextUriString != loadedVideoUriString) {
-                FileLogger.i(TAG, "Transitioning to next video in playlist: $nextUriString")
+                FileLogger.i(TAG, "Chunk transition: advancing internally to $nextUriString")
                 loadedVideoUriString = nextUriString
                 prefs.saveActiveVideoUri(nextUriString)
             }
-            // Apply per-video settings dynamically on transition
-            refreshRenderer()
 
+            // Update non-visual settings (volume, speed) dynamically during the chunk
             val activeUri = Uri.parse(loadedVideoUriString)
             val fileName = activeUri.lastPathSegment ?: ""
             val activeSettings = prefs.getVideoSettings(fileName)

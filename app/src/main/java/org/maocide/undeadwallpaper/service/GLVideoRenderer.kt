@@ -124,6 +124,7 @@ class GLVideoRenderer(private val context: Context) {
     private var userRotation = 0f
     private var userBrightness = 1.0f
     @Volatile private var surfaceDrawTimestamp: Long = 0L
+    @Volatile private var isPendingMatrixUpdate = false
 
     init {
         triangleVertices = ByteBuffer.allocateDirect(triangleVerticesData.size * 4)
@@ -140,7 +141,7 @@ class GLVideoRenderer(private val context: Context) {
         if (currentScalingMode != mode) {
             FileLogger.i(tag, "Scaling Mode changed to: $mode")
             currentScalingMode = mode
-            updateMatrix()
+            isPendingMatrixUpdate = true
         }
     }
 
@@ -149,7 +150,7 @@ class GLVideoRenderer(private val context: Context) {
         userTranslateY = y
         userZoom = zoom
         userRotation = rotation
-        updateMatrix()
+        isPendingMatrixUpdate = true
     }
 
     fun setBrightness(brightness: Float) {
@@ -215,7 +216,7 @@ class GLVideoRenderer(private val context: Context) {
     fun setVideoSize(width: Int, height: Int) {
         videoWidth = width
         videoHeight = height
-        updateMatrix()
+        isPendingMatrixUpdate = true
     }
 
     suspend fun waitForVideoSurface(): Surface? {
@@ -258,8 +259,13 @@ class GLVideoRenderer(private val context: Context) {
                 // CHECK FOR VIEWPORT UPDATES
                 if (viewportChanged) {
                     GLES20.glViewport(0, 0, viewportWidth, viewportHeight)
-                    updateMatrix()
+                    isPendingMatrixUpdate = true
                     viewportChanged = false
+                }
+
+                if (isPendingMatrixUpdate) {
+                    updateMatrix()
+                    isPendingMatrixUpdate = false
                 }
 
                 // The Draw Call

@@ -178,12 +178,14 @@ class PreferencesManager(context: Context) {
     }
 
     /**
-     * Saves the active video URI to SharedPreferences.
+     * Saves the active video URI to SharedPreferences synchronously.
+     * Synchronous save ensures that any broadcast listeners fired immediately after
+     * will read the correct updated URI rather than racing the async disk write.
      *
      * @param uri The URI of the video to save.
      */
     fun saveActiveVideoUri(uri: String) {
-        sharedPrefs.edit {
+        sharedPrefs.edit(commit = true) {
             putString(KEY_VIDEO_URI, uri)
         }
     }
