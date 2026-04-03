@@ -135,6 +135,19 @@ class UndeadWallpaperService : WallpaperService() {
                 mediaSourceFactory.createMediaSource(mediaItem)
             }
 
+            // Intelligent Full-Playlist Loop Optimization:
+            // If the chunk we built contains every video in the playlist, they all share settings!
+            // We can safely enable ExoPlayer's internal REPEAT_MODE_ALL. This gives perfect gapless looping
+            // without ever hitting STATE_ENDED and incurring the manual flush pause.
+            val playlistUris = playlistManager.getPlaylistUris()
+            if ((currentPlaybackMode == PlaybackMode.LOOP_ALL || currentPlaybackMode == PlaybackMode.SHUFFLE)
+                && playlistUris.isNotEmpty() && chunkUris.size == playlistUris.size) {
+                wallpaperPlayer.setRepeatMode(Player.REPEAT_MODE_ALL)
+            } else if (currentPlaybackMode == PlaybackMode.LOOP_ALL || currentPlaybackMode == PlaybackMode.SHUFFLE) {
+                // If chunk is smaller than playlist, we MUST disable repeat mode so it naturally hits STATE_ENDED.
+                wallpaperPlayer.setRepeatMode(Player.REPEAT_MODE_OFF)
+            }
+
             wallpaperPlayer.setMediaSources(mediaSources)
             wallpaperPlayer.seekTo(0, if (keepCurrentPlayback) wallpaperPlayer.currentPosition else playheadTime)
         }

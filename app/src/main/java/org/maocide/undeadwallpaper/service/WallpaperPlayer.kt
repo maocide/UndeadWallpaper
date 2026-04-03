@@ -110,6 +110,10 @@ class WallpaperPlayer(
         player?.pause()
     }
 
+    fun setRepeatMode(mode: Int) {
+        player?.repeatMode = mode
+    }
+
     fun getPlayerInstance(): Player? {
         return player
     }

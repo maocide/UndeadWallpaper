@@ -275,7 +275,8 @@ class SettingsFragment : Fragment() {
                     .setMessage(getString(R.string.remove_file_message, item.file.name))
                     .setPositiveButton(getString(R.string.remove_action)) { _, _ ->
                         val deletedUriString = Uri.fromFile(item.file).toString()
-                        val currentUriString = sharedViewModel.selectedVideoUri?.toString() ?: preferencesManager.getActiveVideoUri()
+                        val uiSelectedUriString = sharedViewModel.selectedVideoUri?.toString() ?: preferencesManager.getActiveVideoUri()
+                        val backgroundActiveUriString = preferencesManager.getActiveVideoUri()
 
                         // Remove from adapter
                         recentFilesAdapter.onItemDismiss(position)
@@ -288,8 +289,8 @@ class SettingsFragment : Fragment() {
                         // Save new list order
                         saveCurrentPlaylistOrder()
 
-                        // Edge case: User deleted the currently playing video
-                        if (deletedUriString == currentUriString) {
+                        // Edge case: User deleted the currently UI-highlighted video, OR the video actively playing in the background
+                        if (deletedUriString == uiSelectedUriString || deletedUriString == backgroundActiveUriString) {
                             val nextItem = recentFilesAdapter.getItems().firstOrNull()
                             if (nextItem != null) {
                                 val newUri = Uri.fromFile(nextItem.file)
@@ -306,6 +307,13 @@ class SettingsFragment : Fragment() {
                                     }
                                 }
                             }
+                        } else {
+                            // If we deleted an inactive video, we MUST still notify the service that the playlist changed.
+                            // Otherwise, the background service's chunk loader might try to buffer the physically deleted file!
+                            val intent = Intent(UndeadWallpaperService.ACTION_PLAYLIST_REORDERED).apply {
+                                setPackage(requireContext().packageName)
+                            }
+                            requireContext().applicationContext.sendBroadcast(intent)
                         }
                     }
                     .setNegativeButton(getString(R.string.cancel)) { dialog, _ ->
