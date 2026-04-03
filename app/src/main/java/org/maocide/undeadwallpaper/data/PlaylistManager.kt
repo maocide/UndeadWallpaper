@@ -113,16 +113,19 @@ class PlaylistManager(
 
         // Look ahead in the sequence
         for (i in 1 until playlistUris.size) {
-            // Do not cross the sequence boundary (end of the playlist) within a single chunk!
+            val nextPositionInSequence = currentPositionInSequence + i
+
+            // For SHUFFLE mode, do not cross the sequence boundary (end of the playlist) within a single chunk!
             // Wrapping around inside a chunk breaks true shuffle logic because it re-uses the OLD sequence order.
             // By stopping the chunk strictly at the end of the sequence, we force the player to hit STATE_ENDED.
             // This guarantees getNextUri() will be called, allowing it to correctly regenerate the shuffle order for the next loop.
-            val nextPositionInSequence = currentPositionInSequence + i
-            if (nextPositionInSequence >= playlistUris.size) {
+            if (playbackMode == PlaybackMode.SHUFFLE && nextPositionInSequence >= playlistUris.size) {
                 break
             }
 
-            val nextLogicalIndex = sequenceOrder[nextPositionInSequence]
+            // For LOOP_ALL, we can safely wrap around the sequence (e.g. from index 2 back to 0).
+            val wrappedPositionInSequence = nextPositionInSequence % playlistUris.size
+            val nextLogicalIndex = sequenceOrder[wrappedPositionInSequence]
 
             val nextUriStr = playlistUris[nextLogicalIndex]
             val nextUriParsed = Uri.parse(nextUriStr)

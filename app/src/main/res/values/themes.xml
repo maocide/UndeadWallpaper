@@ -20,7 +20,8 @@
     </style>
 
     <style name="Widget.UndeadWallpaper.BottomSheet" parent="Widget.Material3.BottomSheet">
-        <item name="backgroundTint">?attr/colorSurface</item>
+        <item name="backgroundTint">@null</item>
+        <item name="android:background">@drawable/bg_sheet_rim</item>
         <item name="shapeAppearanceOverlay">@style/ShapeAppearance.UndeadWallpaper.BottomSheet</item>
     </style>
 

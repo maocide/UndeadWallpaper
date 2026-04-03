@@ -11,7 +11,7 @@ class UndeadWallpaperApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        
+
         // Force dark mode for now
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
 

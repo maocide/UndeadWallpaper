@@ -190,23 +190,17 @@ class UndeadWallpaperService : WallpaperService() {
 
                     ACTION_VIDEO_SETTINGS_CHANGED -> {
                         FileLogger.i(TAG, "Broadcast received: Video settings changed.")
+                        // A video's visual settings were modified.
+                        // If it was part of the current gapless chunk, our identical-settings assumption is now invalid.
+                        // We must rebuild the chunk from scratch to prevent the new settings from bleeding
+                        // into the currently playing video, or vice-versa.
                         if (isPlayerInitialized) {
-                            refreshRenderer()
+                            initializePlayer() // Safely rebuilds the gapless chunk and resumes playback exactly where it was
 
                             // If the wallpaper is paused (e.g. app is open), force a render instantly
-                            // to display the slider changes live.
+                            // to display the slider changes live on the frozen surface.
                             if (!isVisible || wallpaperPlayer.getPlayerInstance()?.playWhenReady == false) {
                                 renderer?.requestRender()
-                            }
-
-                            // Re-apply speed and volume for the active video
-                            val activeUri = Uri.parse(loadedVideoUriString)
-                            val fileName = activeUri.lastPathSegment ?: ""
-                            val activeSettings = prefs.getVideoSettings(fileName)
-
-                            wallpaperPlayer.getPlayerInstance()?.let { player ->
-                                player.volume = activeSettings.volume
-                                player.setPlaybackSpeed(activeSettings.speed)
                             }
                         }
                     }

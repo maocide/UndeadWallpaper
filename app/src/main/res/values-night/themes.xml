@@ -7,10 +7,10 @@
         <item name="colorSurface">@color/dark_surface</item>
         <item name="colorOnSurface">@color/white</item>
 
-        <item name="colorSurface">@color/dark_surface</item>
         <item name="colorSurfaceVariant">@color/light_green_tonal</item>
-
         <item name="colorSecondaryContainer">@color/light_green_tonal</item>
         <item name="colorOnSecondaryContainer">@color/light_green</item>
+
+        <item name="bottomSheetDialogTheme">@style/ThemeOverlay.UndeadWallpaper.BottomSheetDialog</item>
     </style>
 </resources>

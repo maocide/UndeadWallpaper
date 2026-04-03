@@ -17,6 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.lifecycle.lifecycleScope
+import org.maocide.undeadwallpaper.R
 import org.maocide.undeadwallpaper.data.VideoFileManager
 import java.io.File
 
