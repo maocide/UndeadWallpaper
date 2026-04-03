@@ -3,7 +3,10 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".SettingsFragment">
+    tools:context="ui.SettingsFragment"
+    android:paddingBottom="88dp"
+    android:clipToPadding="false"
+    >
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
@@ -15,8 +18,10 @@
             android:id="@+id/card_video_preview"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="4dp"
+            app:cardCornerRadius="24dp"
+            app:strokeWidth="0dp"
+            app:cardElevation="8dp"
+            app:cardBackgroundColor="?attr/colorSurface"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent">
@@ -43,17 +48,18 @@
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/button_pick_video"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    style="@style/Widget.Material3.Button.TonalButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/pick_video"
-                    app:layout_constraintTop_toBottomOf="@id/video_preview_container"
-                    app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintEnd_toEndOf="parent"
                     android:layout_marginTop="16dp"
                     android:layout_marginBottom="16dp"
-                    app:layout_constraintBottom_toBottomOf="parent"/>
-
+                    android:text="@string/pick_video"
+                    app:cornerRadius="24dp"
+                    app:icon="@android:drawable/ic_menu_gallery"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toBottomOf="@id/video_preview_container" />
             </androidx.constraintlayout.widget.ConstraintLayout>
 
         </com.google.android.material.card.MaterialCardView>
@@ -64,8 +70,9 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="4dp"
+            app:cardCornerRadius="24dp"
+            app:strokeWidth="0dp"
+            app:cardElevation="8dp"
             app:layout_constraintTop_toBottomOf="@id/card_video_preview"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent">
@@ -76,7 +83,13 @@
                 android:orientation="vertical"
                 android:padding="16dp">
 
-
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Global Settings"
+                    android:textAppearance="?attr/textAppearanceTitleMedium" android:textStyle="bold"
+                    android:textColor="?attr/colorPrimary"
+                    android:layout_marginBottom="8dp"/>
 
                 <!-- Playback Mode -->
                 <TextView
@@ -84,7 +97,6 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
                     android:text="@string/playback_mode_setting"
-                    android:textAppearance="?attr/textAppearanceBody1"
                     android:visibility="visible" />
 
                 <com.google.android.material.chip.ChipGroup
@@ -132,8 +144,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
-                    android:text="@string/start_time_label"
-                    android:textAppearance="?attr/textAppearanceBody1" />
+
+                    android:text="@string/start_time_label" />
 
                 <com.google.android.material.chip.ChipGroup
                     android:id="@+id/start_time_group"
@@ -173,8 +185,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
-                    android:text="@string/status_bar_icons_label"
-                    android:textAppearance="?attr/textAppearanceBody1" />
+                    android:text="@string/status_bar_icons_label" />
 
                 <com.google.android.material.chip.ChipGroup
                     android:id="@+id/status_bar_color_group"
@@ -270,14 +281,36 @@
                     android:indeterminate="true"
                     android:visibility="gone"
                     tools:visibility="visible" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
 
-                <!-- Recent Files -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/card_playlist"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            app:cardCornerRadius="24dp"
+            app:strokeWidth="0dp"
+            app:cardElevation="8dp"
+            app:layout_constraintTop_toBottomOf="@id/card_settings"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+            <!-- Recent Files -->
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
                     android:text="@string/recent_files"
-                    android:textAppearance="?attr/textAppearanceTitleMedium" />
+                    android:textAppearance="?attr/textAppearanceTitleMedium"
+                    android:textStyle="bold"
+                    android:textColor="?attr/colorPrimary"
+                    android:layout_marginBottom="8dp" />
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -294,6 +327,7 @@
                     android:layout_marginTop="8dp" />
 
             </LinearLayout>
+
 
         </com.google.android.material.card.MaterialCardView>
 

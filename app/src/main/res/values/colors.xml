@@ -4,4 +4,7 @@
     <color name="white">#FFFFFFFF</color>
     <color name="light_green">#3cdc84</color>
     <color name="zombie_green">#23a65e</color>
+    <color name="dark_background">#0A0F0C</color>
+    <color name="dark_surface">#141E18</color>
+    <color name="light_green_tonal">#4D3cdc84</color>
 </resources>

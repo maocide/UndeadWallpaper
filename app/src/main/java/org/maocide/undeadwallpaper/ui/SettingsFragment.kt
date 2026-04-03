@@ -9,7 +9,6 @@ import org.maocide.undeadwallpaper.data.PreferencesManager
 import org.maocide.undeadwallpaper.data.VideoFileManager
 import org.maocide.undeadwallpaper.model.PlaybackMode
 import org.maocide.undeadwallpaper.model.RecentFile
-import org.maocide.undeadwallpaper.model.ScalingMode
 import org.maocide.undeadwallpaper.model.StartTime
 import org.maocide.undeadwallpaper.model.StatusBarColor
 import org.maocide.undeadwallpaper.service.UndeadWallpaperService
@@ -25,7 +24,6 @@ import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.util.Log
 
 
 import android.view.LayoutInflater
@@ -40,19 +38,12 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.transition.AutoTransition
-import androidx.transition.TransitionManager
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
-
-
-import androidx.core.view.isVisible
-import com.google.android.material.slider.Slider
 
 
 import kotlin.math.roundToInt
@@ -238,7 +229,7 @@ class SettingsFragment : Fragment() {
                 }
             },
             onSettingsClick = { recentFile ->
-                val bottomSheet = VideoSettingsBottomSheetFragment.newInstance(recentFile.file.name)
+                val bottomSheet = VideoSettingsSheet.newInstance(recentFile.file.name)
                 bottomSheet.show(childFragmentManager, "VideoSettingsBottomSheet")
             }
         )
@@ -745,6 +736,11 @@ class SettingsFragment : Fragment() {
             // Audio is muted in preview by default, since the global toggle is gone
             it.setVolume(0f, 0f)
         }
+
+        binding.videoPreview.setMediaController(null)
+
+        binding.videoPreview.setOnTouchListener { _, _ -> true }
+
         binding.videoPreview.setOnErrorListener { _, _, _ ->
             Toast.makeText(context, getString(R.string.error_cannot_play_video), Toast.LENGTH_SHORT).show()
             true

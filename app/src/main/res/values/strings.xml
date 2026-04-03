@@ -3,7 +3,7 @@
     <string name="action_settings">About</string>
 
     <!-- Strings used for fragments for navigation -->
-    <string name="first_fragment_label">Wallpaper Settings</string>
+    <string name="first_fragment_label">Undead Settings</string>
     <string name="second_fragment_label">About</string>
     <string name="previous">Previous</string>
 

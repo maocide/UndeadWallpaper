@@ -1,19 +1,15 @@
 package org.maocide.undeadwallpaper.ui
 
 import android.content.Intent
-import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.slider.Slider
-import org.maocide.undeadwallpaper.R
 import org.maocide.undeadwallpaper.data.PreferencesManager
-import org.maocide.undeadwallpaper.databinding.BottomSheetVideoSettingsBinding
+import org.maocide.undeadwallpaper.databinding.SheetVideoSettingsBinding
 import org.maocide.undeadwallpaper.model.ScalingMode
-import org.maocide.undeadwallpaper.model.StartTime
 import org.maocide.undeadwallpaper.model.VideoSettings
 import org.maocide.undeadwallpaper.service.UndeadWallpaperService
 import kotlin.math.roundToInt
@@ -24,9 +20,9 @@ import androidx.lifecycle.lifecycleScope
 import org.maocide.undeadwallpaper.data.VideoFileManager
 import java.io.File
 
-class VideoSettingsBottomSheetFragment : BottomSheetDialogFragment() {
+class VideoSettingsSheet : BottomSheetDialogFragment() {
 
-    private var _binding: BottomSheetVideoSettingsBinding? = null
+    private var _binding: SheetVideoSettingsBinding? = null
     private val binding get() = _binding!!
     private lateinit var preferencesManager: PreferencesManager
     private lateinit var fileName: String
@@ -35,10 +31,10 @@ class VideoSettingsBottomSheetFragment : BottomSheetDialogFragment() {
     companion object {
         private const val ARG_FILE_NAME = "file_name"
 
-        fun newInstance(fileName: String): VideoSettingsBottomSheetFragment {
+        fun newInstance(fileName: String): VideoSettingsSheet {
             val args = Bundle()
             args.putString(ARG_FILE_NAME, fileName)
-            val fragment = VideoSettingsBottomSheetFragment()
+            val fragment = VideoSettingsSheet()
             fragment.arguments = args
             return fragment
         }
@@ -54,7 +50,7 @@ class VideoSettingsBottomSheetFragment : BottomSheetDialogFragment() {
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        _binding = BottomSheetVideoSettingsBinding.inflate(inflater, container, false)
+        _binding = SheetVideoSettingsBinding.inflate(inflater, container, false)
         return binding.root
     }
 
@@ -129,7 +125,25 @@ class VideoSettingsBottomSheetFragment : BottomSheetDialogFragment() {
                     saveAction(slider.value)
                 }
             })
+
+            // Lock the scroll view while touching the slider
+            slider.setOnTouchListener { view, event ->
+                when (event.actionMasked) {
+                    android.view.MotionEvent.ACTION_DOWN -> {
+                        // NestedScrollView, should stop scrolling
+                        view.parent.requestDisallowInterceptTouchEvent(true)
+                    }
+                    android.view.MotionEvent.ACTION_UP,
+                    android.view.MotionEvent.ACTION_CANCEL -> {
+                        // Give back control to scroll view
+                        view.parent.requestDisallowInterceptTouchEvent(false)
+                    }
+                }
+                // Return false to let the slider process touch event
+                false
+            }
         }
+
 
         binding.scalingModeGroup.setOnCheckedStateChangeListener { _, checkedIds ->
             if (checkedIds.isEmpty() || isUpdatingUi) return@setOnCheckedStateChangeListener
