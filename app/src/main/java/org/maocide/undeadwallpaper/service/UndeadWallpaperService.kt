@@ -189,20 +189,10 @@ class UndeadWallpaperService : WallpaperService() {
                     }
 
                     ACTION_VIDEO_SETTINGS_CHANGED -> {
-                        FileLogger.i(TAG, "Broadcast received: Video settings changed.")
-                        // A video's visual settings were modified.
-                        // If it was part of the current gapless chunk, our identical-settings assumption is now invalid.
-                        // We must rebuild the chunk from scratch to prevent the new settings from bleeding
-                        // into the currently playing video, or vice-versa.
-                        if (isPlayerInitialized) {
-                            initializePlayer() // Safely rebuilds the gapless chunk and resumes playback exactly where it was
-
-                            // If the wallpaper is paused (e.g. app is open), force a render instantly
-                            // to display the slider changes live on the frozen surface.
-                            if (!isVisible || wallpaperPlayer.getPlayerInstance()?.playWhenReady == false) {
-                                renderer?.requestRender()
-                            }
-                        }
+                        FileLogger.i(TAG, "Broadcast received: Video settings changed, full re-initialization requested.")
+                        // Ensure settings apply completely identical to a URI change to avoid syncing bugs
+                        playheadTime = 0L
+                        initializePlayer() // force Reinit
                     }
                 }
 
