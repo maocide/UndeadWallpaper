@@ -70,6 +70,14 @@
     <string name="start_time_restart">Reiniciar</string>
     <string name="start_time_random">Aleatorio</string>
 
+    <string name="breadcrumb_zoom">Zoom</string>
+    <string name="breadcrumb_pan">Pan</string>
+    <string name="breadcrumb_rotation">Rotación</string>
+    <string name="breadcrumb_brightness">Brillo</string>
+    <string name="breadcrumb_speed">Velocidad</string>
+    <string name="breadcrumb_volume">Volumen</string>
+    <string name="breadcrumb_more">+%1$d más</string>
+
     <string name="remove_file_title">Remover Video</string>
     <string name="remove_file_message">¿Estás seguro de que deseas remover %s de la aplicación?</string>
     <string name="remove_action">Remover</string>

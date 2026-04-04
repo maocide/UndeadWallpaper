@@ -17,7 +17,10 @@ import org.maocide.undeadwallpaper.utils.FileLogger
 import android.Manifest
 import android.app.Activity
 import android.content.ActivityNotFoundException
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.media.MediaMetadataRetriever
 import android.media.MediaPlayer
@@ -70,6 +73,16 @@ class SettingsFragment : Fragment() {
 
     // Initialize the shared ViewModel
     private val sharedViewModel: SettingsViewModel by activityViewModels()
+
+    private val videoSettingsChangedReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == UndeadWallpaperService.ACTION_VIDEO_SETTINGS_CHANGED) {
+                if (::recentFilesAdapter.isInitialized) {
+                    recentFilesAdapter.notifyDataSetChanged()
+                }
+            }
+        }
+    }
 
     companion object { // key for bundle in restoring instance state
         private const val KEY_ADVANCED_EXPANDED = "key_advanced_expanded"
@@ -131,6 +144,16 @@ class SettingsFragment : Fragment() {
         preferencesManager = PreferencesManager(requireContext())
         videoFileManager = VideoFileManager(requireContext())
         return binding.root
+    }
+
+    override fun onResume() {
+        super.onResume()
+        ContextCompat.registerReceiver(
+            requireContext(),
+            videoSettingsChangedReceiver,
+            IntentFilter(UndeadWallpaperService.ACTION_VIDEO_SETTINGS_CHANGED),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -222,6 +245,7 @@ class SettingsFragment : Fragment() {
         recentFilesAdapter = RecentFilesAdapter(
             recentFiles,
             currentVideoUriString = currentUri,
+            preferencesManager = preferencesManager,
             onItemClick = { recentFile ->
                 val fileUri = Uri.fromFile(recentFile.file)
                 viewLifecycleOwner.lifecycleScope.launch {
@@ -789,6 +813,11 @@ class SettingsFragment : Fragment() {
         // Aggressively release resources when the settings screen is not active
         // This frees up the decoder for the actual wallpaper service
         binding.videoPreview.suspend()
+        try {
+            requireContext().unregisterReceiver(videoSettingsChangedReceiver)
+        } catch (e: IllegalArgumentException) {
+            // Receiver not registered
+        }
     }
 
 }

@@ -1,0 +1,17 @@
+<<<<<<< SEARCH
+    <string name="start_time_random">Random</string>
+
+    <string name="remove_file_title">Remove Video</string>
+=======
+    <string name="start_time_random">Random</string>
+
+    <string name="breadcrumb_zoom">Zoom</string>
+    <string name="breadcrumb_pan">Pan</string>
+    <string name="breadcrumb_rotation">Rotation</string>
+    <string name="breadcrumb_brightness">Brightness</string>
+    <string name="breadcrumb_speed">Speed</string>
+    <string name="breadcrumb_volume">Volume</string>
+    <string name="breadcrumb_more">+%1$d more</string>
+
+    <string name="remove_file_title">Remove Video</string>
+>>>>>>> REPLACE

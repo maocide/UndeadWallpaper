@@ -69,6 +69,14 @@
     <string name="start_time_restart">Riavvia</string>
     <string name="start_time_random">Casuale</string>
 
+    <string name="breadcrumb_zoom">Zoom</string>
+    <string name="breadcrumb_pan">Pan</string>
+    <string name="breadcrumb_rotation">Rotazione</string>
+    <string name="breadcrumb_brightness">Luminosità</string>
+    <string name="breadcrumb_speed">Velocità</string>
+    <string name="breadcrumb_volume">Volume</string>
+    <string name="breadcrumb_more">+%1$d altri</string>
+
     <string name="remove_file_title">Rimuovi Video</string>
     <string name="remove_file_message">Sei sicuro di voler rimuovere %s dall\'app?</string>
     <string name="remove_action">Rimuovi</string>

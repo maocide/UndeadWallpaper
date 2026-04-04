@@ -3,6 +3,9 @@ package org.maocide.undeadwallpaper.ui
 import org.maocide.undeadwallpaper.R
 
 import org.maocide.undeadwallpaper.model.RecentFile
+import org.maocide.undeadwallpaper.model.VideoSettings
+import org.maocide.undeadwallpaper.model.ScalingMode
+import org.maocide.undeadwallpaper.data.PreferencesManager
 
 import android.graphics.Bitmap
 import android.graphics.Color
@@ -21,6 +24,7 @@ import java.util.Collections
 class RecentFilesAdapter(
     private val recentFiles: MutableList<RecentFile>,
     var currentVideoUriString: String?,
+    private val preferencesManager: PreferencesManager,
     private val onItemClick: (RecentFile) -> Unit,
     private val onSettingsClick: (RecentFile) -> Unit
 ) : RecyclerView.Adapter<RecentFilesAdapter.ViewHolder>() {
@@ -70,6 +74,8 @@ class RecentFilesAdapter(
         private val thumbnail: ImageView = itemView.findViewById(R.id.thumbnail)
         private val fileName: TextView = itemView.findViewById(R.id.file_name)
         private val settingsButton: ImageView = itemView.findViewById(R.id.button_settings)
+        private val breadcrumbContainer: View = itemView.findViewById(R.id.breadcrumb_container)
+        private val breadcrumbText: TextView = itemView.findViewById(R.id.breadcrumb_text)
 
         init {
             itemView.setOnClickListener {
@@ -108,6 +114,52 @@ class RecentFilesAdapter(
             } else {
                 // Reset background
                 itemView.findViewById<View>(R.id.item_container).setBackgroundColor(Color.TRANSPARENT)
+            }
+
+            // Update Breadcrumb
+            val settings = preferencesManager.getVideoSettings(recentFile.file.name)
+            val defaultSettings = VideoSettings(recentFile.file.name)
+            val changedLabels = mutableListOf<String>()
+            val context = itemView.context
+
+            if (settings.scalingMode != defaultSettings.scalingMode) {
+                val scalingLabel = when (settings.scalingMode) {
+                    ScalingMode.FIT -> context.getString(R.string.scaling_mode_fit)
+                    ScalingMode.STRETCH -> context.getString(R.string.scaling_mode_stretch)
+                    else -> context.getString(R.string.scaling_mode_fill)
+                }
+                changedLabels.add(scalingLabel)
+            }
+            if (settings.zoom != defaultSettings.zoom) {
+                changedLabels.add(context.getString(R.string.breadcrumb_zoom))
+            }
+            if (settings.positionX != defaultSettings.positionX || settings.positionY != defaultSettings.positionY) {
+                changedLabels.add(context.getString(R.string.breadcrumb_pan))
+            }
+            if (settings.rotation != defaultSettings.rotation) {
+                changedLabels.add(context.getString(R.string.breadcrumb_rotation))
+            }
+            if (settings.brightness != defaultSettings.brightness) {
+                changedLabels.add(context.getString(R.string.breadcrumb_brightness))
+            }
+            if (settings.speed != defaultSettings.speed) {
+                changedLabels.add(context.getString(R.string.breadcrumb_speed))
+            }
+            if (settings.volume != defaultSettings.volume) {
+                changedLabels.add(context.getString(R.string.breadcrumb_volume))
+            }
+
+            if (changedLabels.isEmpty()) {
+                breadcrumbContainer.visibility = View.GONE
+            } else {
+                breadcrumbContainer.visibility = View.VISIBLE
+                val displayLabels = if (changedLabels.size > 3) {
+                    val top3 = changedLabels.take(3)
+                    top3 + context.getString(R.string.breadcrumb_more, changedLabels.size - 3)
+                } else {
+                    changedLabels
+                }
+                breadcrumbText.text = displayLabels.joinToString(" • ")
             }
         }
     }

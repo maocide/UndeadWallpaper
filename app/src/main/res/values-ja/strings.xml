@@ -69,6 +69,14 @@
     <string name="start_time_restart">最初から</string>
     <string name="start_time_random">ランダム</string>
 
+    <string name="breadcrumb_zoom">ズーム</string>
+    <string name="breadcrumb_pan">パン</string>
+    <string name="breadcrumb_rotation">回転</string>
+    <string name="breadcrumb_brightness">明るさ</string>
+    <string name="breadcrumb_speed">速度</string>
+    <string name="breadcrumb_volume">音量</string>
+    <string name="breadcrumb_more">他 +%1$d</string>
+
     <string name="remove_file_title">動画を外す</string>
     <string name="remove_file_message">アプリから %s を外してもよろしいですか？</string>
     <string name="remove_action">外す</string>
