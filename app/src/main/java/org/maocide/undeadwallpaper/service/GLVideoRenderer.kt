@@ -155,7 +155,6 @@ class GLVideoRenderer(private val context: Context) {
 
     fun setBrightness(brightness: Float) {
         userBrightness = brightness
-        isPendingMatrixUpdate = true
     }
 
     fun onSurfaceCreated(holder: SurfaceHolder) {
