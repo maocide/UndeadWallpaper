@@ -186,14 +186,14 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Debug Options"
+                    android:text="@string/debug_options_header"
                     android:textAppearance="?attr/textAppearanceHeadline6" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:text="Enable local file logging to catch hard crashes. It is recommended to leave this off unless you are experiencing issues."
+                    android:text="@string/debug_logging_description"
                     android:textAppearance="?attr/textAppearanceCaption"
                     android:textColor="?android:attr/textColorSecondary" />
 
@@ -203,7 +203,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
-                    android:text="Enable Local File Logging" />
+                    android:text="@string/debug_enable_logging" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -218,7 +218,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:layout_marginEnd="8dp"
-                        android:text="Clear Log"
+                        android:text="@string/debug_clear_log"
                         android:textColor="?attr/colorError" />
 
                     <com.google.android.material.button.MaterialButton
@@ -228,7 +228,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:layout_marginStart="8dp"
-                        android:text="Share Log" />
+                        android:text="@string/debug_share_log" />
 
                 </LinearLayout>
 

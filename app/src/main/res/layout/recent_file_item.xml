@@ -60,7 +60,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="4dp"
-                    android:text="Vol, Pan, Speed"
+                    android:text="@string/breadcrumb_placeholder"
                     android:textSize="11sp"
                     android:singleLine="true"
                     android:ellipsize="end"

@@ -3,7 +3,7 @@
     <string name="action_settings">情報</string>
 
     <!-- Strings used for fragments for navigation -->
-    <string name="first_fragment_label">壁紙設定</string>
+    <string name="first_fragment_label">Undead設定</string>
     <string name="second_fragment_label">情報</string>
     <string name="previous">前へ</string>
 
@@ -62,6 +62,18 @@
     <string name="status_bar_auto">自動</string>
     <string name="status_bar_white_icons">白</string>
     <string name="status_bar_black_icons">黒</string>
+
+    <!-- UI Headers & Sections -->
+    <string name="custom_settings_header">カスタム設定</string>
+    <string name="positioning_header">配置</string>
+    <string name="general_header">一般</string>
+    <string name="volume_label">音量</string>
+    <string name="global_settings_header">グローバル設定</string>
+    <string name="debug_options_header">デバッグオプション</string>
+    <string name="debug_logging_description">ハードクラッシュをキャッチするためにローカルファイルのログ記録を有効にします。問題が発生していない限り、これはオフにしておくことをお勧めします。</string>
+    <string name="debug_enable_logging">ローカルファイルログを有効にする</string>
+    <string name="debug_clear_log">ログをクリア</string>
+    <string name="debug_share_log">ログを共有</string>
 
     <!-- Start Time Settings -->
     <string name="start_time_label">再生開始</string>

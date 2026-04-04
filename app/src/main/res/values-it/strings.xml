@@ -3,7 +3,7 @@
     <string name="action_settings">Informazioni</string>
 
     <!-- Strings used for fragments for navigation -->
-    <string name="first_fragment_label">Impostazioni Sfondo</string>
+    <string name="first_fragment_label">Impostazioni Undead</string>
     <string name="second_fragment_label">Informazioni</string>
     <string name="previous">Precedente</string>
 
@@ -62,6 +62,18 @@
     <string name="status_bar_auto">Automatico</string>
     <string name="status_bar_white_icons">Bianche</string>
     <string name="status_bar_black_icons">Nere</string>
+
+    <!-- UI Headers & Sections -->
+    <string name="custom_settings_header">Impostazioni Personalizzate</string>
+    <string name="positioning_header">Posizionamento</string>
+    <string name="general_header">Generali</string>
+    <string name="volume_label">Volume</string>
+    <string name="global_settings_header">Impostazioni Globali</string>
+    <string name="debug_options_header">Opzioni Debug</string>
+    <string name="debug_logging_description">Abilita il logging su file locale per individuare crash complessi. Si consiglia di lasciarlo disattivato a meno che non si riscontrino problemi.</string>
+    <string name="debug_enable_logging">Abilita Log su File Locale</string>
+    <string name="debug_clear_log">Pulisci Log</string>
+    <string name="debug_share_log">Condividi Log</string>
 
     <!-- Start Time Settings -->
     <string name="start_time_label">All\'avvio</string>
