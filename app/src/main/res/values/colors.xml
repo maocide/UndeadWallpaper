@@ -7,4 +7,8 @@
     <color name="dark_background">#0A0F0C</color>
     <color name="dark_surface">#141E18</color>
     <color name="light_green_tonal">#4D3cdc84</color>
+
+    <!-- Gradient Colors -->
+    <color name="gradient_start">#2A4A35</color>
+    <color name="gradient_center">#0A120E</color>
 </resources>
