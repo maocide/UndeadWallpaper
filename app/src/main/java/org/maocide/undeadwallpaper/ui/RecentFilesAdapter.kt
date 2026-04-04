@@ -118,48 +118,13 @@ class RecentFilesAdapter(
 
             // Update Breadcrumb
             val settings = preferencesManager.getVideoSettings(recentFile.file.name)
-            val defaultSettings = VideoSettings(recentFile.file.name)
-            val changedLabels = mutableListOf<String>()
-            val context = itemView.context
+            val breadcrumbString = settings.getBreadcrumbText(itemView.context)
 
-            if (settings.scalingMode != defaultSettings.scalingMode) {
-                val scalingLabel = when (settings.scalingMode) {
-                    ScalingMode.FIT -> context.getString(R.string.scaling_mode_fit)
-                    ScalingMode.STRETCH -> context.getString(R.string.scaling_mode_stretch)
-                    else -> context.getString(R.string.scaling_mode_fill)
-                }
-                changedLabels.add(scalingLabel)
-            }
-            if (settings.zoom != defaultSettings.zoom) {
-                changedLabels.add(context.getString(R.string.breadcrumb_zoom))
-            }
-            if (settings.positionX != defaultSettings.positionX || settings.positionY != defaultSettings.positionY) {
-                changedLabels.add(context.getString(R.string.breadcrumb_pan))
-            }
-            if (settings.rotation != defaultSettings.rotation) {
-                changedLabels.add(context.getString(R.string.breadcrumb_rotation))
-            }
-            if (settings.brightness != defaultSettings.brightness) {
-                changedLabels.add(context.getString(R.string.breadcrumb_brightness))
-            }
-            if (settings.speed != defaultSettings.speed) {
-                changedLabels.add(context.getString(R.string.breadcrumb_speed))
-            }
-            if (settings.volume != defaultSettings.volume) {
-                changedLabels.add(context.getString(R.string.breadcrumb_volume))
-            }
-
-            if (changedLabels.isEmpty()) {
+            if (breadcrumbString == null) {
                 breadcrumbContainer.visibility = View.GONE
             } else {
                 breadcrumbContainer.visibility = View.VISIBLE
-                val displayLabels = if (changedLabels.size > 3) {
-                    val top3 = changedLabels.take(3)
-                    top3 + context.getString(R.string.breadcrumb_more, changedLabels.size - 3)
-                } else {
-                    changedLabels
-                }
-                breadcrumbText.text = displayLabels.joinToString(" • ")
+                breadcrumbText.text = breadcrumbString
             }
         }
     }
