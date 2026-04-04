@@ -690,6 +690,7 @@ class UndeadWallpaperService : WallpaperService() {
                 addAction(ACTION_PLAYBACK_MODE_CHANGED)
                 addAction(ACTION_STATUS_BAR_COLOR_CHANGED)
                 addAction(ACTION_PLAYLIST_REORDERED)
+                addAction(ACTION_VIDEO_SETTINGS_CHANGED)
             }
             // Registering the broadcast receiver with ContextCompat.RECEIVER_NOT_EXPORTED
             // ensures it is secure across all API levels by preventing external intent injection.
@@ -744,6 +745,7 @@ class UndeadWallpaperService : WallpaperService() {
 
             if (action == ACTION_PLAYBACK_MODE_CHANGED ||
                 action == ACTION_VIDEO_URI_CHANGED ||
+                action == ACTION_VIDEO_SETTINGS_CHANGED ||
                 action == "android.wallpaper.reapply") {
 
                 FileLogger.i(TAG, "Command received -> Re-initializing player.")
