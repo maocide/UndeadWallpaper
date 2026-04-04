@@ -136,6 +136,7 @@
                 </com.google.android.material.chip.ChipGroup>
 
                 <TextView
+                    android:id="@+id/zoom_label"
                     android:text="@string/zoom"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -153,6 +154,7 @@
                     app:tickVisible="false" />
 
                 <TextView
+                    android:id="@+id/position_x_label"
                     android:text="@string/horizontal_position"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -169,6 +171,7 @@
                     app:tickVisible="false" />
 
                 <TextView
+                    android:id="@+id/position_y_label"
                     android:text="@string/vertical_position"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -185,6 +188,7 @@
                     app:tickVisible="false" />
 
                 <TextView
+                    android:id="@+id/rotation_label"
                     android:text="@string/rotation"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -228,6 +232,7 @@
                     android:textColor="?attr/colorPrimary"
                     android:layout_marginBottom="8dp"/>
                 <TextView
+                    android:id="@+id/volume_label"
                     android:text="@string/volume_label"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"/>
@@ -243,6 +248,7 @@
                     app:tickVisible="false" />
 
                 <TextView
+                    android:id="@+id/speed_label"
                     android:text="@string/speed"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -259,6 +265,7 @@
                     app:tickVisible="false" />
 
                 <TextView
+                    android:id="@+id/brightness_label"
                     android:text="@string/brightness"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
