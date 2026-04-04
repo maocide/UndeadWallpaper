@@ -722,7 +722,7 @@ class SettingsFragment : Fragment() {
                 loadRecentFiles()
 
                 // Update the current video (now that the file is in the adapter)
-                updateVideoSource(savedFileUri, false) // Centralized update logic
+                updateVideoSource(savedFileUri, true) // Automatically set as active wallpaper
 
                 // Notifies the service of a change in the playlist
                 val intent = Intent(UndeadWallpaperService.ACTION_PLAYLIST_REORDERED).apply {
