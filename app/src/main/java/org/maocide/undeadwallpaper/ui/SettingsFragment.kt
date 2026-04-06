@@ -23,7 +23,6 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.media.MediaMetadataRetriever
-import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -48,6 +47,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
 
 import kotlin.math.roundToInt
 
@@ -65,7 +68,7 @@ class SettingsFragment : Fragment() {
     private lateinit var recentFilesAdapter: RecentFilesAdapter
     private val recentFiles = mutableListOf<RecentFile>()
     private var currentVideoDurationMs: Long = 0L
-    private var previewMediaPlayer: MediaPlayer? = null
+    private var previewPlayer: ExoPlayer? = null
 
     private var speedValueWarned = false
     private var randomStartTimeWarned = false
@@ -144,16 +147,6 @@ class SettingsFragment : Fragment() {
         preferencesManager = PreferencesManager(requireContext())
         videoFileManager = VideoFileManager(requireContext())
         return binding.root
-    }
-
-    override fun onResume() {
-        super.onResume()
-        ContextCompat.registerReceiver(
-            requireContext(),
-            videoSettingsChangedReceiver,
-            IntentFilter(UndeadWallpaperService.ACTION_VIDEO_SETTINGS_CHANGED),
-            ContextCompat.RECEIVER_NOT_EXPORTED
-        )
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -253,7 +246,7 @@ class SettingsFragment : Fragment() {
                 }
             },
             onSettingsClick = { recentFile ->
-                val bottomSheet = VideoSettingsSheet.newInstance(recentFile.file.name)
+                val bottomSheet = VideoSettingsSheet.newInstance(recentFile.file.name, recentFile.getFormattedMetadata())
                 bottomSheet.show(childFragmentManager, "VideoSettingsBottomSheet")
             }
         )
@@ -748,27 +741,40 @@ class SettingsFragment : Fragment() {
      * @param uri The URI of the video to be previewed.
      */
     private fun setupVideoPreview(uri: Uri) {
-        binding.videoPreview.setVideoURI(uri)
-        val mediaController = MediaController(requireContext())
-        mediaController.setAnchorView(binding.videoPreview)
-        binding.videoPreview.setMediaController(mediaController)
-        binding.videoPreview.setOnPreparedListener {
-            it.isLooping = true
-            previewMediaPlayer = it
-            binding.videoPreview.start()
+        // Release any existing player first
+        releasePreviewPlayer()
 
-            // Audio is muted in preview by default, since the global toggle is gone
-            it.setVolume(0f, 0f)
+        previewPlayer = ExoPlayer.Builder(requireContext()).build().apply {
+            repeatMode = Player.REPEAT_MODE_ALL
+            volume = 0f // Muted
+
+            val mediaItem = MediaItem.fromUri(uri)
+            setMediaItem(mediaItem)
+
+            addListener(object : Player.Listener {
+                override fun onPlayerError(error: PlaybackException) {
+                    if (BuildConfig.DEBUG) {
+                        FileLogger.e(tag, "ExoPlayer error in preview: ${error.message}", error)
+                    } else {
+                        FileLogger.e(tag, "ExoPlayer error in preview", error)
+                    }
+                    if (context != null) {
+                        Toast.makeText(context, getString(R.string.error_cannot_play_video), Toast.LENGTH_SHORT).show()
+                    }
+                }
+            })
+
+            prepare()
+            playWhenReady = true
         }
 
-        binding.videoPreview.setMediaController(null)
+        binding.videoPreview.player = previewPlayer
+    }
 
-        binding.videoPreview.setOnTouchListener { _, _ -> true }
-
-        binding.videoPreview.setOnErrorListener { _, _, _ ->
-            Toast.makeText(context, getString(R.string.error_cannot_play_video), Toast.LENGTH_SHORT).show()
-            true
-        }
+    private fun releasePreviewPlayer() {
+        previewPlayer?.release()
+        previewPlayer = null
+        binding.videoPreview.player = null
     }
 
     /**
@@ -804,15 +810,41 @@ class SettingsFragment : Fragment() {
     override fun onDestroyView() {
         super.onDestroyView()
         // Ensure we don't leak the preview player
-        binding.videoPreview.stopPlayback()
+        releasePreviewPlayer()
         _binding = null
+    }
+
+    override fun onResume() {
+        super.onResume()
+        ContextCompat.registerReceiver(
+            requireContext(),
+            videoSettingsChangedReceiver,
+            IntentFilter(UndeadWallpaperService.ACTION_VIDEO_SETTINGS_CHANGED),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+        // Resume playback if we have a selected video uri
+        sharedViewModel.selectedVideoUri?.let { uri ->
+            if (previewPlayer == null) {
+                setupVideoPreview(uri)
+            } else {
+                previewPlayer?.playWhenReady = true
+            }
+        } ?: run {
+            preferencesManager.getActiveVideoUri()?.let { uriString ->
+                if (previewPlayer == null) {
+                    setupVideoPreview(uriString.toUri())
+                } else {
+                    previewPlayer?.playWhenReady = true
+                }
+            }
+        }
     }
 
     override fun onPause() {
         super.onPause()
         // Aggressively release resources when the settings screen is not active
         // This frees up the decoder for the actual wallpaper service
-        binding.videoPreview.suspend()
+        releasePreviewPlayer()
         try {
             requireContext().unregisterReceiver(videoSettingsChangedReceiver)
         } catch (e: IllegalArgumentException) {

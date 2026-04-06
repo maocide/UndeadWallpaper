@@ -8,6 +8,8 @@ import android.view.ViewGroup
 import android.util.TypedValue
 import android.widget.TextView
 import androidx.core.content.ContextCompat
+import com.google.android.material.bottomsheet.BottomSheetBehavior
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.slider.Slider
 import org.maocide.undeadwallpaper.data.PreferencesManager
@@ -30,14 +32,17 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
     private val binding get() = _binding!!
     private lateinit var preferencesManager: PreferencesManager
     private lateinit var fileName: String
+    private lateinit var metadata: String
     private var isUpdatingUi = false
 
     companion object {
         private const val ARG_FILE_NAME = "file_name"
+        private const val ARG_METADATA = "metadata"
 
-        fun newInstance(fileName: String): VideoSettingsSheet {
+        fun newInstance(fileName: String, metadata: String): VideoSettingsSheet {
             val args = Bundle()
             args.putString(ARG_FILE_NAME, fileName)
+            args.putString(ARG_METADATA, metadata)
             val fragment = VideoSettingsSheet()
             fragment.arguments = args
             return fragment
@@ -47,6 +52,7 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         fileName = arguments?.getString(ARG_FILE_NAME) ?: ""
+        metadata = arguments?.getString(ARG_METADATA) ?: ""
         preferencesManager = PreferencesManager(requireContext())
     }
 
@@ -58,10 +64,34 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
         return binding.root
     }
 
+    override fun onStart() {
+        super.onStart()
+        val dialog = dialog as? BottomSheetDialog
+        val bottomSheet = dialog?.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
+
+        bottomSheet?.let {
+            val behavior = BottomSheetBehavior.from(it)
+
+            // Use 'isFitToContents' to access the public setter
+            behavior.isFitToContents = false
+
+            // Hijack the "Half" state and set it to 82%
+            behavior.halfExpandedRatio = 0.82f
+            behavior.skipCollapsed = true
+
+            // Open the sheet directly into our custom 82% state
+            behavior.state = BottomSheetBehavior.STATE_HALF_EXPANDED
+        }
+    }
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
         binding.videoFileName.text = fileName
+
+        if (metadata.isNotEmpty()) {
+            binding.videoMetadata.text = metadata
+        }
 
         // Load thumbnail
         lifecycleScope.launch(Dispatchers.IO) {

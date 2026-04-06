@@ -64,10 +64,10 @@ data class VideoSettings(
     }
 
     /**
-     * Applies a cubic curve to the linear volume slider value.
+     * Applies a quadratic curve to the linear volume slider value.
      * This mimics the logarithmic perception of human hearing.
      */
     fun getPerceivedVolume(): Float {
-        return volume.toDouble().pow(3.0).toFloat()
+        return volume.toDouble().pow(2.0).toFloat()
     }
 }

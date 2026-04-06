@@ -41,10 +41,13 @@ class PlaylistManager(
         val videosDir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_MOVIES)?.let { File(it, "videos") }
         if (videosDir == null) return emptyList()
 
+        // Fetch directory contents once and use a Set for fast O(1) lookups
+        val physicalFilesSet = videosDir.list()?.toSet() ?: emptySet()
+
         val validUris = mutableListOf<String>()
         for (setting in playlistSettings) {
-            val file = File(videosDir, setting.fileName)
-            if (file.exists()) {
+            if (physicalFilesSet.contains(setting.fileName)) {
+                val file = File(videosDir, setting.fileName)
                 validUris.add(Uri.fromFile(file).toString())
             } else {
                 Log.w(TAG, "File in playlist not found on disk: ${setting.fileName}")

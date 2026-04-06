@@ -47,11 +47,12 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:ellipsize="middle"
-                    android:singleLine="true"
+                    android:maxLines="2"
                     android:textAppearance="?attr/textAppearanceTitleMedium"
                     tools:text="juri_wan_upscaled_00083.mp4" />
 
                 <TextView
+                    android:id="@+id/video_metadata"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"

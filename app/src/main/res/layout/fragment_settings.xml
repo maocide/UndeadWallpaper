@@ -38,11 +38,13 @@
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintEnd_toEndOf="parent">
 
-                    <VideoView
+                    <androidx.media3.ui.PlayerView
                         android:id="@+id/video_preview"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
-                        android:layout_gravity="center" />
+                        android:layout_gravity="center"
+                        app:use_controller="false"
+                        app:surface_type="surface_view" />
 
                 </FrameLayout>
 
@@ -302,7 +304,7 @@
                 android:orientation="vertical"
                 android:padding="16dp">
 
-            <!-- Recent Files -->
+                <!-- Recent Files -->
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
