@@ -22,6 +22,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.UserManager
 import android.service.wallpaper.WallpaperService
 import android.util.Log
 
@@ -139,8 +140,9 @@ class UndeadWallpaperService : WallpaperService() {
             // If the chunk we built contains every video in the playlist, they all share settings!
             // We can safely enable ExoPlayer's internal REPEAT_MODE_ALL. This gives perfect gapless looping
             // without ever hitting STATE_ENDED and incurring the manual flush pause.
+            // NOTE: SHUFFLE mode is excluded because it MUST hit STATE_ENDED to trigger a newly randomized sequence loop.
             val playlistUris = playlistManager.getPlaylistUris()
-            if ((currentPlaybackMode == PlaybackMode.LOOP_ALL || currentPlaybackMode == PlaybackMode.SHUFFLE)
+            if (currentPlaybackMode == PlaybackMode.LOOP_ALL
                 && playlistUris.isNotEmpty() && chunkUris.size == playlistUris.size) {
                 wallpaperPlayer.setRepeatMode(Player.REPEAT_MODE_ALL)
             } else if (currentPlaybackMode == PlaybackMode.LOOP_ALL || currentPlaybackMode == PlaybackMode.SHUFFLE) {
@@ -193,6 +195,11 @@ class UndeadWallpaperService : WallpaperService() {
                         // Ensure settings apply completely identical to a URI change to avoid syncing bugs
                         playheadTime = 0L
                         initializePlayer() // force Reinit
+                    }
+
+                    Intent.ACTION_USER_UNLOCKED -> {
+                        FileLogger.i(TAG, "Broadcast received: User Unlocked. Initializing player safely.")
+                        initializePlayer()
                     }
                 }
 
@@ -302,7 +309,7 @@ class UndeadWallpaperService : WallpaperService() {
                             val fileName = activeUri.lastPathSegment ?: ""
                             val activeSettings = prefs.getVideoSettings(fileName)
                             wallpaperPlayer.getPlayerInstance()?.let { player ->
-                                player.volume = activeSettings.volume
+                                player.volume = activeSettings.getPerceivedVolume()
                                 player.setPlaybackSpeed(activeSettings.speed)
                             }
 
@@ -335,7 +342,7 @@ class UndeadWallpaperService : WallpaperService() {
             val activeSettings = prefs.getVideoSettings(fileName)
 
             wallpaperPlayer.getPlayerInstance()?.let { player ->
-                player.volume = activeSettings.volume
+                player.volume = activeSettings.getPerceivedVolume()
                 player.setPlaybackSpeed(activeSettings.speed)
             }
         }
@@ -346,6 +353,15 @@ class UndeadWallpaperService : WallpaperService() {
 
         @OptIn(UnstableApi::class)
         private fun initializePlayer() {
+            // Direct Boot Check (FBE)
+            // If the user hasn't unlocked the phone after a reboot, storage is heavily encrypted.
+            // Do not attempt to read preferences or initialize the player.
+            val userManager = getSystemService(Context.USER_SERVICE) as UserManager
+            if (!userManager.isUserUnlocked) {
+                FileLogger.w(TAG, "Phone is locked (Direct Boot). Aborting player initialization.")
+                return
+            }
+
             // Cancel any startup issued, avoid race conditions
             playerSetupJob?.cancel()
 
@@ -382,7 +398,7 @@ class UndeadWallpaperService : WallpaperService() {
 
             val fileName = mediaUri.lastPathSegment ?: ""
             val activeSettings = prefs.getVideoSettings(fileName)
-            val initialVolume = activeSettings.volume
+            val initialVolume = activeSettings.getPerceivedVolume()
             speed = activeSettings.speed
 
             wallpaperPlayer.initialize(null, initialVolume, speed, currentPlaybackMode)
@@ -691,6 +707,7 @@ class UndeadWallpaperService : WallpaperService() {
                 addAction(ACTION_STATUS_BAR_COLOR_CHANGED)
                 addAction(ACTION_PLAYLIST_REORDERED)
                 addAction(ACTION_VIDEO_SETTINGS_CHANGED)
+                addAction(Intent.ACTION_USER_UNLOCKED)
             }
             // Registering the broadcast receiver with ContextCompat.RECEIVER_NOT_EXPORTED
             // ensures it is secure across all API levels by preventing external intent injection.

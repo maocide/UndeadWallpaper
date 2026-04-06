@@ -4,6 +4,7 @@ import android.content.Context
 import org.maocide.undeadwallpaper.R
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
+import kotlin.math.pow
 
 @Serializable
 data class VideoSettings(
@@ -60,5 +61,13 @@ data class VideoSettings(
         }
 
         return displayLabels.joinToString(" • ")
+    }
+
+    /**
+     * Applies a cubic curve to the linear volume slider value.
+     * This mimics the logarithmic perception of human hearing.
+     */
+    fun getPerceivedVolume(): Float {
+        return volume.toDouble().pow(3.0).toFloat()
     }
 }
