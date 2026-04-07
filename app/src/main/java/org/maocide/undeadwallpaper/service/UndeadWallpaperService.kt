@@ -689,9 +689,12 @@ class UndeadWallpaperService : WallpaperService() {
                     if (isPreview) {
                         FileLogger.i(TAG, "Preview hidden. Releasing player to save decoders.")
                         releasePlayer()
-                    } else {
+                    } else { // It's the live wallpaper
                         wallpaperPlayer.pause()
                         wallpaperPlayer.playWhenReady = false
+                        if (isPlayerInitialized) {
+                            playheadTime = wallpaperPlayer.currentPosition
+                        }
                     }
                 }
             }

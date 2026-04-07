@@ -34,6 +34,7 @@ import android.view.ViewGroup
 import android.widget.MediaController
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.OptIn
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.fragment.app.Fragment
@@ -47,10 +48,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.upstream.DefaultAllocator
 
 import kotlin.math.roundToInt
 
@@ -740,33 +745,53 @@ class SettingsFragment : Fragment() {
      *
      * @param uri The URI of the video to be previewed.
      */
+    @OptIn(UnstableApi::class)
     private fun setupVideoPreview(uri: Uri) {
         // Release any existing player first
         releasePreviewPlayer()
 
-        previewPlayer = ExoPlayer.Builder(requireContext()).build().apply {
-            repeatMode = Player.REPEAT_MODE_ALL
-            volume = 0f // Muted
+        // Define a 32MB Memory Cap (matching the service)
+        val targetBufferBytes = 32 * 1024 * 1024
 
-            val mediaItem = MediaItem.fromUri(uri)
-            setMediaItem(mediaItem)
+        // Configure the LoadControl
+        val loadControl = DefaultLoadControl.Builder()
+            .setAllocator(DefaultAllocator(true, C.DEFAULT_BUFFER_SEGMENT_SIZE))
+            .setBufferDurationsMs(
+                15_000, // Min buffer 15
+                30_000, // Max buffer 30
+                2_500,  // Buffer to start playback
+                5_000   // Buffer for rebuffer
+            )
+            .setTargetBufferBytes(targetBufferBytes)
+            .setPrioritizeTimeOverSizeThresholds(false)
+            .build()
 
-            addListener(object : Player.Listener {
-                override fun onPlayerError(error: PlaybackException) {
-                    if (BuildConfig.DEBUG) {
-                        FileLogger.e(tag, "ExoPlayer error in preview: ${error.message}", error)
-                    } else {
-                        FileLogger.e(tag, "ExoPlayer error in preview", error)
+        previewPlayer = ExoPlayer.Builder(requireContext())
+            .setLoadControl(loadControl)
+            .build()
+            .apply {
+                repeatMode = Player.REPEAT_MODE_ALL
+                volume = 0f // Muted
+
+                val mediaItem = MediaItem.fromUri(uri)
+                setMediaItem(mediaItem)
+
+                addListener(object : Player.Listener {
+                    override fun onPlayerError(error: PlaybackException) {
+                        if (BuildConfig.DEBUG) {
+                            FileLogger.e(tag, "ExoPlayer error in preview: ${error.message}", error)
+                        } else {
+                            FileLogger.e(tag, "ExoPlayer error in preview", error)
+                        }
+                        if (context != null) {
+                            Toast.makeText(context, getString(R.string.error_cannot_play_video), Toast.LENGTH_SHORT).show()
+                        }
                     }
-                    if (context != null) {
-                        Toast.makeText(context, getString(R.string.error_cannot_play_video), Toast.LENGTH_SHORT).show()
-                    }
-                }
-            })
+                })
 
-            prepare()
-            playWhenReady = true
-        }
+                prepare()
+                playWhenReady = true
+            }
 
         binding.videoPreview.player = previewPlayer
     }
