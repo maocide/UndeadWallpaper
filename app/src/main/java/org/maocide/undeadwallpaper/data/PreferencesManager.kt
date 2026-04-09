@@ -83,47 +83,51 @@ class PreferencesManager(context: Context) {
         val startTime = StartTime.entries.getOrElse(startTimeOrdinal) { StartTime.RESUME }
 
         val newPlaylistSettings = mutableListOf<VideoSettings>()
+        val activeFileName = legacyUri?.let { Uri.parse(it).lastPathSegment }
+        var activeFileAdded = false
 
         if (legacyListString != null) {
             try {
                 val fileNames = jsonParser.decodeFromString<List<String>>(legacyListString)
                 for (fileName in fileNames) {
-                    newPlaylistSettings.add(
-                        VideoSettings(
-                            fileName = fileName,
-                            scalingMode = scalingMode,
-                            positionX = positionX,
-                            positionY = positionY,
-                            zoom = zoom,
-                            rotation = rotation,
-                            brightness = brightness,
-                            speed = speed,
-                            volume = volume
+                    if (fileName == activeFileName) {
+                        newPlaylistSettings.add(
+                            VideoSettings(
+                                fileName = fileName,
+                                scalingMode = scalingMode,
+                                positionX = positionX,
+                                positionY = positionY,
+                                zoom = zoom,
+                                rotation = rotation,
+                                brightness = brightness,
+                                speed = speed,
+                                volume = volume
+                            )
                         )
-                    )
+                        activeFileAdded = true
+                    } else {
+                        newPlaylistSettings.add(VideoSettings(fileName = fileName))
+                    }
                 }
             } catch (e: Exception) {
                 // Ignore parsing errors and fall back to single URI if applicable
             }
         }
 
-        if (newPlaylistSettings.isEmpty() && legacyUri != null) {
-            val fileName = Uri.parse(legacyUri).lastPathSegment
-            if (fileName != null) {
-                newPlaylistSettings.add(
-                    VideoSettings(
-                        fileName = fileName,
-                        scalingMode = scalingMode,
-                        positionX = positionX,
-                        positionY = positionY,
-                        zoom = zoom,
-                        rotation = rotation,
-                        brightness = brightness,
-                        speed = speed,
-                        volume = volume
-                    )
+        if (!activeFileAdded && activeFileName != null) {
+            newPlaylistSettings.add(
+                VideoSettings(
+                    fileName = activeFileName,
+                    scalingMode = scalingMode,
+                    positionX = positionX,
+                    positionY = positionY,
+                    zoom = zoom,
+                    rotation = rotation,
+                    brightness = brightness,
+                    speed = speed,
+                    volume = volume
                 )
-            }
+            )
         }
 
         // Save new format
@@ -160,7 +164,7 @@ class PreferencesManager(context: Context) {
     fun savePlaylistSettings(playlist: List<VideoSettings>) {
         val jsonString = jsonParser.encodeToString(playlist)
         sharedPrefs.edit(commit = true)
-            { putString(KEY_PLAYLIST_SETTINGS, jsonString) }
+        { putString(KEY_PLAYLIST_SETTINGS, jsonString) }
     }
 
     fun updateVideoSettings(fileName: String, updater: (VideoSettings) -> VideoSettings) {
