@@ -8,6 +8,8 @@ import android.view.ViewGroup
 import android.util.TypedValue
 import android.widget.TextView
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
@@ -56,32 +58,36 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
         preferencesManager = PreferencesManager(requireContext())
     }
 
+    override fun onCreateDialog(savedInstanceState: Bundle?): android.app.Dialog {
+        val dialog = super.onCreateDialog(savedInstanceState) as BottomSheetDialog
+        dialog.setOnShowListener { dialogInterface ->
+            val d = dialogInterface as BottomSheetDialog
+            val bottomSheet = d.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
+            bottomSheet?.let { sheet ->
+                val behavior = BottomSheetBehavior.from(sheet)
+
+                // Use 'isFitToContents' to access the public setter
+                behavior.isFitToContents = false
+
+                // Hijack the "Half" state and set it to 82%
+                behavior.halfExpandedRatio = 0.82f
+                behavior.skipCollapsed = true
+
+                // Open the sheet directly into our custom 82% state
+                behavior.state = BottomSheetBehavior.STATE_HALF_EXPANDED
+
+
+            }
+        }
+        return dialog
+    }
+
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
         _binding = SheetVideoSettingsBinding.inflate(inflater, container, false)
         return binding.root
-    }
-
-    override fun onStart() {
-        super.onStart()
-        val dialog = dialog as? BottomSheetDialog
-        val bottomSheet = dialog?.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
-
-        bottomSheet?.let {
-            val behavior = BottomSheetBehavior.from(it)
-
-            // Use 'isFitToContents' to access the public setter
-            behavior.isFitToContents = false
-
-            // Hijack the "Half" state and set it to 82%
-            behavior.halfExpandedRatio = 0.82f
-            behavior.skipCollapsed = true
-
-            // Open the sheet directly into our custom 82% state
-            behavior.state = BottomSheetBehavior.STATE_HALF_EXPANDED
-        }
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -179,22 +185,7 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
                 }
             })
 
-            // Lock the scroll view while touching the slider
-            slider.setOnTouchListener { view, event ->
-                when (event.actionMasked) {
-                    android.view.MotionEvent.ACTION_DOWN -> {
-                        // NestedScrollView, should stop scrolling
-                        view.parent.requestDisallowInterceptTouchEvent(true)
-                    }
-                    android.view.MotionEvent.ACTION_UP,
-                    android.view.MotionEvent.ACTION_CANCEL -> {
-                        // Give back control to scroll view
-                        view.parent.requestDisallowInterceptTouchEvent(false)
-                    }
-                }
-                // Return false to let the slider process touch event
-                false
-            }
+            
         }
 
 
