@@ -2,9 +2,7 @@ package org.maocide.undeadwallpaper.ui
 
 import android.content.Context
 import android.util.AttributeSet
-import android.util.DisplayMetrics
 import android.view.MotionEvent
-import android.view.WindowManager
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.widget.NestedScrollView
@@ -26,14 +24,12 @@ class GestureSafeScrollView @JvmOverloads constructor(
             val gestureBottomInset = insets?.getInsets(WindowInsetsCompat.Type.systemGestures())?.bottom ?: 0
 
             if (gestureBottomInset > 0) {
-                val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-                val realMetrics = DisplayMetrics()
-                windowManager.defaultDisplay.getRealMetrics(realMetrics)
-                val realScreenHeight = realMetrics.heightPixels
+                val windowHeight = rootView.height
 
-                // If the touch is within the gesture inset area at the bottom,
+                // If the touch is within the gesture inset area at the bottom of the window,
                 // intercept it so child views do not receive the ACTION_DOWN.
-                if (ev.rawY >= (realScreenHeight - gestureBottomInset)) {
+                // Using rootView.height natively respects split-screen or multi-window modes.
+                if (ev.rawY >= (windowHeight - gestureBottomInset)) {
                     return true
                 }
             }
