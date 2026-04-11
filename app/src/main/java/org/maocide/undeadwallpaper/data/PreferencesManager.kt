@@ -10,6 +10,7 @@ import android.content.SharedPreferences
 import androidx.core.content.edit
 import org.maocide.undeadwallpaper.model.VideoSettings
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import android.net.Uri
 

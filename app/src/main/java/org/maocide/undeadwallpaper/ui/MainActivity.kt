@@ -11,6 +11,9 @@ import android.app.WallpaperManager
 import android.content.ComponentName
 import android.content.Intent
 import android.os.Bundle
+import android.provider.Settings
+import android.net.Uri
+import org.maocide.undeadwallpaper.utils.FileLogger
 import android.view.Menu
 import android.view.MenuItem
 import android.widget.Toast
@@ -85,6 +88,18 @@ class MainActivity : AppCompatActivity() {
         // as you specify a parent activity in AndroidManifest.xml.
         val navController = findNavController(R.id.nav_host_fragment_content_main)
         return when (item.itemId) {
+            R.id.action_battery_optimization -> {
+                try {
+                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = Uri.fromParts("package", packageName, null)
+                    }
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    FileLogger.e("MainActivity", "Failed to open app info settings", e)
+                    Toast.makeText(this, "Unable to open settings", Toast.LENGTH_SHORT).show()
+                }
+                true
+            }
             R.id.action_settings -> {
                 if (navController.currentDestination?.id != R.id.SecondFragment) {
                     navController.navigate(R.id.action_FirstFragment_to_SecondFragment)

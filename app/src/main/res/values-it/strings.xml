@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">Undead Wallpaper</string>
     <string name="action_settings">Informazioni</string>
+    <string name="action_battery_optimization">Ottimizzazione Batteria</string>
 
     <!-- Strings used for fragments for navigation -->
     <string name="first_fragment_label">Impostazioni Undead</string>
@@ -93,5 +94,25 @@
     <string name="remove_file_message">Sei sicuro di voler rimuovere %s dall\'app?</string>
     <string name="remove_action">Rimuovi</string>
     <string name="cancel">Annulla</string>
+
+    <!-- Battery Optimization Warning -->
+    <string name="battery_warning_title">Consenti in Background</string>
+    <string name="battery_warning_desc">Consenti a Undead Wallpaper di essere eseguito in background per evitare che il sistema lo chiuda.</string>
+    <string name="battery_warning_btn">Correggi</string>
+    <string name="battery_instruction_step_1">1. Tocca "Batteria dell'app"</string>
+    <string name="battery_instruction_step_2">2. Tocca "Consenti l'utilizzo in background"</string>
+    <string name="battery_instruction_step_3">3. Seleziona "Senza restrizioni"</string>
+    <string name="battery_warning_go_to_settings">Vai alle Impostazioni</string>
+
+    <!-- Debug Logger -->
+    <string name="log_enabled_toast">Registrazione su file locale abilitata</string>
+    <string name="log_disabled_toast">Registrazione su file locale disabilitata</string>
+    <string name="share_log_title">Condividi Log di Debug</string>
+    <string name="share_log_warning">Il log di debug potrebbe contenere informazioni sensibili come nomi di file o dettagli del dispositivo. Sei sicuro di volerlo condividere?</string>
+    <string name="share_log_confirm">Condividi</string>
+    <string name="share_log_cancel">Annulla</string>
+    <string name="share_log_intent_title">Condividi Log di Debug</string>
+    <string name="log_empty_toast">File di log non trovato o vuoto</string>
+    <string name="log_cleared_toast">File di log cancellato</string>
 
 </resources>

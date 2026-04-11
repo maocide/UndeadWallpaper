@@ -41,7 +41,6 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginStart="16dp"
-                android:layout_marginEnd="8dp"
                 android:layout_gravity="center_vertical"
                 android:orientation="vertical">
 
@@ -52,7 +51,7 @@
                     android:ellipsize="middle"
                     android:maxLines="2"
                     android:textAppearance="?attr/textAppearanceTitleMedium"
-                    tools:text="juri_wan_upscaled_00083.mp4" />
+                    tools:text="video.mp4" />
 
                 <TextView
                     android:id="@+id/video_metadata"
@@ -62,18 +61,19 @@
                     android:text="@string/custom_settings_header"
                     android:textAppearance="?attr/textAppearanceBodySmall"
                     android:textColor="?android:attr/textColorSecondary" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/button_reset_advanced"
+                    style="@style/Widget.Material3.Button.TextButton.Icon"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:layout_marginTop="4dp"
+                    android:layout_marginStart="0dp"
+                    android:text="@string/reset"
+                    app:icon="@android:drawable/ic_menu_revert"
+                    app:iconSize="16dp" />
+
             </LinearLayout>
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/button_reset_advanced"
-                style="@style/Widget.Material3.Button.IconButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center_vertical"
-                app:icon="@android:drawable/ic_menu_revert"
-                app:iconTint="?attr/colorPrimary"
-                android:tooltipText="Reset Settings" />
-
         </LinearLayout>
 
         <com.google.android.material.card.MaterialCardView

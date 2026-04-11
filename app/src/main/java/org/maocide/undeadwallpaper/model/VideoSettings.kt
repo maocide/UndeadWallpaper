@@ -16,7 +16,11 @@ data class VideoSettings(
     val rotation: Float = 0.0f,
     val brightness: Float = 1.0f,
     val speed: Float = 1.0f,
-    val volume: Float = 0.0f // Replaces boolean `audioEnabled` with a float [0.0 - 1.0]
+    val volume: Float = 0.0f, // Replaces boolean `audioEnabled` with a float [0.0 - 1.0]
+    val primaryColor: Int? = null,
+    val secondaryColor: Int? = null,
+    val tertiaryColor: Int? = null,
+    val colorHints: Int? = null
 ) {
     fun getBreadcrumbText(context: Context): String? {
         val defaultSettings = VideoSettings(fileName)

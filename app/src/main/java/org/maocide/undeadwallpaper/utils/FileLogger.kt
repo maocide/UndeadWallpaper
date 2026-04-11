@@ -2,6 +2,7 @@ package org.maocide.undeadwallpaper.utils
 
 import android.content.Context
 import android.util.Log
+import org.maocide.undeadwallpaper.BuildConfig
 import java.io.File
 import java.io.FileOutputStream
 import java.io.OutputStreamWriter
@@ -50,19 +51,41 @@ object FileLogger {
     }
 
     /**
+     * Sanitizes strings to prevent leaking user file structures or sensitive URIs
+     * into the log files.
+     */
+    private fun sanitize(msg: String?): String {
+        if (msg == null) return ""
+        var sanitized = msg
+
+        // Example 1: Redact standard content URIs (e.g., content://media/external/video/media/123)
+        // Replaces the specific ID/path with [URI_REDACTED]
+        sanitized = sanitized.replace(Regex("content://[\\w\\.\\-\\/]+"), "[URI_REDACTED]")
+
+        // Example 2: Redact absolute file paths (e.g., /storage/emulated/0/Movies/my_video.mp4)
+        // Keeps the file extension if it exists, so you still know the format failing
+        sanitized = sanitized.replace(Regex("/storage/emulated/\\d+/[\\w\\.\\-\\/]+(\\.\\w+)?")) { matchResult ->
+            val extension = matchResult.groups[1]?.value ?: ""
+            "[STORAGE_PATH_REDACTED]$extension"
+        }
+
+        return sanitized
+    }
+
+    /**
      * Helper method to write a formatted string to the log file.
      */
     @Synchronized
-    private fun writeToFile(level: String, tag: String, msg: String, tr: Throwable? = null) {
+    private fun writeToFile(level: String, tag: String, cleanMsg: String, cleanTr: String? = null) {
         if (!isInitialized || logFile == null || !isLoggingEnabled) return
 
         try {
             val timestamp = dateFormat.format(Date())
             val sb = StringBuilder()
-            sb.append("[$timestamp] $level/$tag: $msg\n")
+            sb.append("[$timestamp] $level/$tag: $cleanMsg\n")
 
-            if (tr != null) {
-                sb.append(Log.getStackTraceString(tr))
+            if (cleanTr != null) {
+                sb.append(cleanTr)
                 sb.append("\n")
             }
 
@@ -73,7 +96,9 @@ object FileLogger {
             writer.close()
         } catch (e: Exception) {
             // Fallback to standard log if file writing fails
-            Log.e("FileLogger", "Failed to write to log file", e)
+            if (BuildConfig.DEBUG) {
+                Log.e("FileLogger", "Failed to write to log file", e)
+            }
         }
     }
 
@@ -81,32 +106,52 @@ object FileLogger {
      * Debug log
      */
     fun d(tag: String, msg: String, tr: Throwable? = null) {
-        Log.d(tag, msg, tr)
-        writeToFile("D", tag, msg, tr)
+        val cleanMsg = sanitize(msg)
+        val cleanTr = tr?.let { sanitize(Log.getStackTraceString(it)) }
+
+        if (BuildConfig.DEBUG) {
+            if (cleanTr != null) Log.d(tag, "$cleanMsg\n$cleanTr") else Log.d(tag, cleanMsg)
+        }
+        writeToFile("D", tag, cleanMsg, cleanTr)
     }
 
     /**
      * Info log
      */
     fun i(tag: String, msg: String, tr: Throwable? = null) {
-        Log.i(tag, msg, tr)
-        writeToFile("I", tag, msg, tr)
+        val cleanMsg = sanitize(msg)
+        val cleanTr = tr?.let { sanitize(Log.getStackTraceString(it)) }
+
+        if (BuildConfig.DEBUG) {
+            if (cleanTr != null) Log.i(tag, "$cleanMsg\n$cleanTr") else Log.i(tag, cleanMsg)
+        }
+        writeToFile("I", tag, cleanMsg, cleanTr)
     }
 
     /**
      * Warning log
      */
     fun w(tag: String, msg: String, tr: Throwable? = null) {
-        Log.w(tag, msg, tr)
-        writeToFile("W", tag, msg, tr)
+        val cleanMsg = sanitize(msg)
+        val cleanTr = tr?.let { sanitize(Log.getStackTraceString(it)) }
+
+        if (BuildConfig.DEBUG) {
+            if (cleanTr != null) Log.w(tag, "$cleanMsg\n$cleanTr") else Log.w(tag, cleanMsg)
+        }
+        writeToFile("W", tag, cleanMsg, cleanTr)
     }
 
     /**
      * Error log
      */
     fun e(tag: String, msg: String, tr: Throwable? = null) {
-        Log.e(tag, msg, tr)
-        writeToFile("E", tag, msg, tr)
+        val cleanMsg = sanitize(msg)
+        val cleanTr = tr?.let { sanitize(Log.getStackTraceString(it)) }
+
+        if (BuildConfig.DEBUG) {
+            if (cleanTr != null) Log.e(tag, "$cleanMsg\n$cleanTr") else Log.e(tag, cleanMsg)
+        }
+        writeToFile("E", tag, cleanMsg, cleanTr)
     }
 
     /**

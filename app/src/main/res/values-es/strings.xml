@@ -2,6 +2,7 @@
 <resources>
     <string name="app_name">Undead Wallpaper</string>
     <string name="action_settings">Acerca de</string>
+    <string name="action_battery_optimization">Optimización de Batería</string>
 
     <!-- Strings used for fragments for navigation -->
     <string name="first_fragment_label">Ajustes de Undead</string>
@@ -94,5 +95,25 @@
     <string name="remove_file_message">¿Estás seguro de que deseas remover %s de la aplicación?</string>
     <string name="remove_action">Remover</string>
     <string name="cancel">Cancelar</string>
+
+    <!-- Battery Optimization Warning -->
+    <string name="battery_warning_title">Rendimiento en Segundo Plano</string>
+    <string name="battery_warning_desc">Permite que Undead Wallpaper se ejecute en segundo plano para evitar que el sistema lo cierre.</string>
+    <string name="battery_warning_btn">Solucionar</string>
+    <string name="battery_instruction_step_1">1. Toca "Uso de batería de la aplicación"</string>
+    <string name="battery_instruction_step_2">2. Toca "Permitir uso en segundo plano"</string>
+    <string name="battery_instruction_step_3">3. Selecciona "Sin restricciones"</string>
+    <string name="battery_warning_go_to_settings">Ir a Configuración</string>
+
+    <!-- Debug Logger -->
+    <string name="log_enabled_toast">Registro en archivo local habilitado</string>
+    <string name="log_disabled_toast">Registro en archivo local deshabilitado</string>
+    <string name="share_log_title">Compartir Registro de Depuración</string>
+    <string name="share_log_warning">El registro de depuración puede contener información confidencial, como nombres de archivos o detalles del dispositivo. ¿Estás seguro de que quieres compartirlo?</string>
+    <string name="share_log_confirm">Compartir</string>
+    <string name="share_log_cancel">Cancelar</string>
+    <string name="share_log_intent_title">Compartir Registro de Depuración</string>
+    <string name="log_empty_toast">Archivo de registro no encontrado o vacío</string>
+    <string name="log_cleared_toast">Archivo de registro borrado</string>
 
 </resources>

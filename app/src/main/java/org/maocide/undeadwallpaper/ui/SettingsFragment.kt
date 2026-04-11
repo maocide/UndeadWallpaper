@@ -26,6 +26,8 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
 
 
 import android.view.LayoutInflater
@@ -159,6 +161,7 @@ class SettingsFragment : Fragment() {
 
         // UI SETUP this first
         setupRecyclerView()
+        setupBatteryWarningCard()
 
         // ASYNC TASKS (Data Loading)
         lifecycleScope.launch {
@@ -468,6 +471,42 @@ class SettingsFragment : Fragment() {
     /**
      * Sets up all the listeners for controls.
      */
+    private fun checkBatteryOptimization() {
+        val context = context ?: return
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+        val isOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
+
+        if (isOptimized) {
+            binding.cardBatteryWarning.visibility = View.VISIBLE
+            // Reset the card state in case the user returns without fixing it
+            binding.btnFixBattery.visibility = View.VISIBLE
+            binding.layoutBatteryInstructions.visibility = View.GONE
+        } else {
+            binding.cardBatteryWarning.visibility = View.GONE
+        }
+    }
+
+    private fun setupBatteryWarningCard() {
+        binding.btnFixBattery.setOnClickListener {
+            // Expand the instructions and hide the fix button
+            binding.btnFixBattery.visibility = View.GONE
+            binding.layoutBatteryInstructions.visibility = View.VISIBLE
+        }
+
+        binding.btnGoToSettings.setOnClickListener {
+            try {
+                // Drop them directly into Undead Wallpaper's specific App Info page
+                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.fromParts("package", requireContext().packageName, null)
+                }
+                startActivity(intent)
+            } catch (e: Exception) {
+                FileLogger.e(tag, "Failed to open app info settings", e)
+                Toast.makeText(requireContext(), "Unable to open settings", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     private fun setupListeners() {
         // Helper to broadcast changes
         fun notifySettingsChanged() {
@@ -841,6 +880,7 @@ class SettingsFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
+        checkBatteryOptimization()
         ContextCompat.registerReceiver(
             requireContext(),
             videoSettingsChangedReceiver,

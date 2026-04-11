@@ -8,10 +8,12 @@ import org.maocide.undeadwallpaper.model.RecentFile
 import android.content.Context
 import android.graphics.Bitmap
 import android.media.MediaExtractor
+import android.app.WallpaperColors
 import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.media.ThumbnailUtils
 import android.net.Uri
+import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.provider.OpenableColumns
@@ -204,6 +206,25 @@ class VideoFileManager(private val context: Context) {
                     semaphore.withPermit {
                         try {
                             val thumbnail = createVideoThumbnail(file.path)
+
+                            // Extract WallpaperColors if needed
+                            if (thumbnail != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                                val currentSettings = preferencesManager.getVideoSettings(fileName)
+                                if (currentSettings.primaryColor == null) {
+                                    // Downscale for performance
+                                    val scaledThumb = Bitmap.createScaledBitmap(thumbnail, 112, 112, true)
+                                    val colors = WallpaperColors.fromBitmap(scaledThumb)
+
+                                    preferencesManager.updateVideoSettings(fileName) { settings ->
+                                        settings.copy(
+                                            primaryColor = colors.primaryColor.toArgb(),
+                                            secondaryColor = colors.secondaryColor?.toArgb(),
+                                            tertiaryColor = colors.tertiaryColor?.toArgb(),
+                                            colorHints = colors.colorHints
+                                        )
+                                    }
+                                }
+                            }
 
                             var durationMs = 0L
                             var width = 0

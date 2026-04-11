@@ -131,12 +131,12 @@ class UndeadWallpaperService : WallpaperService() {
             val urisToLoad = if (chunkUris.isNotEmpty()) chunkUris else listOf(loadedVideoUriString)
 
             val mediaSources = urisToLoad.map { uriStr ->
-                val parsedUri = Uri.parse(uriStr)
+                val parsedUri = uriStr.toUri()
                 val mediaItem = MediaItem.Builder().setUri(parsedUri).setMediaId(uriStr).build()
                 mediaSourceFactory.createMediaSource(mediaItem)
             }
 
-            // Intelligent Full-Playlist Loop Optimization:
+            // Full-Playlist Loop Optimization:
             // If the chunk we built contains every video in the playlist, they all share settings!
             // We can safely enable ExoPlayer's internal REPEAT_MODE_ALL. This gives perfect gapless looping
             // without ever hitting STATE_ENDED and incurring the manual flush pause.
@@ -209,7 +209,7 @@ class UndeadWallpaperService : WallpaperService() {
         private fun refreshRenderer() {
             if (loadedVideoUriString.isBlank()) return
 
-            val activeUri = Uri.parse(loadedVideoUriString)
+            val activeUri = loadedVideoUriString.toUri()
             val fileName = activeUri.lastPathSegment ?: ""
             val activeSettings = prefs.getVideoSettings(fileName)
 
@@ -305,7 +305,7 @@ class UndeadWallpaperService : WallpaperService() {
                             bindPlaylistToPlayer(keepCurrentPlayback = false)
                             refreshRenderer()
 
-                            val activeUri = Uri.parse(loadedVideoUriString)
+                            val activeUri = loadedVideoUriString.toUri()
                             val fileName = activeUri.lastPathSegment ?: ""
                             val activeSettings = prefs.getVideoSettings(fileName)
                             wallpaperPlayer.getPlayerInstance()?.let { player ->
@@ -337,13 +337,21 @@ class UndeadWallpaperService : WallpaperService() {
             }
 
             // Update non-visual settings (volume, speed) dynamically during the chunk
-            val activeUri = Uri.parse(loadedVideoUriString)
+            val activeUri = loadedVideoUriString.toUri()
             val fileName = activeUri.lastPathSegment ?: ""
             val activeSettings = prefs.getVideoSettings(fileName)
 
             wallpaperPlayer.getPlayerInstance()?.let { player ->
                 player.volume = activeSettings.getPerceivedVolume()
                 player.setPlaybackSpeed(activeSettings.speed)
+            }
+
+            // Notify system to evaluate Material You colors on video start if Shuffle or Loop All
+            if (
+                currentPlaybackMode == PlaybackMode.SHUFFLE ||
+                currentPlaybackMode == PlaybackMode.LOOP_ALL
+            ) {
+                notifyColorsChanged()
             }
         }
 
@@ -723,33 +731,81 @@ class UndeadWallpaperService : WallpaperService() {
         }
 
 
+        private fun getCachedColorsForActiveVideo(): WallpaperColors? {
+            val activeUriString = prefs.getActiveVideoUri() ?: return null
+            val activeUri = activeUriString.toUri()
+            val fileName = activeUri.lastPathSegment ?: return null
+
+            val settings = prefs.getVideoSettings(fileName)
+            val primaryColorInt = settings.primaryColor ?: return null
+            val secondaryColorInt = settings.secondaryColor
+            val tertiaryColorInt = settings.tertiaryColor
+            val colorHints = settings.colorHints ?: 0
+
+            val primaryColor = Color.valueOf(primaryColorInt)
+            val secondaryColor = secondaryColorInt?.let { Color.valueOf(it) }
+            val tertiaryColor = tertiaryColorInt?.let { Color.valueOf(it) }
+
+            FileLogger.i(javaClass.simpleName, "Cached colors: $primaryColor, $secondaryColor, $tertiaryColor")
+
+            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                WallpaperColors(primaryColor, secondaryColor, tertiaryColor, colorHints)
+            } else {
+                WallpaperColors(primaryColor, secondaryColor, tertiaryColor)
+            }
+        }
+
         override fun onComputeColors(): WallpaperColors? {
             val mode = prefs.getStatusBarColor()
+            val cachedColors = getCachedColorsForActiveVideo() // Retrieve from model
 
-            // If Auto, let system decide
-            if (mode == StatusBarColor.AUTO) return null
+            // AUTO MODE: Best case scenario.
+            // Give the OS the real video colors and let it figure out the contrast.
+            if (mode == StatusBarColor.AUTO) {
+                return cachedColors ?: super.onComputeColors()
+            }
 
             val isLightText = (mode == StatusBarColor.LIGHT)
 
-            // Light Text (White icons) Wallpaper is BLACK
-            // Dark Text (Black icons) Wallpaper is WHITE
-            val baseColor = if (isLightText) Color.BLACK else Color.WHITE
-            val colorObj = Color.valueOf(baseColor)
+            // THE SAMSUNG CASE
+            // Samsung ignores hints and averages colors. If a Samsung user forces a
+            // status bar color, we use the old trick (sacrificing Material You theming).
+            val isSamsung = Build.MANUFACTURER.equals("samsung", ignoreCase = true)
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                // API 31+: We MUST provide the Hint
-                var hints = 0
-                if (!isLightText) {
-                    hints = WallpaperColors.HINT_SUPPORTS_DARK_TEXT
+            if (isSamsung) {
+                val baseColor = if (isLightText) Color.BLACK else Color.WHITE
+                val colorObj = Color.valueOf(baseColor)
+
+                return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    val hints = if (!isLightText) WallpaperColors.HINT_SUPPORTS_DARK_TEXT else 0
+                    // TRICK: Pass identical colors to prevent Samsung from mixing
+                    WallpaperColors(colorObj, colorObj, colorObj, hints)
+                } else {
+                    WallpaperColors(colorObj, colorObj, colorObj)
+                }
+            }
+
+            // STANDARD MODERN ANDROID (API 31+)
+            // Keep the beautiful real colors for Material You, but forcibly inject or
+            // remove the Dark Text hint based on the user's setting.
+            if (cachedColors != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                var hints = cachedColors.colorHints
+                hints = if (!isLightText) {
+                    hints or WallpaperColors.HINT_SUPPORTS_DARK_TEXT // Force Black Icons
+                } else {
+                    hints and WallpaperColors.HINT_SUPPORTS_DARK_TEXT.inv() // Force White Icons
                 }
 
-                // TRICK: Pass the same color for Primary, Secondary, and Tertiary.
-                // This prevents Samsung/OneUI from "mixing" colors and ignoring the contrast.
-                return WallpaperColors(colorObj, colorObj, colorObj, hints)
-            } else {
-                // API 27-30: Use the old constructor (No hints available, relies on contrast)
-                return WallpaperColors(colorObj, colorObj, colorObj)
+                return WallpaperColors(
+                    cachedColors.primaryColor,
+                    cachedColors.secondaryColor,
+                    cachedColors.tertiaryColor,
+                    hints
+                )
             }
+
+            // Fallback for standard Android APIs 27-30 (which don't support explicit hints)
+            return cachedColors ?: super.onComputeColors()
         }
 
         @Deprecated("Deprecated in Java") // This is needed for older Android versions
