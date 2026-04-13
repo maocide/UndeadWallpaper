@@ -179,7 +179,7 @@
                         android:valueTo="2.0"
                         android:value="1.0"
                         android:stepSize="0.05"
-                        app:tickVisible="false" />
+                        app:tickVisible="false" app:trackStopIndicatorSize="0dp" />
 
                     <ImageView
                         android:id="@+id/zoom_icon"
@@ -214,7 +214,7 @@
                         android:valueTo="1"
                         android:value="0.0"
                         android:stepSize="0.025"
-                        app:tickVisible="false" />
+                        app:tickVisible="false" app:trackStopIndicatorSize="0dp" />
 
                     <ImageView
                         android:id="@+id/position_x_icon"
@@ -249,7 +249,7 @@
                         android:valueTo="1"
                         android:value="0.0"
                         android:stepSize="0.025"
-                        app:tickVisible="false" />
+                        app:tickVisible="false" app:trackStopIndicatorSize="0dp" />
 
                     <ImageView
                         android:id="@+id/position_y_icon"
@@ -284,7 +284,7 @@
                         android:valueTo="360.0"
                         android:value="0.0"
                         android:stepSize="1.0"
-                        app:tickVisible="false" />
+                        app:tickVisible="false" app:trackStopIndicatorSize="0dp" />
 
                     <ImageView
                         android:id="@+id/rotation_icon"
@@ -346,7 +346,7 @@
                         android:valueTo="1.0"
                         android:value="0.0"
                         android:stepSize="0.1"
-                        app:tickVisible="false" />
+                        app:tickVisible="false" app:trackStopIndicatorSize="0dp" />
 
                     <ImageView
                         android:id="@+id/volume_icon"
@@ -381,7 +381,7 @@
                         android:valueTo="2.0"
                         android:value="1.0"
                         android:stepSize="0.1"
-                        app:tickVisible="false" />
+                        app:tickVisible="false" app:trackStopIndicatorSize="0dp" />
 
                     <ImageView
                         android:id="@+id/speed_icon"
@@ -416,7 +416,7 @@
                         android:valueTo="2.0"
                         android:value="1.0"
                         android:stepSize="0.1"
-                        app:tickVisible="false" />
+                        app:tickVisible="false" app:trackStopIndicatorSize="0dp" />
 
                     <ImageView
                         android:id="@+id/brightness_icon"
