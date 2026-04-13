@@ -6,6 +6,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.util.TypedValue
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
@@ -131,28 +132,28 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
                 ScalingMode.FILL -> binding.scalingModeGroup.check(binding.scalingModeFill.id)
                 ScalingMode.STRETCH -> binding.scalingModeGroup.check(binding.scalingModeStretch.id)
             }
-            binding.scalingModeLabel.markIfModified(settings.scalingMode, defaults.scalingMode)
+            binding.scalingModeLabel.markIfModified(binding.scalingModeIcon, settings.scalingMode, defaults.scalingMode)
 
             binding.positionXSlider.setValueSafe(settings.positionX)
-            binding.positionXLabel.markIfModified(settings.positionX, defaults.positionX)
+            binding.positionXLabel.markIfModified(binding.positionXIcon, settings.positionX, defaults.positionX)
 
             binding.positionYSlider.setValueSafe(settings.positionY)
-            binding.positionYLabel.markIfModified(settings.positionY, defaults.positionY)
+            binding.positionYLabel.markIfModified(binding.positionYIcon, settings.positionY, defaults.positionY)
 
             binding.zoomSlider.setValueSafe(settings.zoom)
-            binding.zoomLabel.markIfModified(settings.zoom, defaults.zoom)
+            binding.zoomLabel.markIfModified(binding.zoomIcon, settings.zoom, defaults.zoom)
 
             binding.rotationSlider.setValueSafe(settings.rotation)
-            binding.rotationLabel.markIfModified(settings.rotation, defaults.rotation)
+            binding.rotationLabel.markIfModified(binding.rotationIcon, settings.rotation, defaults.rotation)
 
             binding.brightnessSlider.setValueSafe(settings.brightness)
-            binding.brightnessLabel.markIfModified(settings.brightness, defaults.brightness)
+            binding.brightnessLabel.markIfModified(binding.brightnessIcon, settings.brightness, defaults.brightness)
 
             binding.speedSlider.setValueSafe(settings.speed)
-            binding.speedLabel.markIfModified(settings.speed, defaults.speed)
+            binding.speedLabel.markIfModified(binding.speedIcon, settings.speed, defaults.speed)
 
             binding.volumeSlider.setValueSafe(settings.volume)
-            binding.volumeLabel.markIfModified(settings.volume, defaults.volume)
+            binding.volumeLabel.markIfModified(binding.volumeIcon, settings.volume, defaults.volume)
 
         } finally {
             isUpdatingUi = false
@@ -174,14 +175,14 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
     private fun setupListeners() {
         val defaults = VideoSettings(fileName)
 
-        fun setupSafeSlider(slider: Slider, label: TextView, defaultVal: Float, saveAction: (Float) -> Unit) {
+        fun setupSafeSlider(slider: Slider, label: TextView, icon: ImageView, defaultVal: Float, saveAction: (Float) -> Unit) {
             slider.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
                 override fun onStartTrackingTouch(slider: Slider) {}
 
                 override fun onStopTrackingTouch(slider: Slider) {
                     if (isUpdatingUi) return
                     saveAction(slider.value)
-                    label.markIfModified(slider.value, defaultVal)
+                    label.markIfModified(icon, slider.value, defaultVal)
                 }
             })
 
@@ -197,16 +198,16 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
                 else -> ScalingMode.FILL
             }
             updateSettings { it.copy(scalingMode = newMode) }
-            binding.scalingModeLabel.markIfModified(newMode, defaults.scalingMode)
+            binding.scalingModeLabel.markIfModified(binding.scalingModeIcon, newMode, defaults.scalingMode)
         }
 
-        setupSafeSlider(binding.positionXSlider, binding.positionXLabel, defaults.positionX) { value -> updateSettings { it.copy(positionX = value) } }
-        setupSafeSlider(binding.positionYSlider, binding.positionYLabel, defaults.positionY) { value -> updateSettings { it.copy(positionY = value) } }
-        setupSafeSlider(binding.zoomSlider, binding.zoomLabel, defaults.zoom) { value -> updateSettings { it.copy(zoom = value) } }
-        setupSafeSlider(binding.rotationSlider, binding.rotationLabel, defaults.rotation) { value -> updateSettings { it.copy(rotation = value) } }
-        setupSafeSlider(binding.brightnessSlider, binding.brightnessLabel, defaults.brightness) { value -> updateSettings { it.copy(brightness = value) } }
-        setupSafeSlider(binding.speedSlider, binding.speedLabel, defaults.speed) { value -> updateSettings { it.copy(speed = value) } }
-        setupSafeSlider(binding.volumeSlider, binding.volumeLabel, defaults.volume) { value -> updateSettings { it.copy(volume = value) } }
+        setupSafeSlider(binding.positionXSlider, binding.positionXLabel, binding.positionXIcon, defaults.positionX) { value -> updateSettings { it.copy(positionX = value) } }
+        setupSafeSlider(binding.positionYSlider, binding.positionYLabel, binding.positionYIcon, defaults.positionY) { value -> updateSettings { it.copy(positionY = value) } }
+        setupSafeSlider(binding.zoomSlider, binding.zoomLabel, binding.zoomIcon, defaults.zoom) { value -> updateSettings { it.copy(zoom = value) } }
+        setupSafeSlider(binding.rotationSlider, binding.rotationLabel, binding.rotationIcon, defaults.rotation) { value -> updateSettings { it.copy(rotation = value) } }
+        setupSafeSlider(binding.brightnessSlider, binding.brightnessLabel, binding.brightnessIcon, defaults.brightness) { value -> updateSettings { it.copy(brightness = value) } }
+        setupSafeSlider(binding.speedSlider, binding.speedLabel, binding.speedIcon, defaults.speed) { value -> updateSettings { it.copy(speed = value) } }
+        setupSafeSlider(binding.volumeSlider, binding.volumeLabel, binding.volumeIcon, defaults.volume) { value -> updateSettings { it.copy(volume = value) } }
 
         binding.buttonResetAdvanced.setOnClickListener {
             updateSettings { VideoSettings(fileName) }
@@ -225,31 +226,47 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
         this.value = finalValue
     }
 
-    private fun TextView.markIfModified(current: Float, default: Float) {
+    private fun TextView.markIfModified(icon: ImageView, current: Float, default: Float) {
         if (current != default) {
             val typedValue = TypedValue()
             context.theme.resolveAttribute(androidx.appcompat.R.attr.colorPrimary, typedValue, true)
-            this.setTextColor(ContextCompat.getColor(context, typedValue.resourceId))
+            val primaryColor = ContextCompat.getColor(context, typedValue.resourceId)
+            this.setTextColor(primaryColor)
             this.setTypeface(null, android.graphics.Typeface.BOLD)
+
+            icon.setColorFilter(primaryColor)
+            icon.alpha = 1.0f
         } else {
             val typedValue = TypedValue()
             context.theme.resolveAttribute(android.R.attr.textColorSecondary, typedValue, true)
-            this.setTextColor(ContextCompat.getColor(context, typedValue.resourceId))
+            val secondaryColor = ContextCompat.getColor(context, typedValue.resourceId)
+            this.setTextColor(secondaryColor)
             this.setTypeface(null, android.graphics.Typeface.NORMAL)
+
+            icon.setColorFilter(secondaryColor)
+            icon.alpha = 0.5f
         }
     }
 
-    private fun TextView.markIfModified(current: ScalingMode, default: ScalingMode) {
+    private fun TextView.markIfModified(icon: ImageView, current: ScalingMode, default: ScalingMode) {
         if (current != default) {
             val typedValue = TypedValue()
             context.theme.resolveAttribute(androidx.appcompat.R.attr.colorPrimary, typedValue, true)
-            this.setTextColor(ContextCompat.getColor(context, typedValue.resourceId))
+            val primaryColor = ContextCompat.getColor(context, typedValue.resourceId)
+            this.setTextColor(primaryColor)
             this.setTypeface(null, android.graphics.Typeface.BOLD)
+
+            icon.setColorFilter(primaryColor)
+            icon.alpha = 1.0f
         } else {
             val typedValue = TypedValue()
             context.theme.resolveAttribute(android.R.attr.textColorSecondary, typedValue, true)
-            this.setTextColor(ContextCompat.getColor(context, typedValue.resourceId))
+            val secondaryColor = ContextCompat.getColor(context, typedValue.resourceId)
+            this.setTextColor(secondaryColor)
             this.setTypeface(null, android.graphics.Typeface.NORMAL)
+
+            icon.setColorFilter(secondaryColor)
+            icon.alpha = 0.5f
         }
     }
 
