@@ -233,6 +233,8 @@ class UndeadWallpaperService : WallpaperService() {
                 Toast.makeText(baseContext, "Error: ${error.errorCodeName}", Toast.LENGTH_LONG).show()
             }
 
+            FileLogger.e(TAG, "PLAYER ERROR: ${error.errorCodeName}.")
+
             // Re-initialize if visible and retry limit not reached (retries handled by wallpaperPlayer but triggering re-init here)
             // If the wallpaperPlayer triggers a generic error, we just notify user.
             // If it triggered an auto-recovering hardware error, we might need to recreate the surface/player.
@@ -345,14 +347,6 @@ class UndeadWallpaperService : WallpaperService() {
                 player.volume = activeSettings.getPerceivedVolume()
                 player.setPlaybackSpeed(activeSettings.speed)
             }
-
-            // Notify system to evaluate Material You colors on video start if Shuffle or Loop All
-            if (
-                currentPlaybackMode == PlaybackMode.SHUFFLE ||
-                currentPlaybackMode == PlaybackMode.LOOP_ALL
-            ) {
-                notifyColorsChanged()
-            }
         }
 
         override fun onRenderedFirstFrame() {
@@ -391,13 +385,14 @@ class UndeadWallpaperService : WallpaperService() {
 
             hasPlaybackCompleted = false
 
-            // Status bar color refresh
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                notifyColorsChanged()
-            }
-
             val mediaUri = getMediaUri()
             loadedVideoUriString = mediaUri?.toString() ?: ""
+
+            // Status bar color refresh, material you notify
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                FileLogger.i(TAG, "notifyColorsChanged Called. Current URI: $loadedVideoUriString")
+                notifyColorsChanged()
+            }
 
             if (mediaUri == null) {
                 FileLogger.e(TAG, "Media URI is null, cannot play video.")
@@ -577,14 +572,6 @@ class UndeadWallpaperService : WallpaperService() {
             if (!useFallbackSurface) {
                 renderer?.onSurfaceChanged(width, height)
             }
-
-            /*
-            // If the player isn't set up yet (because it was deferred by the 0x0 check),
-            // kick off initialization now that we have real dimensions.
-            if (mediaPlayer?.playbackState == Player.STATE_IDLE || mediaPlayer == null) {
-                initializePlayer()
-            }
-            */
         }
 
         override fun onSurfaceDestroyed(holder: SurfaceHolder) {
@@ -767,7 +754,7 @@ class UndeadWallpaperService : WallpaperService() {
 
             val isLightText = (mode == StatusBarColor.LIGHT)
 
-            // THE SAMSUNG CASE
+            // SAMSUNG CASE
             // Samsung ignores hints and averages colors. If a Samsung user forces a
             // status bar color, we use the old trick (sacrificing Material You theming).
             val isSamsung = Build.MANUFACTURER.equals("samsung", ignoreCase = true)

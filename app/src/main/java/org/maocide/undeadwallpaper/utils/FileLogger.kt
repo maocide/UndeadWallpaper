@@ -56,6 +56,10 @@ object FileLogger {
      */
     private fun sanitize(msg: String?): String {
         if (msg == null) return ""
+        if (BuildConfig.DEBUG) {
+            return msg
+        }
+
         var sanitized = msg
 
         // Example 1: Redact standard content URIs (e.g., content://media/external/video/media/123)
@@ -64,7 +68,7 @@ object FileLogger {
 
         // Example 2: Redact absolute file paths (e.g., /storage/emulated/0/Movies/my_video.mp4)
         // Keeps the file extension if it exists, so you still know the format failing
-        sanitized = sanitized.replace(Regex("/storage/emulated/\\d+/[\\w\\.\\-\\/]+(\\.\\w+)?")) { matchResult ->
+        sanitized = sanitized.replace(Regex("/storage/[\\w\\-]+/[\\w\\.\\-\\/]+(\\.\\w+)?")) { matchResult ->
             val extension = matchResult.groups[1]?.value ?: ""
             "[STORAGE_PATH_REDACTED]$extension"
         }
