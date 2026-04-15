@@ -1,5 +1,3 @@
-***
-
 # UndeadWallpaper 🧟‍♀️📱
 
 ![UndeadWallpaper Banner](banner.png)
@@ -14,27 +12,26 @@ This isn't just a clever pun on "live" wallpaper. The name **UndeadWallpaper** i
 
 ## Features ✨
 
-*   **The New Engine (OpenGL Power):** We ripped out the old guts and replaced them with a custom OpenGL pipeline. It's smoother, faster, and lets you do things standard Android wallpapers can't.
-*   **God-Mode Controls:** Don't just set a video; *own* it. Scale it with professional modes (Fit, Fill, Stretch), then zoom, rotate, and position your wallpaper exactly how you want it. Too dark? Crank the brightness. Need it faster? Adjust the playback speed. Can't read your clock? Force your Status Bar icons to be White, Black, or Auto. It's your screen, do what you want.
-*   **Interactive Playlist:** Your recent files are a fully drag-and-drop playground. Swipe to delete, reorder on the fly, and hit `Loop All` or `Shuffle` modes for endless, zero-flash transitions between your favorite clips. 
-*   **Smart Start Times:** Customize exactly what your wallpaper does when you unlock your phone. Resume where you left off, restart for that dramatic intro, or jump to a random frame because chaos is fun.
-*   **One-Shot Mode:** Want a "Live Photo" vibe? Set your video to play once and freeze on the final frame. Perfect for cinematic intros.
-*   **Zombillie is Here:** Fresh install? We got you covered with a default Zombillie animation so your screen isn't naked while you look for your own clips.
-*   **Buttery-Smooth Looping:** Powered by ExoPlayer, your video loops will be so seamless, you'll forget where they even begin (o˘◡˘o).
-*   **Unleash Your Own Videos:** No pre-packaged crap. Grab any video straight from your phone's storage and make it your backdrop.
-*   **Audio On/Off Toggle:** Want your wallpaper to make some noise? Flip the switch. Want silent beauty? We got you.
-*   **100% Free & Open Source:** No ads, no bullshit, no microtransactions. Ever. This is a passion project, and the code is open for all you brilliant weirdos to see.
+* **Per-Video God-Mode Controls:** Why apply one setting to everything? Tap the gear icon next to any video to open the new Video Settings Sheet. Individually tweak the zoom, offset, rotation, playback speed, and volume for *every single file*. The UI even shows you dynamic breadcrumbs so you know exactly which videos have custom tweaks.
+* **The New Engine (Gapless & Smooth):** Ripped out the old guts and built a custom OpenGL + ExoPlayer pipeline. The new batching engine groups videos with identical settings, allowing for seamless, gapless transitions between your favorite clips with zero buffering or black screens.
+* **Dynamic UI Colors (Material You):** Your phone, your vibe. As you set a video, the app extracts the dominant colors from your wallpaper and seamlessly themes your Android system to match. 
+* **Sleek Material 3 UI:** Wrapped in a custom "Zombie Glass" dark theme, everything from the tonal chips to the smooth bottom sheets is designed to look native, premium, and easy to use with one hand.
+* **Interactive Playlist:** Your recent files are a fully drag-and-drop playground. Swipe to delete, reorder on the fly, and hit `Loop All` or `Shuffle` modes for endless visual chaos. 
+* **Smart Start Times:** Customize what your wallpaper does when you unlock your phone. Resume where you left off, restart for that dramatic intro, or jump to a random frame.
+* **One-Shot Mode:** Want a "Live Photo" vibe? Set your video to play once and freeze on the final frame. Perfect for cinematic intros.
+* **Zombillie is Here:** Fresh install? We got you covered with a default Zombillie animation so your screen isn't naked while you look for your own clips.
+* **100% Free & Open Source:** No ads, no bullshit, no microtransactions. Ever. This is a passion project, and the code is open for all you brilliant weirdos to see.
 
 ## Getting Started (It's scary simple)
 
 1.  **Pick Your Poison:** Tap the "Pick Video" button and choose your masterpiece.
-2.  **Tweak It:** Use the new advanced settings to fit, fill, or stretch your video. Zoom in, move it around, make it perfect.
-3.  **Smash the Button:** Like what you see in the preview? Hit that floating button and bring your screen to glorious un-life.
+2.  **Tweak It:** Tap the gear icon next to your video. Use the advanced settings to fit, fill, or stretch it. Zoom in, move it around, make it perfect.
+3.  **Smash the Button:** Like what you see? Hit that floating button and bring your screen to glorious un-life.
 
 ### Keep It Alive (Disable Battery Optimizations) 🧟‍♂️
 Some Android ROMs are absolutely ruthless. They will try to double-tap this app in the background to save a drop of battery, killing the decoders or the background service right when you need them. 
 
-To keep your wallpaper running *smoothly* and truly *undead*, dive into your phone's app settings and **disable battery optimizations** for UndeadWallpaper. Tell the OS to back off and leave the dead alone; it's the perfect workaround for aggressive battery killers.
+A built-in **"Allow Background Performance"** card directly in the app will warn you. Just tap "Fix" to dive straight into your phone's app settings and **disable battery optimizations** for UndeadWallpaper. Tell the OS to back off and leave the dead alone!
 
 ## Join the Horde! (Contribute & Connect)
 
@@ -53,8 +50,8 @@ This whole shebang is licensed under the **GNU General Public License v3.0**. Fr
 
 ## Download Now (Do it!)
 
-*   **Google Play Store:** [From the Play Store](https://play.google.com/store/apps/details?id=org.maocide.undeadwallpaper)
-*   **GitHub Releases:** [Grab the bleeding-edge APKs here!](https://github.com/maocide/UndeadWallpaper/releases/)
+* **Google Play Store:** [From the Play Store](https://play.google.com/store/apps/details?id=org.maocide.undeadwallpaper)
+* **GitHub Releases:** [Grab the bleeding-edge APKs here!](https://github.com/maocide/UndeadWallpaper/releases/)
 
 ### The Graveyard Shift (Special Thanks) 🪦
 Bringing a project back from the dead takes a village (or at least a few good souls). A big thanks to the people and projects that helped piece this monster together:
@@ -62,6 +59,7 @@ Bringing a project back from the dead takes a village (or at least a few good so
 * **@kitsumed** - For contributing the GitHub Actions CI pipeline and providing brilliant technical insights.
 * **Lucid** - For relentless testing, immense patience, and helping hunt down obscure OEM/custom OS engine crashes.
 * **@sms1sis** - For the great brainstorming about resources and optimization.
+* **@DerpOtron9k** - For submitting the early prototype PR that sparked the transition to per-video settings.
 * **Trick_Equipment_6938** - For sparking the original concept that eventually evolved into the v1.2.0 Dynamic Playlist Engine.
 * **@AmazingKo** - For excellent feature suggestions that helped shape the development backlog.
 * **Everyone** who has taken the time to report an issue, leave a review on the Play Store, or test a beta build. Your support keeps the undead alive!
