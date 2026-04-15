@@ -1,4 +1,7 @@
-package org.maocide.undeadwallpaper
+package org.maocide.undeadwallpaper.service
+
+import org.maocide.undeadwallpaper.model.ScalingMode
+import org.maocide.undeadwallpaper.utils.FileLogger
 
 import android.content.Context
 import android.graphics.SurfaceTexture
@@ -6,7 +9,7 @@ import android.opengl.EGLExt.EGL_RECORDABLE_ANDROID
 import android.opengl.GLES20
 import android.opengl.Matrix
 import android.util.Log
-import org.maocide.undeadwallpaper.FileLogger
+
 import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.WindowManager
@@ -16,7 +19,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
-import org.maocide.undeadwallpaper.model.ScalingMode
+
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
@@ -121,6 +124,7 @@ class GLVideoRenderer(private val context: Context) {
     private var userRotation = 0f
     private var userBrightness = 1.0f
     @Volatile private var surfaceDrawTimestamp: Long = 0L
+    @Volatile private var isPendingMatrixUpdate = false
 
     init {
         triangleVertices = ByteBuffer.allocateDirect(triangleVerticesData.size * 4)
@@ -137,7 +141,7 @@ class GLVideoRenderer(private val context: Context) {
         if (currentScalingMode != mode) {
             FileLogger.i(tag, "Scaling Mode changed to: $mode")
             currentScalingMode = mode
-            updateMatrix()
+            isPendingMatrixUpdate = true
         }
     }
 
@@ -146,7 +150,7 @@ class GLVideoRenderer(private val context: Context) {
         userTranslateY = y
         userZoom = zoom
         userRotation = rotation
-        updateMatrix()
+        isPendingMatrixUpdate = true
     }
 
     fun setBrightness(brightness: Float) {
@@ -171,6 +175,16 @@ class GLVideoRenderer(private val context: Context) {
         glExecutor.shutdown()
         // We do NOT call releaseGL here directly, we let the loop finish and clean up itself
         // or we risk thread collision.
+    }
+
+    /**
+     * Forces the GL thread to render a frame immediately.
+     * This is useful when visual settings (like zoom or position) are changed
+     * while the video player is paused, preventing the screen from appearing stuck
+     * on old settings until the video resumes playback.
+     */
+    fun requestRender() {
+        renderSignal.trySend(Unit)
     }
 
     fun onSurfaceChanged(width: Int, height: Int) {
@@ -212,7 +226,7 @@ class GLVideoRenderer(private val context: Context) {
     fun setVideoSize(width: Int, height: Int) {
         videoWidth = width
         videoHeight = height
-        updateMatrix()
+        isPendingMatrixUpdate = true
     }
 
     suspend fun waitForVideoSurface(): Surface? {
@@ -255,8 +269,13 @@ class GLVideoRenderer(private val context: Context) {
                 // CHECK FOR VIEWPORT UPDATES
                 if (viewportChanged) {
                     GLES20.glViewport(0, 0, viewportWidth, viewportHeight)
-                    updateMatrix()
+                    isPendingMatrixUpdate = true
                     viewportChanged = false
+                }
+
+                if (isPendingMatrixUpdate) {
+                    updateMatrix()
+                    isPendingMatrixUpdate = false
                 }
 
                 // The Draw Call

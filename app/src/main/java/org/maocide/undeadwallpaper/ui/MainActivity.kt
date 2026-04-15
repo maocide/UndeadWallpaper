@@ -1,20 +1,31 @@
-package org.maocide.undeadwallpaper
+package org.maocide.undeadwallpaper.ui
+
+import org.maocide.undeadwallpaper.databinding.ActivityMainBinding
+
+import org.maocide.undeadwallpaper.R
+
+import org.maocide.undeadwallpaper.data.PreferencesManager
+import org.maocide.undeadwallpaper.service.UndeadWallpaperService
 
 import android.app.WallpaperManager
 import android.content.ComponentName
 import android.content.Intent
 import android.os.Bundle
+import android.provider.Settings
+import android.net.Uri
+import org.maocide.undeadwallpaper.utils.FileLogger
 import android.view.Menu
 import android.view.MenuItem
 import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.navigation.findNavController
 import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.navigateUp
 import androidx.navigation.ui.setupActionBarWithNavController
 import com.google.android.material.snackbar.Snackbar
-import org.maocide.undeadwallpaper.databinding.ActivityMainBinding
+
 
 
 
@@ -43,8 +54,8 @@ class MainActivity : AppCompatActivity() {
         binding.fabSetWallpaper.setOnClickListener { view ->
             // Retrieve and save the uri for the wallpaper service to use
             val videoUri = sharedViewModel.selectedVideoUri
-            preferencesManager.saveVideoUri(videoUri.toString())
-            //val videoUri = preferencesManager.getVideoUri()
+            preferencesManager.saveActiveVideoUri(videoUri.toString())
+            //val videoUri = preferencesManager.getActiveVideoUri()
 
             if (videoUri != null) {
                 // Changed from hardcoded string to string resource
@@ -77,6 +88,18 @@ class MainActivity : AppCompatActivity() {
         // as you specify a parent activity in AndroidManifest.xml.
         val navController = findNavController(R.id.nav_host_fragment_content_main)
         return when (item.itemId) {
+            R.id.action_battery_optimization -> {
+                try {
+                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = Uri.fromParts("package", packageName, null)
+                    }
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    FileLogger.e("MainActivity", "Failed to open app info settings", e)
+                    Toast.makeText(this, "Unable to open settings", Toast.LENGTH_SHORT).show()
+                }
+                true
+            }
             R.id.action_settings -> {
                 if (navController.currentDestination?.id != R.id.SecondFragment) {
                     navController.navigate(R.id.action_FirstFragment_to_SecondFragment)

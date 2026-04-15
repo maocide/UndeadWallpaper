@@ -1,45 +1,64 @@
-package org.maocide.undeadwallpaper
+package org.maocide.undeadwallpaper.ui
+
+import org.maocide.undeadwallpaper.databinding.FragmentSettingsBinding
+
+import org.maocide.undeadwallpaper.R
+import org.maocide.undeadwallpaper.BuildConfig
+
+import org.maocide.undeadwallpaper.data.PreferencesManager
+import org.maocide.undeadwallpaper.data.VideoFileManager
+import org.maocide.undeadwallpaper.model.PlaybackMode
+import org.maocide.undeadwallpaper.model.RecentFile
+import org.maocide.undeadwallpaper.model.StartTime
+import org.maocide.undeadwallpaper.model.StatusBarColor
+import org.maocide.undeadwallpaper.service.UndeadWallpaperService
+import org.maocide.undeadwallpaper.utils.FileLogger
 
 import android.Manifest
 import android.app.Activity
 import android.content.ActivityNotFoundException
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.media.MediaMetadataRetriever
-import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.util.Log
-import org.maocide.undeadwallpaper.FileLogger
-import org.maocide.undeadwallpaper.BuildConfig
+import android.os.PowerManager
+import android.provider.Settings
+
+
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.MediaController
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.OptIn
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.transition.AutoTransition
-import androidx.transition.TransitionManager
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.maocide.undeadwallpaper.databinding.FragmentSettingsBinding
-import org.maocide.undeadwallpaper.model.PlaybackMode
-import org.maocide.undeadwallpaper.model.ScalingMode
-import androidx.core.view.isVisible
-import com.google.android.material.slider.Slider
-import org.maocide.undeadwallpaper.model.StartTime
-import org.maocide.undeadwallpaper.model.StatusBarColor
+
+import androidx.media3.common.C
+import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.upstream.DefaultAllocator
+
 import kotlin.math.roundToInt
 
 /**
@@ -56,7 +75,7 @@ class SettingsFragment : Fragment() {
     private lateinit var recentFilesAdapter: RecentFilesAdapter
     private val recentFiles = mutableListOf<RecentFile>()
     private var currentVideoDurationMs: Long = 0L
-    private var previewMediaPlayer: MediaPlayer? = null
+    private var previewPlayer: ExoPlayer? = null
 
     private var speedValueWarned = false
     private var randomStartTimeWarned = false
@@ -65,20 +84,20 @@ class SettingsFragment : Fragment() {
     // Initialize the shared ViewModel
     private val sharedViewModel: SettingsViewModel by activityViewModels()
 
+    private val videoSettingsChangedReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == UndeadWallpaperService.ACTION_VIDEO_SETTINGS_CHANGED) {
+                if (::recentFilesAdapter.isInitialized) {
+                    recentFilesAdapter.notifyDataSetChanged()
+                }
+            }
+        }
+    }
+
     companion object { // key for bundle in restoring instance state
         private const val KEY_ADVANCED_EXPANDED = "key_advanced_expanded"
     }
 
-    override fun onSaveInstanceState(outState: Bundle) {
-        super.onSaveInstanceState(outState)
-
-        // Check if the binding is initialized and the view exists
-        if (_binding != null) {
-            val isVisible = binding.advancedOptionsContainer.isVisible
-            // Save the state of the accordion
-            outState.putBoolean(KEY_ADVANCED_EXPANDED, isVisible)
-        }
-    }
 
     /**
      * Launcher for picking media from the file system.
@@ -141,17 +160,8 @@ class SettingsFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         // UI SETUP this first
-        savedInstanceState?.let { restoreState(it) }
         setupRecyclerView()
-
-
-        // DISABLE VIEW STATE SAVING FOR SLIDERS, it might overwrite syncUiState
-        binding.positionXSlider.isSaveEnabled = false
-        binding.positionYSlider.isSaveEnabled = false
-        binding.zoomSlider.isSaveEnabled = false
-        binding.rotationSlider.isSaveEnabled = false
-        binding.brightnessSlider.isSaveEnabled = false
-        binding.speedSlider.isSaveEnabled = false
+        setupBatteryWarningCard()
 
         // ASYNC TASKS (Data Loading)
         lifecycleScope.launch {
@@ -163,26 +173,6 @@ class SettingsFragment : Fragment() {
             setupListeners()
         }
 
-    }
-
-    /**
-     * Restores the state of the UI after a configuration change (e.g., screen rotation).
-     * Specifically, this handles the expanded/collapsed state of the "Advanced Options" accordion.
-     *
-     * @param savedInstanceState The bundle containing the saved state, typically from `onSaveInstanceState`.
-     */
-    private fun restoreState(savedInstanceState: Bundle) {
-        // RESTORE ACCORDION STATE
-        val isExpanded = savedInstanceState.getBoolean(KEY_ADVANCED_EXPANDED, false)
-
-        if (isExpanded) {
-            // Show the container
-            binding.advancedOptionsContainer.visibility = View.VISIBLE
-            binding.imageArrow.rotation = 180f
-        } else {
-            binding.advancedOptionsContainer.visibility = View.GONE
-            binding.imageArrow.rotation = 0f
-        }
     }
 
     private suspend fun setPreviewVideo(uri: Uri) {
@@ -238,15 +228,12 @@ class SettingsFragment : Fragment() {
 
         // Save the preference and notify the service to reload the video from that value
         if(forceChange) {
-            preferencesManager.saveVideoUri(uri.toString())
+            preferencesManager.saveActiveVideoUri(uri.toString())
             val intent = Intent(UndeadWallpaperService.ACTION_VIDEO_URI_CHANGED).apply {
                 setPackage(context?.packageName)
             }
             context?.sendBroadcast(intent)
         }
-
-        // Refresh the recent files list
-        loadRecentFiles()
 
     }
 
@@ -255,15 +242,20 @@ class SettingsFragment : Fragment() {
      * Sets up the RecyclerView for displaying recent files.
      */
     private fun setupRecyclerView() {
-        val currentUri = sharedViewModel.selectedVideoUri?.toString() ?: preferencesManager.getVideoUri()
+        val currentUri = sharedViewModel.selectedVideoUri?.toString() ?: preferencesManager.getActiveVideoUri()
         recentFilesAdapter = RecentFilesAdapter(
             recentFiles,
             currentVideoUriString = currentUri,
+            preferencesManager = preferencesManager,
             onItemClick = { recentFile ->
                 val fileUri = Uri.fromFile(recentFile.file)
                 viewLifecycleOwner.lifecycleScope.launch {
                     updateVideoSource(fileUri, true)
                 }
+            },
+            onSettingsClick = { recentFile ->
+                val bottomSheet = VideoSettingsSheet.newInstance(recentFile.file.name, recentFile.getFormattedMetadata())
+                bottomSheet.show(childFragmentManager, "VideoSettingsBottomSheet")
             }
         )
         binding.recyclerViewRecentFiles.layoutManager = LinearLayoutManager(context)
@@ -299,7 +291,8 @@ class SettingsFragment : Fragment() {
                     .setMessage(getString(R.string.remove_file_message, item.file.name))
                     .setPositiveButton(getString(R.string.remove_action)) { _, _ ->
                         val deletedUriString = Uri.fromFile(item.file).toString()
-                        val currentUriString = sharedViewModel.selectedVideoUri?.toString() ?: preferencesManager.getVideoUri()
+                        val uiSelectedUriString = sharedViewModel.selectedVideoUri?.toString() ?: preferencesManager.getActiveVideoUri()
+                        val backgroundActiveUriString = preferencesManager.getActiveVideoUri()
 
                         // Remove from adapter
                         recentFilesAdapter.onItemDismiss(position)
@@ -312,8 +305,8 @@ class SettingsFragment : Fragment() {
                         // Save new list order
                         saveCurrentPlaylistOrder()
 
-                        // Edge case: User deleted the currently playing video
-                        if (deletedUriString == currentUriString) {
+                        // Edge case: User deleted the currently UI-highlighted video, OR the video actively playing in the background
+                        if (deletedUriString == uiSelectedUriString || deletedUriString == backgroundActiveUriString) {
                             val nextItem = recentFilesAdapter.getItems().firstOrNull()
                             if (nextItem != null) {
                                 val newUri = Uri.fromFile(nextItem.file)
@@ -324,12 +317,19 @@ class SettingsFragment : Fragment() {
                                 // Fallback if list is entirely empty (shouldn't happen due to 1 video at least enforced)
                                 viewLifecycleOwner.lifecycleScope.launch {
                                     ensureDefaultVideoExists()
-                                    val defaultUri = preferencesManager.getVideoUri()
+                                    val defaultUri = preferencesManager.getActiveVideoUri()
                                     if (defaultUri != null) {
                                         updateVideoSource(defaultUri.toUri(), true)
                                     }
                                 }
                             }
+                        } else {
+                            // If we deleted an inactive video, we MUST still notify the service that the playlist changed.
+                            // Otherwise, the background service's chunk loader might try to buffer the physically deleted file!
+                            val intent = Intent(UndeadWallpaperService.ACTION_PLAYLIST_REORDERED).apply {
+                                setPackage(requireContext().packageName)
+                            }
+                            requireContext().applicationContext.sendBroadcast(intent)
                         }
                     }
                     .setNegativeButton(getString(R.string.cancel)) { dialog, _ ->
@@ -369,7 +369,17 @@ class SettingsFragment : Fragment() {
      */
     private fun saveCurrentPlaylistOrder() {
         val currentFileNames = recentFilesAdapter.getItems().map { it.file.name }
-        preferencesManager.saveRecentFilesList(currentFileNames)
+        val currentSettings = preferencesManager.getPlaylistSettings()
+
+        // Reorder the settings to match the new file name order
+        val newSettingsList = mutableListOf<org.maocide.undeadwallpaper.model.VideoSettings>()
+        for (fileName in currentFileNames) {
+            val setting = currentSettings.find { it.fileName == fileName }
+            if (setting != null) {
+                newSettingsList.add(setting)
+            }
+        }
+        preferencesManager.savePlaylistSettings(newSettingsList)
     }
 
     /**
@@ -391,7 +401,7 @@ class SettingsFragment : Fragment() {
      * specific to Dispatchers.IO to keep UI smooth.
      */
     private suspend fun ensureDefaultVideoExists() = withContext(Dispatchers.IO) {
-        if (preferencesManager.getVideoUri() == null) {
+        if (preferencesManager.getActiveVideoUri() == null) {
             val defaultFile = videoFileManager.createDefaultFileFromResource(
                 R.raw.zombillie_default,
                 getString(R.string.default_video_filename)
@@ -401,7 +411,7 @@ class SettingsFragment : Fragment() {
                 val defaultUri = Uri.fromFile(defaultFile)
                 // Switch back to Main thread to update Prefs safely
                 withContext(Dispatchers.Main) {
-                    preferencesManager.saveVideoUri(defaultUri.toString())
+                    preferencesManager.saveActiveVideoUri(defaultUri.toString())
                 }
             }
         }
@@ -419,22 +429,12 @@ class SettingsFragment : Fragment() {
 
         try {
 
-            // Audio
-            binding.switchAudio.isChecked = preferencesManager.isAudioEnabled()
-
             // Playback Mode
             when (preferencesManager.getPlaybackMode()) {
                 PlaybackMode.LOOP -> binding.playbackModeGroup.check(binding.playbackModeLoop.id)
                 PlaybackMode.ONE_SHOT -> binding.playbackModeGroup.check(binding.playbackModeOneshot.id)
                 PlaybackMode.LOOP_ALL -> binding.playbackModeGroup.check(binding.playbackModeLoopAll.id)
                 PlaybackMode.SHUFFLE -> binding.playbackModeGroup.check(binding.playbackModeShuffle.id)
-            }
-
-            // Scaling Mode
-            when (preferencesManager.getScalingMode()) {
-                ScalingMode.FIT -> binding.scalingModeGroup.check(binding.scalingModeFit.id)
-                ScalingMode.FILL -> binding.scalingModeGroup.check(binding.scalingModeFill.id)
-                ScalingMode.STRETCH -> binding.scalingModeGroup.check(binding.scalingModeStretch.id)
             }
 
             // Start Time
@@ -451,45 +451,62 @@ class SettingsFragment : Fragment() {
                 StatusBarColor.LIGHT -> binding.statusBarColorGroup.check(binding.statusBarLight.id)
             }
 
-            // Load sliders for advanced (using safe loading)
-            binding.positionXSlider.setValueSafe(preferencesManager.getPositionX())
-            binding.positionYSlider.setValueSafe(preferencesManager.getPositionY())
-            binding.zoomSlider.setValueSafe(preferencesManager.getZoom())
-            binding.rotationSlider.setValueSafe(preferencesManager.getRotation())
-            binding.brightnessSlider.setValueSafe(preferencesManager.getBrightness())
-            binding.speedSlider.setValueSafe(preferencesManager.getSpeed())
-
             // Load Video Preview and set the video as selected
-            val savedUri = preferencesManager.getVideoUri()
+            val savedUri = preferencesManager.getActiveVideoUri()
             if (savedUri != null) {
                 //setupVideoPreview(uriString.toUri())
                 updateVideoSource(savedUri.toUri(), false)
-            } else {
-                // Fallback: If no video is selected, still load recent files
-                loadRecentFiles()
             }
+
+            // Regardless of having a selected video or not, we need to load the recent files
+            // into the RecyclerView adapter ONCE during UI initialization.
+            loadRecentFiles()
         } finally {
             isUpdatingUi = false
         }
 
     }
 
-    private fun resetPreferencesToDefaults() {
-        preferencesManager.apply {
-            setScalingMode(ScalingMode.FILL)
-            savePositionX(0.0f)
-            savePositionY(0.0f)
-            saveZoom(1.0f)
-            saveRotation(0f)
-            saveBrightness(1.0f)
-            saveSpeed(1.0f)
-        }
-    }
-
 
     /**
      * Sets up all the listeners for controls.
      */
+    private fun checkBatteryOptimization() {
+        val context = context ?: return
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+        val isOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
+
+        if (isOptimized) {
+            binding.cardBatteryWarning.visibility = View.VISIBLE
+            // Reset the card state in case the user returns without fixing it
+            binding.btnFixBattery.visibility = View.VISIBLE
+            binding.layoutBatteryInstructions.visibility = View.GONE
+        } else {
+            binding.cardBatteryWarning.visibility = View.GONE
+        }
+    }
+
+    private fun setupBatteryWarningCard() {
+        binding.btnFixBattery.setOnClickListener {
+            // Expand the instructions and hide the fix button
+            binding.btnFixBattery.visibility = View.GONE
+            binding.layoutBatteryInstructions.visibility = View.VISIBLE
+        }
+
+        binding.btnGoToSettings.setOnClickListener {
+            try {
+                // Drop them directly into Undead Wallpaper's specific App Info page
+                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.fromParts("package", requireContext().packageName, null)
+                }
+                startActivity(intent)
+            } catch (e: Exception) {
+                FileLogger.e(tag, "Failed to open app info settings", e)
+                Toast.makeText(requireContext(), "Unable to open settings", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     private fun setupListeners() {
         // Helper to broadcast changes
         fun notifySettingsChanged() {
@@ -497,24 +514,6 @@ class SettingsFragment : Fragment() {
                 setPackage(requireContext().packageName)
             }
             requireContext().applicationContext.sendBroadcast(intent)
-        }
-
-        // Helper to setup slider safe listeners, to avoid sending too many
-        fun setupSafeSlider(slider: Slider, saveAction: (Float) -> Unit) {
-            slider.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
-                override fun onStartTrackingTouch(slider: Slider) {
-                    // Do nothing when touch starts
-                }
-
-                override fun onStopTrackingTouch(slider: Slider) {
-                    // If is updating skip this event to not override
-                    if (isUpdatingUi) return
-
-                    // Only save and broadcast when the user lifts their finger
-                    saveAction(slider.value)
-                    notifySettingsChanged()
-                }
-            })
         }
 
         // Playback Mode
@@ -532,9 +531,19 @@ class SettingsFragment : Fragment() {
             }
 
             preferencesManager.setPlaybackMode(newMode)
-            // Forcing an update to current uri in case we switch back from playlist to single video
-            val currentSelectedUri = sharedViewModel.selectedVideoUri?.toString() ?: preferencesManager.getVideoUri()
-            preferencesManager.saveVideoUri(currentSelectedUri.toString())
+
+            // Forcing an update to current uri in case we switch back from playlist to single video.
+            // We use the adapter's highlighted URI to guarantee the background service plays
+            // the exact video the user is currently looking at in the UI list.
+            if (::recentFilesAdapter.isInitialized && recentFilesAdapter.currentVideoUriString?.isNotEmpty() == true) {
+                val highlightedUri = recentFilesAdapter.currentVideoUriString!!
+                sharedViewModel.selectedVideoUri = Uri.parse(highlightedUri)
+                preferencesManager.saveActiveVideoUri(highlightedUri)
+            } else {
+                val currentSelectedUri = sharedViewModel.selectedVideoUri?.toString() ?: preferencesManager.getActiveVideoUri()
+                preferencesManager.saveActiveVideoUri(currentSelectedUri.toString())
+            }
+
             notifySettingsChanged()
         }
 
@@ -583,96 +592,11 @@ class SettingsFragment : Fragment() {
             requireContext().applicationContext.sendBroadcast(intent)
         }
 
-        // Audio Switch
-        binding.switchAudio.setOnCheckedChangeListener { _, isChecked ->
-            preferencesManager.saveAudioEnabled(isChecked)
-            // Update local preview immediately
-            previewMediaPlayer?.setVolume(if (isChecked) 1f else 0f, if (isChecked) 1f else 0f)
-            notifySettingsChanged()
-        }
-
-        // Accordion Logic and animation
-        binding.layoutHeader.setOnClickListener {
-            val advancedOptionsContainer = binding.advancedOptionsContainer
-            val isVisible = advancedOptionsContainer.isVisible
-
-            TransitionManager.beginDelayedTransition(binding.accordionCard as ViewGroup, AutoTransition())
-            advancedOptionsContainer.visibility = if (isVisible) View.GONE else View.VISIBLE
-
-            val rotation = if (!isVisible) 180f else 0f
-            binding.imageArrow.animate().rotation(rotation).setDuration(200).start()
-        }
-
-        // Scaling Mode
-        binding.scalingModeGroup.setOnCheckedStateChangeListener { group, checkedIds ->
-            if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
-
-            val checkedId = checkedIds[0] // Get the single selected ID
-
-            val newMode = when (checkedId) {
-                binding.scalingModeFit.id -> ScalingMode.FIT
-                binding.scalingModeStretch.id -> ScalingMode.STRETCH
-                else -> ScalingMode.FILL
-            }
-            preferencesManager.setScalingMode(newMode)
-            notifySettingsChanged()
-        }
-
         // Video Picker
         binding.buttonPickVideo.setOnClickListener {
             checkPermissionAndOpenFilePicker()
         }
 
-        // Advanced Settings
-        // Brightness
-        setupSafeSlider(binding.brightnessSlider) { value ->
-            preferencesManager.saveBrightness(value)
-        }
-
-        // Horizontal Position (X)
-        setupSafeSlider(binding.positionXSlider) { value ->
-            preferencesManager.savePositionX(value)
-        }
-
-        // Vertical Position (Y)
-        setupSafeSlider(binding.positionYSlider) { value ->
-            preferencesManager.savePositionY(value)
-        }
-
-        // Zoom
-        setupSafeSlider(binding.zoomSlider) { value ->
-            preferencesManager.saveZoom(value)
-        }
-
-        // Rotation
-        setupSafeSlider(binding.rotationSlider) { value ->
-            preferencesManager.saveRotation(value)
-        }
-
-        // Speed
-        setupSafeSlider(binding.speedSlider) { value ->
-            preferencesManager.saveSpeed(value)
-
-            // If not sent a warning, but speed is high, warn about possible hardware bottleneck
-            if (value > 1.0f && !speedValueWarned) {
-                Toast.makeText(context, R.string.warning_high_speed_stuttering, Toast.LENGTH_LONG).show()
-                speedValueWarned = true
-            }
-        }
-
-        // Reset Values in UI
-        binding.buttonResetAdvanced.setOnClickListener {
-            // Reset and save values
-            resetPreferencesToDefaults()
-
-            // Reload UI (Warning!! might refire listeners of controls! Should be ok...)
-            viewLifecycleOwner.lifecycleScope.launch {
-                syncUiState()
-            }
-
-            // Notify wallpaper service
-            notifySettingsChanged()
-        }
     }
 
     /**
@@ -831,8 +755,11 @@ class SettingsFragment : Fragment() {
                     FileLogger.d(tag, "File copied to local storage")
                 }
 
-                // Update the current video
-                updateVideoSource(savedFileUri, false) // Centralized update logic
+                // Load the new file into the RecyclerView
+                loadRecentFiles()
+
+                // Update the current video (now that the file is in the adapter)
+                updateVideoSource(savedFileUri, true) // Automatically set as active wallpaper
 
                 // Notifies the service of a change in the playlist
                 val intent = Intent(UndeadWallpaperService.ACTION_PLAYLIST_REORDERED).apply {
@@ -857,22 +784,61 @@ class SettingsFragment : Fragment() {
      *
      * @param uri The URI of the video to be previewed.
      */
+    @OptIn(UnstableApi::class)
     private fun setupVideoPreview(uri: Uri) {
-        binding.videoPreview.setVideoURI(uri)
-        val mediaController = MediaController(requireContext())
-        mediaController.setAnchorView(binding.videoPreview)
-        binding.videoPreview.setMediaController(mediaController)
-        binding.videoPreview.setOnPreparedListener {
-            it.isLooping = true
-            previewMediaPlayer = it
-            binding.videoPreview.start()
-            if(binding.switchAudio.isChecked) it.setVolume(1f, 1f)
-            else it.setVolume(0f, 0f)
-        }
-        binding.videoPreview.setOnErrorListener { _, _, _ ->
-            Toast.makeText(context, getString(R.string.error_cannot_play_video), Toast.LENGTH_SHORT).show()
-            true
-        }
+        // Release any existing player first
+        releasePreviewPlayer()
+
+        // Define a 32MB Memory Cap (matching the service)
+        val targetBufferBytes = 32 * 1024 * 1024
+
+        // Configure the LoadControl
+        val loadControl = DefaultLoadControl.Builder()
+            .setAllocator(DefaultAllocator(true, C.DEFAULT_BUFFER_SEGMENT_SIZE))
+            .setBufferDurationsMs(
+                15_000, // Min buffer 15
+                30_000, // Max buffer 30
+                2_500,  // Buffer to start playback
+                5_000   // Buffer for rebuffer
+            )
+            .setTargetBufferBytes(targetBufferBytes)
+            .setPrioritizeTimeOverSizeThresholds(false)
+            .build()
+
+        previewPlayer = ExoPlayer.Builder(requireContext())
+            .setLoadControl(loadControl)
+            .build()
+            .apply {
+                repeatMode = Player.REPEAT_MODE_ALL
+                volume = 0f // Muted
+
+                val mediaItem = MediaItem.fromUri(uri)
+                setMediaItem(mediaItem)
+
+                addListener(object : Player.Listener {
+                    override fun onPlayerError(error: PlaybackException) {
+                        if (BuildConfig.DEBUG) {
+                            FileLogger.e(tag, "ExoPlayer error in preview: ${error.message}", error)
+                        } else {
+                            FileLogger.e(tag, "ExoPlayer error in preview", error)
+                        }
+                        if (context != null) {
+                            Toast.makeText(context, getString(R.string.error_cannot_play_video), Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                })
+
+                prepare()
+                playWhenReady = true
+            }
+
+        binding.videoPreview.player = previewPlayer
+    }
+
+    private fun releasePreviewPlayer() {
+        previewPlayer?.release()
+        previewPlayer = null
+        binding.videoPreview.player = null
     }
 
     /**
@@ -908,15 +874,47 @@ class SettingsFragment : Fragment() {
     override fun onDestroyView() {
         super.onDestroyView()
         // Ensure we don't leak the preview player
-        binding.videoPreview.stopPlayback()
+        releasePreviewPlayer()
         _binding = null
+    }
+
+    override fun onResume() {
+        super.onResume()
+        checkBatteryOptimization()
+        ContextCompat.registerReceiver(
+            requireContext(),
+            videoSettingsChangedReceiver,
+            IntentFilter(UndeadWallpaperService.ACTION_VIDEO_SETTINGS_CHANGED),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+        // Resume playback if we have a selected video uri
+        sharedViewModel.selectedVideoUri?.let { uri ->
+            if (previewPlayer == null) {
+                setupVideoPreview(uri)
+            } else {
+                previewPlayer?.playWhenReady = true
+            }
+        } ?: run {
+            preferencesManager.getActiveVideoUri()?.let { uriString ->
+                if (previewPlayer == null) {
+                    setupVideoPreview(uriString.toUri())
+                } else {
+                    previewPlayer?.playWhenReady = true
+                }
+            }
+        }
     }
 
     override fun onPause() {
         super.onPause()
         // Aggressively release resources when the settings screen is not active
         // This frees up the decoder for the actual wallpaper service
-        binding.videoPreview.suspend()
+        releasePreviewPlayer()
+        try {
+            requireContext().unregisterReceiver(videoSettingsChangedReceiver)
+        } catch (e: IllegalArgumentException) {
+            // Receiver not registered
+        }
     }
 
 }

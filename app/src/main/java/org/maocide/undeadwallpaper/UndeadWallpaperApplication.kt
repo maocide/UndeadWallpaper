@@ -1,12 +1,19 @@
 package org.maocide.undeadwallpaper
 
+import org.maocide.undeadwallpaper.data.PreferencesManager
+import org.maocide.undeadwallpaper.utils.FileLogger
+
 import android.app.Application
 import android.util.Log
+import androidx.appcompat.app.AppCompatDelegate
 
 class UndeadWallpaperApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+
+        // Force dark mode for now
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
 
         // Read preferences and initialize the FileLogger
         val prefs = PreferencesManager(this)

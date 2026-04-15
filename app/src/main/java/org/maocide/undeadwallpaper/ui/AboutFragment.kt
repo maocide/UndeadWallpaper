@@ -1,4 +1,9 @@
-package org.maocide.undeadwallpaper
+package org.maocide.undeadwallpaper.ui
+
+import org.maocide.undeadwallpaper.databinding.FragmentAboutBinding
+
+import org.maocide.undeadwallpaper.data.PreferencesManager
+import org.maocide.undeadwallpaper.utils.FileLogger
 
 import android.content.Intent
 import android.os.Bundle
@@ -8,7 +13,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.fragment.app.Fragment
-import org.maocide.undeadwallpaper.databinding.FragmentAboutBinding
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+
 
 /**
  * A simple [Fragment] subclass as the second destination in the navigation, the about page.
@@ -64,19 +70,28 @@ class AboutFragment : Fragment() {
         binding.buttonShareLog.setOnClickListener {
             val logFile = FileLogger.getLogFile()
             if (logFile != null && logFile.exists() && logFile.length() > 0) {
-                val uri = androidx.core.content.FileProvider.getUriForFile(
-                    requireContext(),
-                    "${requireContext().packageName}.fileprovider",
-                    logFile
-                )
 
-                val intent = Intent(Intent.ACTION_SEND).apply {
-                    type = "text/plain"
-                    putExtra(Intent.EXTRA_STREAM, uri)
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                }
+                MaterialAlertDialogBuilder(requireContext())
+                    .setTitle("Share Debug Log")
+                    .setMessage("The debug log may contain sensitive information such as file names or device details. Are you sure you want to share it?")
+                    .setPositiveButton("Share") { _, _ ->
+                        val uri = androidx.core.content.FileProvider.getUriForFile(
+                            requireContext(),
+                            "${requireContext().packageName}.fileprovider",
+                            logFile
+                        )
 
-                startActivity(Intent.createChooser(intent, "Share Debug Log"))
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_STREAM, uri)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+
+                        startActivity(Intent.createChooser(intent, "Share Debug Log"))
+                    }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+
             } else {
                 Toast.makeText(context, "Log file not found or empty", Toast.LENGTH_SHORT).show()
                 updateLogButtonsState() // Refresh state
