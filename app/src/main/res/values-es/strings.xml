@@ -2,9 +2,10 @@
 <resources>
     <string name="app_name">Undead Wallpaper</string>
     <string name="action_settings">Acerca de</string>
+    <string name="action_battery_optimization">Optimización de Batería</string>
 
     <!-- Strings used for fragments for navigation -->
-    <string name="first_fragment_label">Ajustes del Fondo de Pantalla</string>
+    <string name="first_fragment_label">Ajustes de Undead</string>
     <string name="second_fragment_label">Acerca de</string>
     <string name="previous">Anterior</string>
 
@@ -64,15 +65,55 @@
     <string name="status_bar_white_icons">Blanco</string>
     <string name="status_bar_black_icons">Negro</string>
 
+    <!-- UI Headers & Sections -->
+    <string name="custom_settings_header">Ajustes Personalizados</string>
+    <string name="positioning_header">Posicionamiento</string>
+    <string name="general_header">General</string>
+    <string name="volume_label">Volumen</string>
+    <string name="global_settings_header">Ajustes Globales</string>
+    <string name="debug_options_header">Opciones de Depuración</string>
+    <string name="debug_logging_description">Habilita el registro de archivos locales para capturar bloqueos graves. Se recomienda dejar esto apagado a menos que experimentes problemas.</string>
+    <string name="debug_enable_logging">Habilitar Registro de Archivo Local</string>
+    <string name="debug_clear_log">Limpiar Registro</string>
+    <string name="debug_share_log">Compartir Registro</string>
+
     <!-- Start Time Settings -->
     <string name="start_time_label">Al Ser Visible</string>
     <string name="start_time_resume">Continuar</string>
     <string name="start_time_restart">Reiniciar</string>
     <string name="start_time_random">Aleatorio</string>
 
+    <string name="breadcrumb_zoom">Zoom</string>
+    <string name="breadcrumb_pan">Pan</string>
+    <string name="breadcrumb_rotation">Rotación</string>
+    <string name="breadcrumb_brightness">Brillo</string>
+    <string name="breadcrumb_speed">Velocidad</string>
+    <string name="breadcrumb_volume">Volumen</string>
+    <string name="breadcrumb_more">+%1$d más</string>
+
     <string name="remove_file_title">Remover Video</string>
     <string name="remove_file_message">¿Estás seguro de que deseas remover %s de la aplicación?</string>
     <string name="remove_action">Remover</string>
     <string name="cancel">Cancelar</string>
+
+    <!-- Battery Optimization Warning -->
+    <string name="battery_warning_title">Rendimiento en Segundo Plano</string>
+    <string name="battery_warning_desc">Permite que Undead Wallpaper se ejecute en segundo plano para evitar que el sistema lo cierre.</string>
+    <string name="battery_warning_btn">Solucionar</string>
+    <string name="battery_instruction_step_1">1. Toca "Uso de batería de la aplicación"</string>
+    <string name="battery_instruction_step_2">2. Toca "Permitir uso en segundo plano"</string>
+    <string name="battery_instruction_step_3">3. Selecciona "Sin restricciones"</string>
+    <string name="battery_warning_go_to_settings">Ir a Configuración</string>
+
+    <!-- Debug Logger -->
+    <string name="log_enabled_toast">Registro en archivo local habilitado</string>
+    <string name="log_disabled_toast">Registro en archivo local deshabilitado</string>
+    <string name="share_log_title">Compartir Registro de Depuración</string>
+    <string name="share_log_warning">El registro de depuración puede contener información confidencial, como nombres de archivos o detalles del dispositivo. ¿Estás seguro de que quieres compartirlo?</string>
+    <string name="share_log_confirm">Compartir</string>
+    <string name="share_log_cancel">Cancelar</string>
+    <string name="share_log_intent_title">Compartir Registro de Depuración</string>
+    <string name="log_empty_toast">Archivo de registro no encontrado o vacío</string>
+    <string name="log_cleared_toast">Archivo de registro borrado</string>
 
 </resources>

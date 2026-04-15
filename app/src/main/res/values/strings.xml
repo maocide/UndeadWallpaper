@@ -1,9 +1,10 @@
 <resources>
     <string name="app_name">Undead Wallpaper</string>
     <string name="action_settings">About</string>
+    <string name="action_battery_optimization">Battery Optimization</string>
 
     <!-- Strings used for fragments for navigation -->
-    <string name="first_fragment_label">Wallpaper Settings</string>
+    <string name="first_fragment_label">Undead Settings</string>
     <string name="second_fragment_label">About</string>
     <string name="previous">Previous</string>
 
@@ -74,15 +75,56 @@
     <string name="status_bar_white_icons">White</string>
     <string name="status_bar_black_icons">Black</string>
 
+    <!-- UI Headers & Sections -->
+    <string name="custom_settings_header">Custom Settings</string>
+    <string name="positioning_header">Positioning</string>
+    <string name="general_header">General</string>
+    <string name="volume_label">Volume</string>
+    <string name="global_settings_header">Global Settings</string>
+    <string name="debug_options_header">Debug Options</string>
+    <string name="debug_logging_description">Enable local file logging to catch hard crashes. It is recommended to leave this off unless you are experiencing issues.</string>
+    <string name="debug_enable_logging">Enable Local File Logging</string>
+    <string name="debug_clear_log">Clear Log</string>
+    <string name="debug_share_log">Share Log</string>
+    <string name="breadcrumb_placeholder" translatable="false">Vol, Pan, Speed</string>
+
     <!-- Start Time Settings -->
     <string name="start_time_label">On Visible</string>
     <string name="start_time_resume">Resume</string>
     <string name="start_time_restart">Restart</string>
     <string name="start_time_random">Random</string>
 
+    <string name="breadcrumb_zoom">Zoom</string>
+    <string name="breadcrumb_pan">Pan</string>
+    <string name="breadcrumb_rotation">Rotation</string>
+    <string name="breadcrumb_brightness">Brightness</string>
+    <string name="breadcrumb_speed">Speed</string>
+    <string name="breadcrumb_volume">Volume</string>
+    <string name="breadcrumb_more">+%1$d more</string>
+
     <string name="remove_file_title">Remove Video</string>
     <string name="remove_file_message">Are you sure you want to remove %s from the app?</string>
     <string name="remove_action">Remove</string>
     <string name="cancel">Cancel</string>
+
+    <!-- Battery Optimization Warning -->
+    <string name="battery_warning_title">Allow Background Performance</string>
+    <string name="battery_warning_desc">Allow Undead Wallpaper to run in the background to prevent the system from killing it.</string>
+    <string name="battery_warning_btn">Fix</string>
+    <string name="battery_instruction_step_1">1. Tap App Battery Usage</string>
+    <string name="battery_instruction_step_2">2. Tap Allow Background Usage</string>
+    <string name="battery_instruction_step_3">3. Allow and Select Unrestricted</string>
+    <string name="battery_warning_go_to_settings">Go to Settings</string>
+
+    <!-- Debug Logger -->
+    <string name="log_enabled_toast">Local file logging enabled</string>
+    <string name="log_disabled_toast">Local file logging disabled</string>
+    <string name="share_log_title">Share Debug Log</string>
+    <string name="share_log_warning">The debug log may contain sensitive information such as file names or device details. Are you sure you want to share it?</string>
+    <string name="share_log_confirm">Share</string>
+    <string name="share_log_cancel">Cancel</string>
+    <string name="share_log_intent_title">Share Debug Log</string>
+    <string name="log_empty_toast">Log file not found or empty</string>
+    <string name="log_cleared_toast">Log file cleared</string>
 
 </resources>

@@ -4,7 +4,9 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".AboutFragment">
+    tools:context=".AboutFragment"
+    android:paddingBottom="88dp"
+    android:clipToPadding="false">
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
@@ -170,8 +172,9 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
             android:layout_marginBottom="16dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="4dp"
+            app:cardCornerRadius="24dp"
+            app:strokeWidth="0dp"
+            app:cardElevation="8dp"
             app:layout_constraintTop_toBottomOf="@id/divider4"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
@@ -186,14 +189,17 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Debug Options"
-                    android:textAppearance="?attr/textAppearanceHeadline6" />
+                    android:text="@string/debug_options_header"
+                    android:textAppearance="?attr/textAppearanceTitleMedium"
+                    android:textStyle="bold"
+                    android:textColor="?attr/colorPrimary"
+                    android:layout_marginBottom="8dp" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:text="Enable local file logging to catch hard crashes. It is recommended to leave this off unless you are experiencing issues."
+                    android:text="@string/debug_logging_description"
                     android:textAppearance="?attr/textAppearanceCaption"
                     android:textColor="?android:attr/textColorSecondary" />
 
@@ -203,7 +209,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
-                    android:text="Enable Local File Logging" />
+                    android:text="@string/debug_enable_logging" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -218,7 +224,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:layout_marginEnd="8dp"
-                        android:text="Clear Log"
+                        android:text="@string/debug_clear_log"
                         android:textColor="?attr/colorError" />
 
                     <com.google.android.material.button.MaterialButton
@@ -228,7 +234,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:layout_marginStart="8dp"
-                        android:text="Share Log" />
+                        android:text="@string/debug_share_log" />
 
                 </LinearLayout>
 

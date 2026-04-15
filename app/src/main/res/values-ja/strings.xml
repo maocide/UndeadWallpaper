@@ -1,9 +1,10 @@
 <resources>
     <string name="app_name">Undead Wallpaper</string>
     <string name="action_settings">情報</string>
+    <string name="action_battery_optimization">バッテリーの最適化</string>
 
     <!-- Strings used for fragments for navigation -->
-    <string name="first_fragment_label">壁紙設定</string>
+    <string name="first_fragment_label">Undead設定</string>
     <string name="second_fragment_label">情報</string>
     <string name="previous">前へ</string>
 
@@ -63,14 +64,54 @@
     <string name="status_bar_white_icons">白</string>
     <string name="status_bar_black_icons">黒</string>
 
+    <!-- UI Headers & Sections -->
+    <string name="custom_settings_header">カスタム設定</string>
+    <string name="positioning_header">配置</string>
+    <string name="general_header">一般</string>
+    <string name="volume_label">音量</string>
+    <string name="global_settings_header">グローバル設定</string>
+    <string name="debug_options_header">デバッグオプション</string>
+    <string name="debug_logging_description">ハードクラッシュをキャッチするためにローカルファイルのログ記録を有効にします。問題が発生していない限り、これはオフにしておくことをお勧めします。</string>
+    <string name="debug_enable_logging">ローカルファイルログを有効にする</string>
+    <string name="debug_clear_log">ログをクリア</string>
+    <string name="debug_share_log">ログを共有</string>
+
     <!-- Start Time Settings -->
     <string name="start_time_label">再生開始</string>
     <string name="start_time_resume">続きから</string>
     <string name="start_time_restart">最初から</string>
     <string name="start_time_random">ランダム</string>
 
+    <string name="breadcrumb_zoom">ズーム</string>
+    <string name="breadcrumb_pan">パン</string>
+    <string name="breadcrumb_rotation">回転</string>
+    <string name="breadcrumb_brightness">明るさ</string>
+    <string name="breadcrumb_speed">速度</string>
+    <string name="breadcrumb_volume">音量</string>
+    <string name="breadcrumb_more">他 +%1$d</string>
+
     <string name="remove_file_title">動画を外す</string>
     <string name="remove_file_message">アプリから %s を外してもよろしいですか？</string>
     <string name="remove_action">外す</string>
     <string name="cancel">キャンセル</string>
+    <!-- Battery Optimization Warning -->
+    <string name="battery_warning_title">バックグラウンド実行を許可</string>
+    <string name="battery_warning_desc">システムによる終了を防ぐため、Undead Wallpaper のバックグラウンド実行を許可してください。</string>
+    <string name="battery_warning_btn">修正する</string>
+    <string name="battery_instruction_step_1">1. 「アプリのバッテリー使用量」をタップ</string>
+    <string name="battery_instruction_step_2">2. 「バックグラウンドでの使用を許可」をタップ</string>
+    <string name="battery_instruction_step_3">3. 「制限なし」を選択</string>
+    <string name="battery_warning_go_to_settings">設定を開く</string>
+
+    <!-- Debug Logger -->
+    <string name="log_enabled_toast">ローカルファイルへのログ記録が有効になりました</string>
+    <string name="log_disabled_toast">ローカルファイルへのログ記録が無効になりました</string>
+    <string name="share_log_title">デバッグログを共有</string>
+    <string name="share_log_warning">デバッグログには、ファイル名やデバイスの詳細などの機密情報が含まれる場合があります。共有してもよろしいですか？</string>
+    <string name="share_log_confirm">共有</string>
+    <string name="share_log_cancel">キャンセル</string>
+    <string name="share_log_intent_title">デバッグログを共有</string>
+    <string name="log_empty_toast">ログファイルが見つからないか、空です</string>
+    <string name="log_cleared_toast">ログファイルがクリアされました</string>
+
 </resources>

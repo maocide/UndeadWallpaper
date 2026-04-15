@@ -1,4 +1,11 @@
-package org.maocide.undeadwallpaper
+package org.maocide.undeadwallpaper.ui
+
+import org.maocide.undeadwallpaper.R
+
+import org.maocide.undeadwallpaper.model.RecentFile
+import org.maocide.undeadwallpaper.model.VideoSettings
+import org.maocide.undeadwallpaper.model.ScalingMode
+import org.maocide.undeadwallpaper.data.PreferencesManager
 
 import android.graphics.Bitmap
 import android.graphics.Color
@@ -17,7 +24,9 @@ import java.util.Collections
 class RecentFilesAdapter(
     private val recentFiles: MutableList<RecentFile>,
     var currentVideoUriString: String?,
-    private val onItemClick: (RecentFile) -> Unit
+    private val preferencesManager: PreferencesManager,
+    private val onItemClick: (RecentFile) -> Unit,
+    private val onSettingsClick: (RecentFile) -> Unit
 ) : RecyclerView.Adapter<RecentFilesAdapter.ViewHolder>() {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -64,12 +73,22 @@ class RecentFilesAdapter(
     inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val thumbnail: ImageView = itemView.findViewById(R.id.thumbnail)
         private val fileName: TextView = itemView.findViewById(R.id.file_name)
+        private val settingsButton: ImageView = itemView.findViewById(R.id.button_settings)
+        private val breadcrumbContainer: View = itemView.findViewById(R.id.breadcrumb_container)
+        private val breadcrumbText: TextView = itemView.findViewById(R.id.breadcrumb_text)
 
         init {
             itemView.setOnClickListener {
                 val position = bindingAdapterPosition
                 if (position != RecyclerView.NO_POSITION) {
                     onItemClick(recentFiles[position])
+                }
+            }
+
+            settingsButton.setOnClickListener {
+                val position = bindingAdapterPosition
+                if (position != RecyclerView.NO_POSITION) {
+                    onSettingsClick(recentFiles[position])
                 }
             }
         }
@@ -95,6 +114,17 @@ class RecentFilesAdapter(
             } else {
                 // Reset background
                 itemView.findViewById<View>(R.id.item_container).setBackgroundColor(Color.TRANSPARENT)
+            }
+
+            // Update Breadcrumb
+            val settings = preferencesManager.getVideoSettings(recentFile.file.name)
+            val breadcrumbString = settings.getBreadcrumbText(itemView.context)
+
+            if (breadcrumbString == null) {
+                breadcrumbContainer.visibility = View.GONE
+            } else {
+                breadcrumbContainer.visibility = View.VISIBLE
+                breadcrumbText.text = breadcrumbString
             }
         }
     }

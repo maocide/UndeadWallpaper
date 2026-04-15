@@ -1,4 +1,4 @@
-package org.maocide.undeadwallpaper
+package org.maocide.undeadwallpaper.ui
 
 import android.net.Uri
 import androidx.lifecycle.ViewModel
