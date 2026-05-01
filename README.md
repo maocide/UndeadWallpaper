@@ -24,14 +24,21 @@ This isn't just a clever pun on "live" wallpaper. The name **UndeadWallpaper** i
 
 ## Getting Started (It's scary simple)
 
-1.  **Pick Your Poison:** Tap the "Pick Video" button and choose your masterpiece.
-2.  **Tweak It:** Tap the gear icon next to your video. Use the advanced settings to fit, fill, or stretch it. Zoom in, move it around, make it perfect.
-3.  **Smash the Button:** Like what you see? Hit that floating button and bring your screen to glorious un-life.
+1. **Pick Your Poison:** Tap the "Pick Video" button and choose your masterpiece.
+2. **Tweak It:** Tap the gear icon next to your video. Use the advanced settings to fit, fill, or stretch it. Zoom in, move it around, make it perfect.
+3. **Smash the Button:** Like what you see? Hit that floating button and bring your screen to glorious un-life.
 
 ### Keep It Alive (Disable Battery Optimizations) 🧟‍♂️
+
 Some Android ROMs are absolutely ruthless. They will try to double-tap this app in the background to save a drop of battery, killing the decoders or the background service right when you need them. 
 
 A built-in **"Allow Background Performance"** card directly in the app will warn you. Just tap "Fix" to dive straight into your phone's app settings and **disable battery optimizations** for UndeadWallpaper. Tell the OS to back off and leave the dead alone!
+
+
+
+> **Having weird OS issues? Screen freezing? Icons the wrong color? [Check out The Horde's Survival Guide (FAQ)](FAQ.md) for workarounds to annoying OEM limitations.**
+
+
 
 ## Join the Horde! (Contribute & Connect)
 
@@ -54,6 +61,7 @@ This whole shebang is licensed under the **GNU General Public License v3.0**. Fr
 * **GitHub Releases:** [Grab the bleeding-edge APKs here!](https://github.com/maocide/UndeadWallpaper/releases/)
 
 ### The Graveyard Shift (Special Thanks) 🪦
+
 Bringing a project back from the dead takes a village (or at least a few good souls). A big thanks to the people and projects that helped piece this monster together:
 
 * **@kitsumed** - For contributing the GitHub Actions CI pipeline and providing brilliant technical insights.
