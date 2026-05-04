@@ -135,15 +135,8 @@ class PlaylistManager(
             val nextFileName = nextUriParsed.lastPathSegment ?: ""
             val nextSettings = prefs.getVideoSettings(nextFileName)
 
-            // Check if visual settings are identical
-            val isVisualMatch = baseSettings.scalingMode == nextSettings.scalingMode &&
-                    baseSettings.positionX == nextSettings.positionX &&
-                    baseSettings.positionY == nextSettings.positionY &&
-                    baseSettings.zoom == nextSettings.zoom &&
-                    baseSettings.rotation == nextSettings.rotation &&
-                    baseSettings.brightness == nextSettings.brightness
-
-            if (isVisualMatch) {
+            // Check transforms difference in VideoSettings model that would require GL matrix/uniforms updates
+            if (baseSettings.hasSameVisualTransformsAs(nextSettings)) {
                 chunkUris.add(nextUriStr)
             } else {
                 // Settings differ! Break the batch.
@@ -162,13 +155,11 @@ class PlaylistManager(
         val playlistUris = getPlaylistUris()
         if (playlistUris.isEmpty()) return null
 
-        if (playbackMode != PlaybackMode.LOOP_ALL && playbackMode != PlaybackMode.SHUFFLE) {
-            return currentUri // Shouldn't be called, but fallback to same video
-        }
-
         var currentIndex = playlistUris.indexOf(currentUri)
         if (currentIndex == -1) currentIndex = 0
 
+        // Determine the sequence. If SHUFFLE, use shuffle map. Otherwise, use linear.
+        // This allows ONE_SHOT and LOOP to behave like LOOP_ALL when manually skipped.
         val sequenceOrder = if (playbackMode == PlaybackMode.SHUFFLE) {
             getShuffleOrder(playlistUris.size)
         } else {
@@ -181,12 +172,11 @@ class PlaylistManager(
         if (nextPositionInSequence >= playlistUris.size) {
             // We reached the very end of the playlist sequence!
             if (playbackMode == PlaybackMode.SHUFFLE) {
-                // Time to generate a new shuffle order for the next loop
                 regenerateShuffleOrder(playlistUris.size)
                 val newOrder = getShuffleOrder(playlistUris.size)
                 return playlistUris[newOrder[0]]
             } else {
-                // Loop linear back to start
+                // Loop linear back to start (handles LOOP_ALL, LOOP, and ONE_SHOT skips)
                 return playlistUris[0]
             }
         }

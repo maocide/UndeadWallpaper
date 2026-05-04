@@ -13,6 +13,8 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import android.net.Uri
+import org.maocide.undeadwallpaper.model.GestureType
+import org.maocide.undeadwallpaper.model.WallpaperAction
 
 /**
  * Manages SharedPreferences for the application.
@@ -49,6 +51,10 @@ class PreferencesManager(context: Context) {
 
         private const val KEY_RECENT_FILES_LIST = "recent_files_list"
         private const val KEY_PLAYLIST_SETTINGS = "playlist_settings"
+
+        private const val KEY_ACTION_DOUBLE_TAP = "action_double_tap"
+
+        private const val KEY_ACTION_LONG_PRESS = "action_long_press"
     }
 
     init {
@@ -291,6 +297,28 @@ class PreferencesManager(context: Context) {
 
     fun isLoggingEnabled(): Boolean {
         return sharedPrefs.getBoolean(KEY_LOGGING_ENABLED, false)
+    }
+
+    /**
+     * Gets the action bound to a specific gesture.
+     * Default for ALL gestures is NONE.
+     */
+    fun getActionForGesture(gesture: GestureType): WallpaperAction {
+        val key = when (gesture) {
+            GestureType.DOUBLE_TAP -> KEY_ACTION_DOUBLE_TAP
+            GestureType.LONG_PRESS -> KEY_ACTION_LONG_PRESS
+        }
+
+        val storedOrdinal = sharedPrefs.getInt(key, WallpaperAction.NONE.ordinal)
+        return WallpaperAction.entries.getOrElse(storedOrdinal) { WallpaperAction.NONE }
+    }
+
+    fun setActionForGesture(gesture: GestureType, action: WallpaperAction) {
+        val key = when (gesture) {
+            GestureType.DOUBLE_TAP -> KEY_ACTION_DOUBLE_TAP
+            GestureType.LONG_PRESS -> KEY_ACTION_LONG_PRESS
+        }
+        sharedPrefs.edit { putInt(key, action.ordinal) }
     }
 
 }
