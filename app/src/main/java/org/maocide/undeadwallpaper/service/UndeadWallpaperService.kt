@@ -521,7 +521,8 @@ class UndeadWallpaperService : WallpaperService() {
             bindPlaylistToPlayer(keepCurrentPlayback = false)
 
             // Send all values to renderer updating it, will be used for matrix calc.
-            refreshRenderer()
+            // refreshRenderer() // Removed from initialization, as it's called on first frame
+            // it will be better there to sync better with video switching on touch events.
 
             // WAIT for the GL Surface, then attach
             playerSetupJob = kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
@@ -604,7 +605,6 @@ class UndeadWallpaperService : WallpaperService() {
         }
 
         /**
-         * Helper method to keep it DRY (Don't Repeat Yourself)
          * Releases the [GLVideoRenderer] and its associated resources.
          * This should be called when the underlying surface is destroyed.
          * It ensures that OpenGL contexts and other graphics-related
