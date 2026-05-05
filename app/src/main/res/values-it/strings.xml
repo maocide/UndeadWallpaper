@@ -49,6 +49,15 @@
     <string name="reset">Ripristina</string>
     <string name="rotation">Rotazione</string>
 
+    <!-- Gesture Controls -->
+    <string name="gesture_controls_header">Controlli Touch</string>
+    <string name="double_tap_label">Doppio Tap</string>
+    <string name="triple_tap_label">Triplo Tap</string>
+    <string name="gesture_action_none">Nessuna</string>
+    <string name="gesture_action_pause_play">Pausa/Riproduzione</string>
+    <string name="gesture_action_skip">Salta</string>
+    <string name="gesture_launcher_warning">Nota: Alcuni launcher potrebbero bloccare i gesti dello sfondo.</string>
+
     <!-- Error and Warning Messages -->
     <string name="error_permission_failed">Impossibile ottenere l\'autorizzazione per il file selezionato.</string>
     <string name="warning_4k_video">Attenzione: i video 4K potrebbero causare crash o lag su alcuni dispositivi.</string>
@@ -58,6 +67,8 @@
     <string name="error_file_picker_not_available">Il selettore file non è disponibile nel sistema!</string>
     <string name="error_could_not_read_video_duration">Impossibile leggere la durata del video.</string>
     <string name="warning_random_start_time_delay">Random potrebbe causare ritardi a causa della ricerca</string>
+    <string name="error_video_too_large">Video troppo grande! La risoluzione massima supportata è 4K (UHD).</string>
+    <string name="error_open_settings_failed">Impossibile aprire le impostazioni</string>
     <!-- Status Bar Icon Color Settings -->
     <string name="status_bar_icons_label">Icone Barra di Stato</string>
     <string name="status_bar_auto">Automatico</string>

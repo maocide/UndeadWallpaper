@@ -420,7 +420,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Gesture Controls"
+                    android:text="@string/gesture_controls_header"
                     android:textAppearance="?attr/textAppearanceTitleMedium" android:textStyle="bold"
                     android:textColor="?attr/colorPrimary"
                     android:layout_marginBottom="8dp"/>
@@ -430,7 +430,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
-                    android:text="Double Tap" />
+                    android:text="@string/double_tap_label" />
 
                 <com.google.android.material.chip.ChipGroup
                     android:id="@+id/double_tap_group"
@@ -447,30 +447,30 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:checked="true"
-                        android:text="None" />
+                        android:text="@string/gesture_action_none" />
 
                     <com.google.android.material.chip.Chip
                         android:id="@+id/double_tap_pause"
                         style="@style/Widget.MaterialComponents.Chip.Choice"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Pause/Play" />
+                        android:text="@string/gesture_action_pause_play" />
 
                     <com.google.android.material.chip.Chip
                         android:id="@+id/double_tap_skip"
                         style="@style/Widget.MaterialComponents.Chip.Choice"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Skip" />
+                        android:text="@string/gesture_action_skip" />
 
                 </com.google.android.material.chip.ChipGroup>
 
-                <!-- Double Tap -->
+                <!-- Triple Tap -->
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
-                    android:text="Triple Tap" />
+                    android:text="@string/triple_tap_label" />
 
                 <com.google.android.material.chip.ChipGroup
                     android:id="@+id/triple_tap_group"
@@ -487,21 +487,21 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:checked="true"
-                        android:text="None" />
+                        android:text="@string/gesture_action_none" />
 
                     <com.google.android.material.chip.Chip
                         android:id="@+id/triple_tap_pause"
                         style="@style/Widget.MaterialComponents.Chip.Choice"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Pause/Play" />
+                        android:text="@string/gesture_action_pause_play" />
 
                     <com.google.android.material.chip.Chip
                         android:id="@+id/triple_tap_skip"
                         style="@style/Widget.MaterialComponents.Chip.Choice"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Skip" />
+                        android:text="@string/gesture_action_skip" />
 
                 </com.google.android.material.chip.ChipGroup>
 
@@ -509,7 +509,6 @@
 
 
         </com.google.android.material.card.MaterialCardView>
-
 
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/card_playlist"

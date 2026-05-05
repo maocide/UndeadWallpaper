@@ -60,6 +60,15 @@
     <string name="reset">Reset</string>
     <string name="rotation">Rotation</string>
 
+    <!-- Gesture Controls -->
+    <string name="gesture_controls_header">Gesture Controls</string>
+    <string name="double_tap_label">Double Tap</string>
+    <string name="triple_tap_label">Triple Tap</string>
+    <string name="gesture_action_none">None</string>
+    <string name="gesture_action_pause_play">Pause/Play</string>
+    <string name="gesture_action_skip">Skip</string>
+    <string name="gesture_launcher_warning">Note: Some launchers may block wallpaper gestures.</string>
+
     <!-- Error and Warning Messages -->
     <string name="error_permission_failed">Failed to get permission for the selected file.</string>
     <string name="warning_4k_video">Warning: 4K videos may crash or lag on some devices.</string>
@@ -69,6 +78,8 @@
     <string name="error_file_picker_not_available">File picker not available in the system!</string>
     <string name="error_could_not_read_video_duration">Could not read video duration.</string>
     <string name="warning_random_start_time_delay">Random might cause delay due to seek</string>
+    <string name="error_video_too_large">Video too large! Max supported resolution is 4K (UHD).</string>
+    <string name="error_open_settings_failed">Unable to open settings</string>
     <!-- Status Bar Icon Color Settings -->
     <string name="status_bar_icons_label">Status Bar Icons</string>
     <string name="status_bar_auto">Auto</string>

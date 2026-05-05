@@ -519,7 +519,7 @@ class SettingsFragment : Fragment() {
                 startActivity(intent)
             } catch (e: Exception) {
                 FileLogger.e(tag, "Failed to open app info settings", e)
-                Toast.makeText(requireContext(), "Unable to open settings", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), getString(R.string.error_open_settings_failed), Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -614,7 +614,7 @@ class SettingsFragment : Fragment() {
             if (!hasWarnedAboutGestures) {
                 Toast.makeText(
                     requireContext(),
-                    "Note: Some launchers may block wallpaper gestures.",
+                    getString(R.string.gesture_launcher_warning),
                     Toast.LENGTH_LONG
                 ).show()
                 hasWarnedAboutGestures = true
@@ -808,7 +808,7 @@ class SettingsFragment : Fragment() {
             if (!isValid) {
                 Toast.makeText(
                     context,
-                    "Video too large! Max supported resolution is 4K (UHD).",
+                    getString(R.string.error_video_too_large),
                     Toast.LENGTH_LONG
                 ).show()
 
