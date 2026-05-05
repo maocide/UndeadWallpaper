@@ -58,6 +58,8 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.upstream.DefaultAllocator
+import org.maocide.undeadwallpaper.model.GestureType
+import org.maocide.undeadwallpaper.model.WallpaperAction
 
 import kotlin.math.roundToInt
 
@@ -76,10 +78,9 @@ class SettingsFragment : Fragment() {
     private val recentFiles = mutableListOf<RecentFile>()
     private var currentVideoDurationMs: Long = 0L
     private var previewPlayer: ExoPlayer? = null
-
-    private var speedValueWarned = false
     private var randomStartTimeWarned = false
     private var isUpdatingUi = false
+    private var hasWarnedAboutGestures = false
 
     // Initialize the shared ViewModel
     private val sharedViewModel: SettingsViewModel by activityViewModels()
@@ -420,7 +421,6 @@ class SettingsFragment : Fragment() {
     /**
      * Update all Buttons/Switches to match Preferences.
      * Calling this BEFORE listeners prevents accidental triggers.
-     * Also called by reset button listener after resetting values
      */
     private suspend fun syncUiState() {
 
@@ -458,6 +458,20 @@ class SettingsFragment : Fragment() {
                 updateVideoSource(savedUri.toUri(), false)
             }
 
+            // Double Tap Gesture
+            when (preferencesManager.getActionForGesture(GestureType.DOUBLE_TAP)) {
+                WallpaperAction.NONE -> binding.doubleTapGroup.check(binding.doubleTapNone.id)
+                WallpaperAction.PLAY_PAUSE -> binding.doubleTapGroup.check(binding.doubleTapPause.id)
+                WallpaperAction.SKIP_NEXT -> binding.doubleTapGroup.check(binding.doubleTapSkip.id)
+            }
+
+            // Triple Tap Gesture
+            when (preferencesManager.getActionForGesture(GestureType.TRIPLE_TAP)) {
+                WallpaperAction.NONE -> binding.tripleTapGroup.check(binding.tripleTapNone.id)
+                WallpaperAction.PLAY_PAUSE -> binding.tripleTapGroup.check(binding.tripleTapPause.id)
+                WallpaperAction.SKIP_NEXT -> binding.tripleTapGroup.check(binding.tripleTapSkip.id)
+            }
+
             // Regardless of having a selected video or not, we need to load the recent files
             // into the RecyclerView adapter ONCE during UI initialization.
             loadRecentFiles()
@@ -469,7 +483,7 @@ class SettingsFragment : Fragment() {
 
 
     /**
-     * Sets up all the listeners for controls.
+     * Updates status for battery card controls.
      */
     private fun checkBatteryOptimization() {
         val context = context ?: return
@@ -486,6 +500,9 @@ class SettingsFragment : Fragment() {
         }
     }
 
+    /**
+     * Sets up the listeners for battery card controls.
+     */
     private fun setupBatteryWarningCard() {
         binding.btnFixBattery.setOnClickListener {
             // Expand the instructions and hide the fix button
@@ -587,6 +604,62 @@ class SettingsFragment : Fragment() {
 
             // Specific intent sent to not reload video
             val intent = Intent(UndeadWallpaperService.ACTION_STATUS_BAR_COLOR_CHANGED).apply {
+                setPackage(requireContext().packageName)
+            }
+            requireContext().applicationContext.sendBroadcast(intent)
+        }
+
+        // Helper function for the warning Toast
+        fun showGestureWarningIfNeeded() {
+            if (!hasWarnedAboutGestures) {
+                Toast.makeText(
+                    requireContext(),
+                    "Note: Some launchers may block wallpaper gestures.",
+                    Toast.LENGTH_LONG
+                ).show()
+                hasWarnedAboutGestures = true
+            }
+        }
+
+        // Double Tap Gesture
+        binding.doubleTapGroup.setOnCheckedStateChangeListener { _, checkedIds ->
+            if (isUpdatingUi || checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
+
+            val action = when (checkedIds[0]) {
+                binding.doubleTapPause.id -> WallpaperAction.PLAY_PAUSE
+                binding.doubleTapSkip.id -> WallpaperAction.SKIP_NEXT
+                else -> WallpaperAction.NONE
+            }
+
+            preferencesManager.setActionForGesture(GestureType.DOUBLE_TAP, action)
+
+            if (action != WallpaperAction.NONE) {
+                showGestureWarningIfNeeded()
+            }
+
+            val intent = Intent(UndeadWallpaperService.ACTION_VIDEO_SETTINGS_CHANGED).apply {
+                setPackage(requireContext().packageName)
+            }
+            requireContext().applicationContext.sendBroadcast(intent)
+        }
+
+        // Triple Tap Gesture
+        binding.tripleTapGroup.setOnCheckedStateChangeListener { _, checkedIds ->
+            if (isUpdatingUi || checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
+
+            val action = when (checkedIds[0]) {
+                binding.tripleTapPause.id -> WallpaperAction.PLAY_PAUSE
+                binding.tripleTapSkip.id -> WallpaperAction.SKIP_NEXT
+                else -> WallpaperAction.NONE
+            }
+
+            preferencesManager.setActionForGesture(GestureType.TRIPLE_TAP, action)
+
+            if (action != WallpaperAction.NONE) {
+                showGestureWarningIfNeeded()
+            }
+
+            val intent = Intent(UndeadWallpaperService.ACTION_VIDEO_SETTINGS_CHANGED).apply {
                 setPackage(requireContext().packageName)
             }
             requireContext().applicationContext.sendBroadcast(intent)
@@ -839,36 +912,6 @@ class SettingsFragment : Fragment() {
         previewPlayer?.release()
         previewPlayer = null
         binding.videoPreview.player = null
-    }
-
-    /**
-     * Safely sets the value of a Material Slider, preventing crashes from out-of-range/step values.
-     *
-     * This extension function ensures that any value assigned to the slider is first clamped
-     * to be within the slider's `valueFrom` and `valueTo` range. If the slider has a `stepSize`
-     * defined, the function will also snap the clamped value to the nearest valid step.
-     *
-     * This is useful for programmatically setting slider values that might come from external
-     * sources (like saved preferences) without causing an `IllegalArgumentException`.
-     *
-     * @param newValue The desired new value for the slider.
-     */
-    fun com.google.android.material.slider.Slider.setValueSafe(newValue: Float) {
-        // Clamp: Ensure value is strictly between valueFrom and valueTo
-        val clampedValue = newValue.coerceIn(valueFrom, valueTo)
-
-        // Snap: If a stepSize is defined, ensure the value fits the step
-        val finalValue = if (stepSize > 0) {
-            // Calculate how many "steps" we are from the start
-            val steps = ((clampedValue - valueFrom) / stepSize).roundToInt()
-            // Reconstruct the value based on exact steps
-            valueFrom + (steps * stepSize)
-        } else {
-            clampedValue
-        }
-
-        // Apply: Only now is it safe to set the value
-        this.value = finalValue
     }
 
     override fun onDestroyView() {

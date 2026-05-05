@@ -54,6 +54,8 @@ class PreferencesManager(context: Context) {
 
         private const val KEY_ACTION_DOUBLE_TAP = "action_double_tap"
 
+        private const val KEY_ACTION_TRIPLE_TAP = "action_triple_tap"
+
         private const val KEY_ACTION_LONG_PRESS = "action_long_press"
     }
 
@@ -306,7 +308,7 @@ class PreferencesManager(context: Context) {
     fun getActionForGesture(gesture: GestureType): WallpaperAction {
         val key = when (gesture) {
             GestureType.DOUBLE_TAP -> KEY_ACTION_DOUBLE_TAP
-            GestureType.LONG_PRESS -> KEY_ACTION_LONG_PRESS
+            GestureType.TRIPLE_TAP -> KEY_ACTION_TRIPLE_TAP
         }
 
         val storedOrdinal = sharedPrefs.getInt(key, WallpaperAction.NONE.ordinal)
@@ -316,7 +318,7 @@ class PreferencesManager(context: Context) {
     fun setActionForGesture(gesture: GestureType, action: WallpaperAction) {
         val key = when (gesture) {
             GestureType.DOUBLE_TAP -> KEY_ACTION_DOUBLE_TAP
-            GestureType.LONG_PRESS -> KEY_ACTION_LONG_PRESS
+            GestureType.TRIPLE_TAP -> KEY_ACTION_TRIPLE_TAP
         }
         sharedPrefs.edit { putInt(key, action.ordinal) }
     }
