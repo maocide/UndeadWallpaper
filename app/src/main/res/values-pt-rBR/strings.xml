@@ -1,0 +1,138 @@
+<resources>
+    <string name="app_name">Undead Wallpaper</string>
+    <string name="action_settings">Sobre</string>
+    <string name="action_battery_optimization">Otimização de Bateria</string>
+
+    <!-- Strings used for fragments for navigation -->
+    <string name="first_fragment_label">Configurações do Undead</string>
+    <string name="second_fragment_label">Sobre</string>
+    <string name="previous">Anterior</string>
+
+    <!-- UI Strings -->
+    <string name="pick_video">Escolher Vídeo</string>
+    <string name="trim_video">Cortar Vídeo</string>
+    <string name="setting_audio_enabled">Habilitar Áudio</string>
+    <string name="playback_mode_setting">Modo de Reprodução</string>
+    <string name="recent_files">Playlist / Arquivos Recentes</string>
+    <string name="playlist_instructions">Toque longo para reordenar. Deslize para esquerda ou direita para remover.</string>
+    <string name="error_cannot_remove_last_video">Não é possível remover o último vídeo da playlist.</string>
+    <string name="apply_trim">Aplicar</string>
+    <string name="wallpaper_description">Um wallpaper vivo que reproduz vídeos.</string>
+    <string name="activating_wallpaper_message">Ativando wallpaper…</string>
+    <string name="select_video_first_message">Por favor, escolha um vídeo primeiro</string>
+
+    <!-- SharedPreferences Keys. These are not meant for translation. -->
+    <string name="video_uri" translatable="false">video_uri</string>
+    <string name="video_audio_enabled" translatable="false">video_audio_enabled</string>
+    <string name="playback_mode" translatable="false">playback_mode</string>
+    <string name="video_zoom_level" translatable="false">video_zoom_level</string>
+    <string name="video_start_ms" translatable="false">video_start_ms</string>
+    <string name="video_end_ms" translatable="false">video_end_ms</string>
+
+    <string name="default_video_filename" translatable="false">zombillie_default.mp4</string>
+    <string name="profile_image_content_description">Foto de perfil do desenvolvedor</string>
+    <string name="github_profile_text"><![CDATA[<a href="https://github.com/maocide/">GitHub: maocide</a>]]></string>
+    <string name="license_text"><![CDATA[<a href="https://www.gnu.org/licenses/gpl-3.0.en.html">Licença: GNU GPL v3.0</a>]]></string>
+
+    <!-- About Page Strings -->
+    <string name="about_header_story">A História Por Trás do Nome</string>
+    <string name="about_story_content">Isso não é apenas um trocadilho inteligente com wallpaper <b>vivo</b>. O nome <b>UndeadWallpaper</b> é pessoal. Depois de uma longa e forçada pausa na programação, este projeto foi o primeiro sinal de vida—o momento em que uma paixão que estava enterrada voltou com força à tona. Este app não é apenas <b>vivo</b>; é o símbolo de um criador voltando dos mortos. É <b>imortal</b>, porque algumas coisas são simplesmente teimosas demais para morrer.</string>
+    <string name="about_header_features">O Que Ele Faz</string>
+    <string name="about_feature_loops">• Loops Suaves: Transforma qualquer vídeo do seu telefone em um wallpaper vivo contínuo e sem travamentos.</string>
+    <string name="about_feature_freedom">• Liberdade Total: Sem anúncios, sem compras no app, sem merda. Nunca.</string>
+    <string name="about_feature_control">• Você Está no Controle: Suporta alternância de áudio e rastreia seus vídeos recentes para trocas rápidas.</string>
+    <string name="playback_mode_loop">Repetir</string>
+    <string name="playback_mode_oneshot">Uma Vez</string>
+    <string name="playback_mode_loop_all">Repetir Todos</string>
+    <string name="playback_mode_shuffle">Aleatório</string>
+    <string name="scaling_mode">Modo de Redimensionamento</string>
+    <string name="scaling_mode_fit">Ajustar</string>
+    <string name="scaling_mode_fill">Preencher</string>
+    <string name="scaling_mode_stretch">Esticar</string>
+    <string name="advanced">Avançado</string>
+    <string name="horizontal_position">Posição Horizontal</string>
+    <string name="vertical_position">Posição Vertical</string>
+    <string name="zoom">Zoom</string>
+    <string name="brightness">Brilho</string>
+    <string name="speed">Velocidade</string>
+    <string name="reset">Redefinir</string>
+    <string name="rotation">Rotação</string>
+
+    <!-- Gesture Controls -->
+    <string name="gesture_controls_header">Controles de Gestos</string>
+    <string name="double_tap_label">Toque Duplo</string>
+    <string name="triple_tap_label">Toque Triplo</string>
+    <string name="gesture_action_none">Nenhum</string>
+    <string name="gesture_action_pause_play">Pausar/Reproduzir</string>
+    <string name="gesture_action_skip">Pular</string>
+    <string name="gesture_launcher_warning">Nota: Alguns lançadores podem bloquear os gestos do wallpaper.</string>
+
+    <!-- Error and Warning Messages -->
+    <string name="error_permission_failed">Falha ao obter permissão para o arquivo selecionado.</string>
+    <string name="warning_4k_video">Aviso: vídeos 4K podem travar ou causar atrasos em alguns dispositivos.</string>
+    <string name="error_copy_failed">Falha ao copiar o arquivo de vídeo.</string>
+    <string name="error_cannot_play_video">Não é possível reproduzir este arquivo de vídeo.</string>
+    <string name="warning_high_speed_stuttering">Velocidades altas podem causar travamentos em vídeos de alta resolução.</string>
+    <string name="error_file_picker_not_available">O seletor de arquivos não está disponível no sistema!</string>
+    <string name="error_could_not_read_video_duration">Não foi possível ler a duração do vídeo.</string>
+    <string name="warning_random_start_time_delay">Aleatório pode causar atraso devido ao seek</string>
+    <string name="error_video_too_large">Vídeo muito grande! A resolução máxima suportada é 4K (UHD).</string>
+    <string name="error_open_settings_failed">Falha ao abrir as configurações</string>
+    <!-- Status Bar Icon Color Settings -->
+    <string name="status_bar_icons_label">Ícones da Barra de Status</string>
+    <string name="status_bar_auto">Automático</string>
+    <string name="status_bar_white_icons">Branco</string>
+    <string name="status_bar_black_icons">Preto</string>
+
+    <!-- UI Headers & Sections -->
+    <string name="custom_settings_header">Configurações Personalizadas</string>
+    <string name="positioning_header">Posicionamento</string>
+    <string name="general_header">Geral</string>
+    <string name="volume_label">Volume</string>
+    <string name="global_settings_header">Configurações Globais</string>
+    <string name="debug_options_header">Opções de Depuração</string>
+    <string name="debug_logging_description">Habilite o registro em arquivo local para capturar crashes complexos. É recomendado deixar isso desativado a menos que você esteja enfrentando problemas.</string>
+    <string name="debug_enable_logging">Habilitar Registro Local</string>
+    <string name="debug_clear_log">Limpar Registro</string>
+    <string name="debug_share_log">Compartilhar Registro</string>
+
+    <!-- Start Time Settings -->
+    <string name="start_time_label">Ao Visível</string>
+    <string name="start_time_resume">Continuar</string>
+    <string name="start_time_restart">Reiniciar</string>
+    <string name="start_time_random">Aleatório</string>
+
+    <string name="breadcrumb_zoom">Zoom</string>
+    <string name="breadcrumb_pan">Pan</string>
+    <string name="breadcrumb_rotation">Rotação</string>
+    <string name="breadcrumb_brightness">Brilho</string>
+    <string name="breadcrumb_speed">Velocidade</string>
+    <string name="breadcrumb_volume">Volume</string>
+    <string name="breadcrumb_more">+%1$d mais</string>
+
+    <string name="remove_file_title">Remover Vídeo</string>
+    <string name="remove_file_message">Tem certeza que deseja remover %s do app?</string>
+    <string name="remove_action">Remover</string>
+    <string name="cancel">Cancelar</string>
+
+    <!-- Battery Optimization Warning -->
+    <string name="battery_warning_title">Permitir Desempenho em Segundo Plano</string>
+    <string name="battery_warning_desc">Permita que o Undead Wallpaper seja executado em segundo plano para evitar que o sistema o encerre.</string>
+    <string name="battery_warning_btn">Corrigir</string>
+    <string name="battery_instruction_step_1">1. Toque em Uso de Bateria do App</string>
+    <string name="battery_instruction_step_2">2. Toque em Permitir Uso em Segundo Plano</string>
+    <string name="battery_instruction_step_3">3. Permita e Selecione Sem Restrições</string>
+    <string name="battery_warning_go_to_settings">Ir para Configurações</string>
+
+    <!-- Debug Logger -->
+    <string name="log_enabled_toast">Registro em arquivo local habilitado</string>
+    <string name="log_disabled_toast">Registro em arquivo local desabilitado</string>
+    <string name="share_log_title">Compartilhar Registro de Depuração</string>
+    <string name="share_log_warning">O registro de depuração pode conter informações sensíveis como nomes de arquivos ou detalhes do dispositivo. Tem certeza que deseja compartilhá-lo?</string>
+    <string name="share_log_confirm">Compartilhar</string>
+    <string name="share_log_cancel">Cancelar</string>
+    <string name="share_log_intent_title">Compartilhar Registro de Depuração</string>
+    <string name="log_empty_toast">Arquivo de registro não encontrado ou vazio</string>
+    <string name="log_cleared_toast">Arquivo de registro limpo</string>
+
+</resources>
