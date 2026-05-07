@@ -121,6 +121,7 @@ class UndeadWallpaperService : WallpaperService() {
 
         // Touch Interaction State
         private var isUserManuallyPaused = false
+        private var isCurrentlyListeningForTouch = true // Engine onCreate defaults to true
 
         // Initialize our new clean manager
         private val gestureManager = WallpaperGestureManager(prefs) { action ->
@@ -168,11 +169,17 @@ class UndeadWallpaperService : WallpaperService() {
             val doubleTapAction = prefs.getActionForGesture(GestureType.DOUBLE_TAP)
             val tripleTapAction = prefs.getActionForGesture(GestureType.TRIPLE_TAP)
 
-            // Only turn on the Android touch pipeline if the user actually bound an action
-            val wantsTouchEvents = doubleTapAction != WallpaperAction.NONE || tripleTapAction != WallpaperAction.NONE
+            // VIVO AND CHINESE PHONES FIX: Never request touch events while in the system preview screen,
+            // otherwise Vivo's OS sends the "Apply Wallpaper" button taps to us instead of the system.
+            // Checking isPreview flag should solve.
+            val wantsTouchEvents = !isPreview && (doubleTapAction != WallpaperAction.NONE || tripleTapAction != WallpaperAction.NONE)
 
-            setTouchEventsEnabled(wantsTouchEvents)
-            FileLogger.i(TAG, "Touch events enabled: $wantsTouchEvents")
+            // ONLY tell the OS to change the touch state if it's different from the current state.
+            if (isCurrentlyListeningForTouch != wantsTouchEvents) {
+                setTouchEventsEnabled(wantsTouchEvents)
+                isCurrentlyListeningForTouch = wantsTouchEvents
+                FileLogger.i(TAG, "Touch events enabled changed to: $wantsTouchEvents")
+            }
         }
 
         private fun executeGestureAction(action: WallpaperAction) {
@@ -343,14 +350,8 @@ class UndeadWallpaperService : WallpaperService() {
                 FileLogger.i(TAG, "Manual skip: Delaying matrix update to onRenderedFirstFrame.")
             }
 
-            val activeUri = loadedVideoUriString.toUri()
-            val fileName = activeUri.lastPathSegment ?: ""
-            val activeSettings = prefs.getVideoSettings(fileName)
-
-            wallpaperPlayer.getPlayerInstance()?.let { player ->
-                player.volume = activeSettings.getPerceivedVolume()
-                player.setPlaybackSpeed(activeSettings.speed)
-            }
+            val activeSettings = getSettingsForUri(loadedVideoUriString)
+            applyNonVisualSettings(activeSettings)
 
             wallpaperPlayer.prepare()
             wallpaperPlayer.playWhenReady = if (isManualSkip) isVisible else true
@@ -358,6 +359,12 @@ class UndeadWallpaperService : WallpaperService() {
 
         override fun onTouchEvent(event: MotionEvent?) {
             super.onTouchEvent(event)
+
+            // If we actively decided we don't want touches, ignore any ghost touches
+            // the Android OS accidentally forwards to us anyway.
+            // Most likely needed too for VIVO and CHINESE phones.
+            if (!isCurrentlyListeningForTouch) return
+
             gestureManager.onTouchEvent(event)
         }
 
@@ -676,8 +683,15 @@ class UndeadWallpaperService : WallpaperService() {
             FileLogger.i(TAG, "onSurfaceCreated")
             this.surfaceHolder = holder
 
+            // VIVO SHIELD: Funtouch OS spams onSurfaceCreated when touch events change,
+            // WITHOUT calling onSurfaceDestroyed first.
+            // If we already have a renderer, the surface is still perfectly valid. Ignore the spam!
+            if (renderer != null) {
+                FileLogger.w(TAG, "Vivo spam detected: onSurfaceCreated called but renderer exists. Ignoring.")
+                return
+            }
+
             if (!useFallbackSurface) {
-                // Start the GL Renderer
                 renderer = GLVideoRenderer(applicationContext)
                 renderer?.onSurfaceCreated(holder)
             } else {
@@ -818,9 +832,6 @@ class UndeadWallpaperService : WallpaperService() {
         override fun onCreate(surfaceHolder: SurfaceHolder) {
             super.onCreate(surfaceHolder)
             FileLogger.i(TAG, "Engine onCreate")
-
-            // Allow the OS to send MotionEvents to this engine
-            setTouchEventsEnabled(true)
 
             // Turn on filter to start listening
             val intentFilter = IntentFilter().apply {

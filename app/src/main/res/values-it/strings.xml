@@ -49,8 +49,8 @@
     <string name="reset">Ripristina</string>
     <string name="rotation">Rotazione</string>
 
-    <!-- Gesture Controls -->
-    <string name="gesture_controls_header">Controlli Touch</string>
+    <!-- Home Screen Gestures -->
+    <string name="gesture_controls_header">Controlli Touch sulla Home</string>
     <string name="double_tap_label">Doppio Tap</string>
     <string name="triple_tap_label">Triplo Tap</string>
     <string name="gesture_action_none">Nessuna</string>

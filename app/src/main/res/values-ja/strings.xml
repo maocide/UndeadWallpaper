@@ -48,8 +48,8 @@
     <string name="reset">リセット</string>
     <string name="rotation">回転</string>
 
-    <!-- Gesture Controls -->
-    <string name="gesture_controls_header">ジェスチャ設定</string>
+    <!-- Home Screen Gestures -->
+    <string name="gesture_controls_header">ホーム画面のジェスチャ</string>
     <string name="double_tap_label">ダブルタップ</string>
     <string name="triple_tap_label">トリプルタップ</string>
     <string name="gesture_action_none">なし</string>

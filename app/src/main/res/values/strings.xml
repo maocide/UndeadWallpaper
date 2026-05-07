@@ -60,8 +60,8 @@
     <string name="reset">Reset</string>
     <string name="rotation">Rotation</string>
 
-    <!-- Gesture Controls -->
-    <string name="gesture_controls_header">Gesture Controls</string>
+    <!-- Home Screen Gestures -->
+    <string name="gesture_controls_header">Home Screen Gestures</string>
     <string name="double_tap_label">Double Tap</string>
     <string name="triple_tap_label">Triple Tap</string>
     <string name="gesture_action_none">None</string>
