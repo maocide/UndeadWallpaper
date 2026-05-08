@@ -169,9 +169,16 @@ class UndeadWallpaperService : WallpaperService() {
             val doubleTapAction = prefs.getActionForGesture(GestureType.DOUBLE_TAP)
             val tripleTapAction = prefs.getActionForGesture(GestureType.TRIPLE_TAP)
 
+            // EDGE CASE: If the video is manually paused, but the user just removed
+            // the PLAY_PAUSE action from all gestures, we must unpause it so they don't get stuck
+            val canPause = doubleTapAction == WallpaperAction.PLAY_PAUSE || tripleTapAction == WallpaperAction.PLAY_PAUSE
+            if (isUserManuallyPaused && !canPause) {
+                isUserManuallyPaused = false
+                FileLogger.i(TAG, "Play/Pause action unbound. Clearing manual pause state.")
+            }
+
             // VIVO AND CHINESE PHONES FIX: Never request touch events while in the system preview screen,
             // otherwise Vivo's OS sends the "Apply Wallpaper" button taps to us instead of the system.
-            // Checking isPreview flag should solve.
             val wantsTouchEvents = !isPreview && (doubleTapAction != WallpaperAction.NONE || tripleTapAction != WallpaperAction.NONE)
 
             // ONLY tell the OS to change the touch state if it's different from the current state.

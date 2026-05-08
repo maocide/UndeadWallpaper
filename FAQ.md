@@ -9,9 +9,17 @@
 
 **Q: Can I set a different video for the Lock Screen and the Home Screen?**
 
-**A:** Not currently, and this is due to Android OS limitations. Android's native engine, for a wallpaper running in the background, provide no stable way to detect if it is running in Home or Lock screen.
+**A:** Not currently, and this is due to Android OS limitations. Android's native engine, for a wallpaper running in the background, provides no stable way to detect if it is running on the Home or Lock screen.
 
 * Furthermore, manufacturers like **Asus (ROG UI)** are aggressively hardcoded to override third-party apps, forcing the "Both" behavior. Many custom ROMs lock down the lock screen to force you into their monetized theme stores. The app runs in a sandbox and cannot bypass this.
+
+**Q: I enabled Home Screen Gestures (Double/Triple Tap), but nothing happens when I tap!**
+
+**A:** If your taps are being ignored, one of these three system rules is blocking them from reaching the wallpaper:
+
+* **The Lock Screen Blockade:** Gestures will *never* work on the lock screen. Android natively blocks live wallpapers from receiving touch inputs on the lock screen for security reasons. This is a hard, unbypassable OS rule.
+* **Greedy Custom Launchers:** If you use a custom launcher (like Nova, Smart Launcher, Niagara, etc.), it is likely stealing your taps. For example, if your launcher has a "Double tap to turn off screen" feature enabled, it intercepts your fingers before the wallpaper ever feels them. You must disable the launcher's gesture in its own settings to let the taps pass through to the horde.
+* **The Preview Screen:** Gestures are intentionally disabled while you are looking at the system's "Apply Wallpaper" preview screen to prevent hardware bugs on heavily modified Chinese ROMs (like Vivo's Funtouch OS). Apply the wallpaper first, then tap your actual Home Screen.
 
 **Q: I have a Xiaomi/POCO/Redmi phone. The video applies to my Home Screen, but my Lock Screen is still static.**
 
