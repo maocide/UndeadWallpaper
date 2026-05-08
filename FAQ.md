@@ -18,8 +18,8 @@
 **A:** If your taps are being ignored, one of these three system rules is blocking them from reaching the wallpaper:
 
 * **The Lock Screen Blockade:** Gestures will *never* work on the lock screen. Android natively blocks live wallpapers from receiving touch inputs on the lock screen for security reasons. This is a hard, unbypassable OS rule.
-* **Greedy Custom Launchers:** If you use a custom launcher (like Nova, Smart Launcher, Niagara, etc.), it is likely stealing your taps. For example, if your launcher has a "Double tap to turn off screen" feature enabled, it intercepts your fingers before the wallpaper ever feels them. You must disable the launcher's gesture in its own settings to let the taps pass through to the horde.
-* **The Preview Screen:** Gestures are intentionally disabled while you are looking at the system's "Apply Wallpaper" preview screen to prevent hardware bugs on heavily modified Chinese ROMs (like Vivo's Funtouch OS). Apply the wallpaper first, then tap your actual Home Screen.
+* **Greedy Custom Launchers:** If you use a custom launcher (like **Nova**, **Smart Launcher**, **Niagara**, etc.), it is likely stealing your taps. For example, if your launcher has a "Double tap to turn off screen" feature enabled, it intercepts your fingers before the wallpaper ever feels them. You must disable the launcher's gesture in its own settings to let the taps pass through to the horde.
+* **The Preview Screen:** Gestures are intentionally disabled while you are looking at the system's "Apply Wallpaper" preview screen to prevent hardware bugs on certain manufacturer interfaces (like Vivo, Oppo, or Xiaomi). Apply the wallpaper first, then tap your actual Home Screen.
 
 **Q: I have a Xiaomi/POCO/Redmi phone. The video applies to my Home Screen, but my Lock Screen is still static.**
 
@@ -49,3 +49,10 @@
 * **The Battery Killer:** Playing a GIF forces your phone's CPU to manually decode and draw every single frame continuously. Apps that allow this cause massive, silent battery drain.
 * **The Video Advantage:** Actual video files (`.mp4`, `.mkv`) use hardware acceleration. Your phone has a dedicated chip just for decoding video, which is incredibly efficient and uses almost zero extra battery.
 * **The Fix:** If you have a GIF you love, use a free online converter to change it into an `.mp4` file first. Your battery will thank you.
+
+**Q: When I open my app drawer, the background blurs a static image of Zombillie instead of my video. Why?**
+
+**A:** Your phone’s manufacturer is taking a lazy shortcut to save battery. 
+
+* **The Technical Reason:** Blurring live video in real-time requires GPU power. Aggressive custom interfaces (like Infinix's XOS or certain Xiaomi builds) refuse to do this. Instead, their launcher asks the OS for the app's default, hardcoded static thumbnail—our mascot, Zombillie—and just blurs that image instead. 
+* **The Fix:** Because Android requires that fallback thumbnail to be permanently baked into the app's installation file, third-party apps cannot dynamically change it to match your video. To get a true, live video blur, you either have to switch to a well-behaved custom launcher (like **Nova** or **Smart Launcher**) or just embrace your new zombie app drawer companion!
