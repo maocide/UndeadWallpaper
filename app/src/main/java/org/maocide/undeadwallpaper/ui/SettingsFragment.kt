@@ -220,12 +220,14 @@ class SettingsFragment : Fragment() {
         // Get duration and update UI
         currentVideoDurationMs = getVideoDuration(uri)
         if (currentVideoDurationMs == 0L) {
-            // Handle case where duration is invalid or video is corrupt
             Toast.makeText(context, R.string.error_could_not_read_video_duration, Toast.LENGTH_LONG).show()
         }
 
-        // Update the video preview
-        setupVideoPreview(uri)
+        // Only spawn a new player if the user actively clicked
+        // If the app is booting up, onResume will handle it
+        if (isResumed) {
+            setupVideoPreview(uri)
+        }
 
         // Save the preference and notify the service to reload the video from that value
         if(forceChange) {
@@ -235,7 +237,6 @@ class SettingsFragment : Fragment() {
             }
             context?.sendBroadcast(intent)
         }
-
     }
 
 
@@ -454,8 +455,8 @@ class SettingsFragment : Fragment() {
             // Load Video Preview and set the video as selected
             val savedUri = preferencesManager.getActiveVideoUri()
             if (savedUri != null) {
-                //setupVideoPreview(uriString.toUri())
-                updateVideoSource(savedUri.toUri(), false)
+                // onResume() will handle actually creating ExoPlayer safely, updating video source
+                sharedViewModel.selectedVideoUri = savedUri.toUri()
             }
 
             // Double Tap Gesture

@@ -86,8 +86,7 @@ class PlaylistManager(
      * If a video requires a visual change, the chunk ends, forcing the player to
      * hit a playback boundary so the renderer can safely apply the new settings.
      */
-    fun getGaplessChunkUris(currentUri: String, playbackMode: PlaybackMode): List<String> {
-        val playlistUris = getPlaylistUris()
+    fun getGaplessChunkUris(currentUri: String, playbackMode: PlaybackMode, playlistUris: List<String> = getPlaylistUris()): List<String> {
         if (playlistUris.isEmpty()) return emptyList()
 
         val chunkUris = mutableListOf<String>()

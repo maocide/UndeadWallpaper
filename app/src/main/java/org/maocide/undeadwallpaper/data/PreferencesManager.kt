@@ -29,6 +29,9 @@ class PreferencesManager(context: Context) {
 
     private val jsonParser = Json { ignoreUnknownKeys = true }
 
+    private var cachedPlaylistSettingsString: String? = null
+    private var cachedPlaylistSettings: List<VideoSettings>? = null
+
     companion object {
         private const val PREFS_NAME = "DEFAULT"
         private const val KEY_VIDEO_URI = "video_uri"
@@ -158,13 +161,26 @@ class PreferencesManager(context: Context) {
         }
     }
 
+    /**
+     * Getter for playlist video settings implementing a caching to avoid json decoding each call.
+     * the cache is updated/invalidated by the save method.
+     */
     fun getPlaylistSettings(): List<VideoSettings> {
         val jsonString = sharedPrefs.getString(KEY_PLAYLIST_SETTINGS, null)
         if (jsonString.isNullOrBlank()) {
+            cachedPlaylistSettingsString = null
+            cachedPlaylistSettings = null
             return emptyList()
         }
+        val cachedSettings = cachedPlaylistSettings
+        if (jsonString == cachedPlaylistSettingsString && cachedSettings != null) {
+            return cachedSettings
+        }
         return try {
-            jsonParser.decodeFromString<List<VideoSettings>>(jsonString)
+            val decoded = jsonParser.decodeFromString<List<VideoSettings>>(jsonString)
+            cachedPlaylistSettingsString = jsonString
+            cachedPlaylistSettings = decoded
+            decoded
         } catch (e: Exception) {
             emptyList()
         }
@@ -172,6 +188,8 @@ class PreferencesManager(context: Context) {
 
     fun savePlaylistSettings(playlist: List<VideoSettings>) {
         val jsonString = jsonParser.encodeToString(playlist)
+        cachedPlaylistSettingsString = jsonString
+        cachedPlaylistSettings = playlist
         sharedPrefs.edit(commit = true)
         { putString(KEY_PLAYLIST_SETTINGS, jsonString) }
     }

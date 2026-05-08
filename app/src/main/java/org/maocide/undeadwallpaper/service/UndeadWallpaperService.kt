@@ -218,9 +218,11 @@ class UndeadWallpaperService : WallpaperService() {
 
             val mediaUri = getMediaUri() ?: return
 
+            val playlistUris = playlistManager.getPlaylistUris()
+
             // Hybrid Gapless Batching:
             // Fetch the chunk of consecutive URIs that share identical visual settings.
-            val chunkUris = playlistManager.getGaplessChunkUris(loadedVideoUriString, currentPlaybackMode)
+            val chunkUris = playlistManager.getGaplessChunkUris(loadedVideoUriString, currentPlaybackMode, playlistUris)
 
             // If the chunk is empty for some reason, fallback to the single mediaUri
             val urisToLoad = if (chunkUris.isNotEmpty()) chunkUris else listOf(loadedVideoUriString)
@@ -236,7 +238,6 @@ class UndeadWallpaperService : WallpaperService() {
             // We can safely enable ExoPlayer's internal REPEAT_MODE_ALL. This gives perfect gapless looping
             // without ever hitting STATE_ENDED and incurring the manual flush pause.
             // NOTE: SHUFFLE mode is excluded because it MUST hit STATE_ENDED to trigger a newly randomized sequence loop.
-            val playlistUris = playlistManager.getPlaylistUris()
             if (currentPlaybackMode == PlaybackMode.LOOP_ALL
                 && playlistUris.isNotEmpty() && chunkUris.size == playlistUris.size) {
                 wallpaperPlayer.setRepeatMode(Player.REPEAT_MODE_ALL)
