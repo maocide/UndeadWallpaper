@@ -25,6 +25,7 @@ import android.os.Looper
 import android.os.UserManager
 import android.service.wallpaper.WallpaperService
 import android.util.Log
+import android.view.MotionEvent
 
 
 import android.view.SurfaceHolder
@@ -50,8 +51,10 @@ import androidx.media3.exoplayer.upstream.DefaultAllocator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-
-
+import org.maocide.undeadwallpaper.input.WallpaperGestureManager
+import org.maocide.undeadwallpaper.model.GestureType
+import org.maocide.undeadwallpaper.model.VideoSettings
+import org.maocide.undeadwallpaper.model.WallpaperAction
 
 
 import kotlin.math.log
@@ -116,6 +119,105 @@ class UndeadWallpaperService : WallpaperService() {
 
         private var visibilityJob: kotlinx.coroutines.Job? = null
 
+        // Touch Interaction State
+        private var isUserManuallyPaused = false
+        private var isCurrentlyListeningForTouch = true // Engine onCreate defaults to true
+
+        // Initialize our new clean manager
+        private val gestureManager = WallpaperGestureManager(prefs) { action ->
+            executeGestureAction(action)
+        }
+
+        /**
+         * Resets the internal playback timeline variables.
+         * @param seekPlayerToStart If true, also forces the active ExoPlayer instance to rewind to the beginning.
+         */
+        private fun resetPlaybackTimeline(seekPlayerToStart: Boolean = false) {
+            playheadTime = 0L
+            hasPlaybackCompleted = false
+            if (seekPlayerToStart) {
+                wallpaperPlayer.seekToDefaultPosition()
+            }
+        }
+
+        /**
+         * Applies VideoSettings that don't require a GL Renderer Update. Volume, speed...
+         * @param settings VideoSettings object from which to apply non-visual settings
+         */
+        private fun applyNonVisualSettings(settings: VideoSettings) {
+            wallpaperPlayer.getPlayerInstance()?.let { player ->
+                player.volume = settings.getPerceivedVolume()
+                player.setPlaybackSpeed(settings.speed)
+            }
+        }
+
+        /**
+         * Retrieves VideoSettings for the provided uri String.
+         * @param uriString the uri string of the video to get settings from.
+         */
+        private fun getSettingsForUri(uriString: String): VideoSettings {
+            val fileName = uriString.toUri().lastPathSegment ?: ""
+            return prefs.getVideoSettings(fileName)
+        }
+
+        private fun updateActiveVideoState(newUriString: String) {
+            loadedVideoUriString = newUriString
+            prefs.saveActiveVideoUri(newUriString)
+        }
+
+        private fun updateTouchListeningState() {
+            val doubleTapAction = prefs.getActionForGesture(GestureType.DOUBLE_TAP)
+            val tripleTapAction = prefs.getActionForGesture(GestureType.TRIPLE_TAP)
+
+            // EDGE CASE: If the video is manually paused, but the user just removed
+            // the PLAY_PAUSE action from all gestures, we must unpause it so they don't get stuck
+            val canPause = doubleTapAction == WallpaperAction.PLAY_PAUSE || tripleTapAction == WallpaperAction.PLAY_PAUSE
+            if (isUserManuallyPaused && !canPause) {
+                isUserManuallyPaused = false
+                FileLogger.i(TAG, "Play/Pause action unbound. Clearing manual pause state.")
+            }
+
+            // VIVO AND CHINESE PHONES FIX: Never request touch events while in the system preview screen,
+            // otherwise Vivo's OS sends the "Apply Wallpaper" button taps to us instead of the system.
+            val wantsTouchEvents = !isPreview && (doubleTapAction != WallpaperAction.NONE || tripleTapAction != WallpaperAction.NONE)
+
+            // ONLY tell the OS to change the touch state if it's different from the current state.
+            if (isCurrentlyListeningForTouch != wantsTouchEvents) {
+                setTouchEventsEnabled(wantsTouchEvents)
+                isCurrentlyListeningForTouch = wantsTouchEvents
+                FileLogger.i(TAG, "Touch events enabled changed to: $wantsTouchEvents")
+            }
+        }
+
+        private fun executeGestureAction(action: WallpaperAction) {
+            when (action) {
+                WallpaperAction.NONE -> return
+
+                WallpaperAction.SKIP_NEXT -> {
+                    // UX Rule: If they skip, they want to see the new video. Unpause it.
+                    isUserManuallyPaused = false
+                    skipNextVideo(isManualSkip = true)
+                }
+
+                WallpaperAction.PLAY_PAUSE -> {
+                    if (!isPlayerInitialized) return
+
+                    // ONE_SHOT CASE: If they "Play" a finished video, restart it!
+                    if (currentPlaybackMode == PlaybackMode.ONE_SHOT && hasPlaybackCompleted) {
+                        FileLogger.i(TAG, "User triggered Play on a finished ONE_SHOT video. Replaying.")
+                        resetPlaybackTimeline(seekPlayerToStart = true)
+                        isUserManuallyPaused = false
+                    } else {
+                        // Normal toggle behavior
+                        isUserManuallyPaused = !isUserManuallyPaused
+                    }
+
+                    wallpaperPlayer.playWhenReady = !isUserManuallyPaused
+                    FileLogger.i(TAG, "User toggled Play/Pause. isUserManuallyPaused: $isUserManuallyPaused")
+                }
+            }
+        }
+
         @OptIn(UnstableApi::class)
         private fun bindPlaylistToPlayer(keepCurrentPlayback: Boolean) {
             val dataSourceFactory = DefaultDataSource.Factory(baseContext)
@@ -123,9 +225,11 @@ class UndeadWallpaperService : WallpaperService() {
 
             val mediaUri = getMediaUri() ?: return
 
+            val playlistUris = playlistManager.getPlaylistUris()
+
             // Hybrid Gapless Batching:
             // Fetch the chunk of consecutive URIs that share identical visual settings.
-            val chunkUris = playlistManager.getGaplessChunkUris(loadedVideoUriString, currentPlaybackMode)
+            val chunkUris = playlistManager.getGaplessChunkUris(loadedVideoUriString, currentPlaybackMode, playlistUris)
 
             // If the chunk is empty for some reason, fallback to the single mediaUri
             val urisToLoad = if (chunkUris.isNotEmpty()) chunkUris else listOf(loadedVideoUriString)
@@ -141,7 +245,6 @@ class UndeadWallpaperService : WallpaperService() {
             // We can safely enable ExoPlayer's internal REPEAT_MODE_ALL. This gives perfect gapless looping
             // without ever hitting STATE_ENDED and incurring the manual flush pause.
             // NOTE: SHUFFLE mode is excluded because it MUST hit STATE_ENDED to trigger a newly randomized sequence loop.
-            val playlistUris = playlistManager.getPlaylistUris()
             if (currentPlaybackMode == PlaybackMode.LOOP_ALL
                 && playlistUris.isNotEmpty() && chunkUris.size == playlistUris.size) {
                 wallpaperPlayer.setRepeatMode(Player.REPEAT_MODE_ALL)
@@ -163,14 +266,16 @@ class UndeadWallpaperService : WallpaperService() {
                     // Will be called by changing video
                     ACTION_VIDEO_URI_CHANGED -> {
                         FileLogger.i(TAG, "Broadcast received: Video uri changed, full re-initialization requested.")
-                        playheadTime = 0L
+                        isUserManuallyPaused = false // CLEAR PAUSE STATE
+                        resetPlaybackTimeline()
                         initializePlayer() // force Reinit
                     }
 
                     // Will be called by changing scaling, playback mode, all things requiring a reinit
                     ACTION_PLAYBACK_MODE_CHANGED -> {
                         FileLogger.i(TAG, "Broadcast received: Playback mode change, full re-initialization requested.")
-                        playheadTime = 0L
+                        isUserManuallyPaused = false // CLEAR PAUSE STATE
+                        resetPlaybackTimeline()
                         initializePlayer() // force Reinit
                     }
 
@@ -192,8 +297,9 @@ class UndeadWallpaperService : WallpaperService() {
 
                     ACTION_VIDEO_SETTINGS_CHANGED -> {
                         FileLogger.i(TAG, "Broadcast received: Video settings changed, full re-initialization requested.")
+                        isUserManuallyPaused = false // CLEAR PAUSE STATE
                         // Ensure settings apply completely identical to a URI change to avoid syncing bugs
-                        playheadTime = 0L
+                        resetPlaybackTimeline()
                         initializePlayer() // force Reinit
                     }
 
@@ -206,14 +312,82 @@ class UndeadWallpaperService : WallpaperService() {
             }
         }
 
+        /**
+         * Skips current video and moves to next using chunks to buffer video sharing settings
+         * @param isManualSkip when true, means that the user initiated the action and
+         * matrix changes are not applied on call, but applied later on first frame of the new video.
+         */
+        private fun skipNextVideo(isManualSkip: Boolean) {
+            if (!isPlayerInitialized) return
+
+            val nextUriString = playlistManager.getNextUri(loadedVideoUriString, currentPlaybackMode)
+
+            if (nextUriString == null) {
+                FileLogger.w(TAG, "Transition aborted: Next URI is null.")
+                return
+            }
+
+            FileLogger.i(TAG, "Transitioning across boundary to: $nextUriString (Manual: $isManualSkip)")
+
+            // ONE_SHOT / LOOP Reset (These still need a hard re-init to reset their single-video state)
+            if (currentPlaybackMode == PlaybackMode.ONE_SHOT || currentPlaybackMode == PlaybackMode.LOOP) {
+                loadedVideoUriString = nextUriString
+                prefs.saveActiveVideoUri(nextUriString)
+
+                FileLogger.i(TAG, "Single-video mode detected. Performing hard re-initialization for skip.")
+                releasePlayer()
+                resetPlaybackTimeline()
+                initializePlayer()
+                return
+            }
+
+            // Now update the state
+            updateActiveVideoState(nextUriString)
+            resetPlaybackTimeline()
+
+            // ALWAYS Hot-swap via Chunking!
+            bindPlaylistToPlayer(keepCurrentPlayback = false)
+
+            if (!isManualSkip) {
+                // AUTOMATIC TRANSITION (STATE_ENDED):
+                // The decoder buffer is completely empty. We MUST apply the matrix NOW
+                // so the very first frame of the new video draws perfectly.
+                FileLogger.i(TAG, "Auto-transition: Applying matrix immediately.")
+                refreshRenderer()
+            } else {
+                // MANUAL SKIP:
+                // The buffer has old frames. We DELAY the matrix update until
+                // onRenderedFirstFrame fires to prevent a visual snap.
+                FileLogger.i(TAG, "Manual skip: Delaying matrix update to onRenderedFirstFrame.")
+            }
+
+            val activeSettings = getSettingsForUri(loadedVideoUriString)
+            applyNonVisualSettings(activeSettings)
+
+            wallpaperPlayer.prepare()
+            wallpaperPlayer.playWhenReady = if (isManualSkip) isVisible else true
+        }
+
+        override fun onTouchEvent(event: MotionEvent?) {
+            super.onTouchEvent(event)
+
+            // If we actively decided we don't want touches, ignore any ghost touches
+            // the Android OS accidentally forwards to us anyway.
+            // Most likely needed too for VIVO and CHINESE phones.
+            if (!isCurrentlyListeningForTouch) return
+
+            gestureManager.onTouchEvent(event)
+        }
+
+        /**
+         * Uses the VideoSettings of the current uri to recompute matrix/uniforms on GL Renderer
+         * It is done here to be as late and synced to playback as possible.
+         */
         private fun refreshRenderer() {
             if (loadedVideoUriString.isBlank()) return
 
-            val activeUri = loadedVideoUriString.toUri()
-            val fileName = activeUri.lastPathSegment ?: ""
-            val activeSettings = prefs.getVideoSettings(fileName)
+            val activeSettings = getSettingsForUri(loadedVideoUriString)
 
-            // Send the whole package to the renderer
             currentScalingMode = activeSettings.scalingMode
             renderer?.setScalingMode(currentScalingMode)
             renderer?.setTransforms(
@@ -226,7 +400,6 @@ class UndeadWallpaperService : WallpaperService() {
         }
 
         // WallpaperPlayerListener implementations
-
         override fun onPlayerError(error: PlaybackException) {
             // Handled mostly by WallpaperPlayer, this is just for non-hardware errors or restart triggers
             Handler(Looper.getMainLooper()).post {
@@ -259,8 +432,8 @@ class UndeadWallpaperService : WallpaperService() {
             // Send video size to Renderer for Matrix Calculation
             renderer?.setVideoSize(width, height)
 
-            // refresh all user values to renderer
-            refreshRenderer()
+            // No more refreshed here, just on new frame
+            // refreshRenderer()
 
             // Use ExoPlayer's scaling only if fallback surface is used
             if (useFallbackSurface) {
@@ -290,34 +463,8 @@ class UndeadWallpaperService : WallpaperService() {
                         hasPlaybackCompleted = true
                         wallpaperPlayer.pause()
                     } else if (currentPlaybackMode == PlaybackMode.LOOP_ALL || currentPlaybackMode == PlaybackMode.SHUFFLE) {
-                        // Manual playlist boundary handling
-                        // The playback ended because we reached the end of a chunk of identical-settings videos.
-                        // We must load the NEXT chunk starting from the video after the one that just finished.
-                        val nextUriString = playlistManager.getNextUri(loadedVideoUriString, currentPlaybackMode)
-                        if (nextUriString != null) {
-                            FileLogger.i(TAG, "Manually transitioning across settings boundary to: $nextUriString")
-
-                            loadedVideoUriString = nextUriString
-                            prefs.saveActiveVideoUri(nextUriString)
-
-                            playheadTime = 0L
-                            hasPlaybackCompleted = false
-
-                            // Load the next chunk and flush the player
-                            bindPlaylistToPlayer(keepCurrentPlayback = false)
-                            refreshRenderer()
-
-                            val activeUri = loadedVideoUriString.toUri()
-                            val fileName = activeUri.lastPathSegment ?: ""
-                            val activeSettings = prefs.getVideoSettings(fileName)
-                            wallpaperPlayer.getPlayerInstance()?.let { player ->
-                                player.volume = activeSettings.getPerceivedVolume()
-                                player.setPlaybackSpeed(activeSettings.speed)
-                            }
-
-                            wallpaperPlayer.prepare()
-                            wallpaperPlayer.playWhenReady = true
-                        }
+                        // Same flow as skip, inside the playback mode is handled
+                        skipNextVideo(isManualSkip = false)
                     }
                 }
                 Player.STATE_READY -> {
@@ -330,27 +477,19 @@ class UndeadWallpaperService : WallpaperService() {
 
         @OptIn(UnstableApi::class)
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-            // Track chunk advancement internally
+            // Track chunk advancement internally for optimized batching
             val nextUriString = mediaItem?.mediaId
             if (nextUriString != null && nextUriString != loadedVideoUriString) {
-                FileLogger.i(TAG, "Chunk transition: advancing internally to $nextUriString")
-                loadedVideoUriString = nextUriString
-                prefs.saveActiveVideoUri(nextUriString)
+                updateActiveVideoState(nextUriString)
             }
 
-            // Update non-visual settings (volume, speed) dynamically during the chunk
-            val activeUri = loadedVideoUriString.toUri()
-            val fileName = activeUri.lastPathSegment ?: ""
-            val activeSettings = prefs.getVideoSettings(fileName)
-
-            wallpaperPlayer.getPlayerInstance()?.let { player ->
-                player.volume = activeSettings.getPerceivedVolume()
-                player.setPlaybackSpeed(activeSettings.speed)
-            }
+            val activeSettings = getSettingsForUri(loadedVideoUriString)
+            applyNonVisualSettings(activeSettings)
         }
 
         override fun onRenderedFirstFrame() {
             FileLogger.i(TAG, "SUCCESS: onRenderedFirstFrame called. Decoder actually pushed a frame to the screen!")
+            refreshRenderer() // Applies as late as possible a matrix/uniform recomputation on openGL engine
         }
 
         @OptIn(UnstableApi::class)
@@ -370,6 +509,9 @@ class UndeadWallpaperService : WallpaperService() {
             if (isPlayerInitialized) {
                 releasePlayer()
             }
+
+            // Allow the OS to send MotionEvents to this engine
+            updateTouchListeningState()
 
             // Get a surface
             val holder = surfaceHolder
@@ -412,7 +554,8 @@ class UndeadWallpaperService : WallpaperService() {
             bindPlaylistToPlayer(keepCurrentPlayback = false)
 
             // Send all values to renderer updating it, will be used for matrix calc.
-            refreshRenderer()
+            // refreshRenderer() // Removed from initialization, as it's called on first frame
+            // it will be better there to sync better with video switching on touch events.
 
             // WAIT for the GL Surface, then attach
             playerSetupJob = kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
@@ -495,7 +638,6 @@ class UndeadWallpaperService : WallpaperService() {
         }
 
         /**
-         * Helper method to keep it DRY (Don't Repeat Yourself)
          * Releases the [GLVideoRenderer] and its associated resources.
          * This should be called when the underlying surface is destroyed.
          * It ensures that OpenGL contexts and other graphics-related
@@ -552,8 +694,15 @@ class UndeadWallpaperService : WallpaperService() {
             FileLogger.i(TAG, "onSurfaceCreated")
             this.surfaceHolder = holder
 
+            // VIVO SHIELD: Funtouch OS spams onSurfaceCreated when touch events change,
+            // WITHOUT calling onSurfaceDestroyed first.
+            // If we already have a renderer, the surface is still perfectly valid. Ignore the spam!
+            if (renderer != null) {
+                FileLogger.w(TAG, "Vivo spam detected: onSurfaceCreated called but renderer exists. Ignoring.")
+                return
+            }
+
             if (!useFallbackSurface) {
-                // Start the GL Renderer
                 renderer = GLVideoRenderer(applicationContext)
                 renderer?.onSurfaceCreated(holder)
             } else {
@@ -591,6 +740,7 @@ class UndeadWallpaperService : WallpaperService() {
             playbackWatchdog.stop() // Kill the playback watchdog
             releasePlayer()
             releaseRenderer()
+            gestureManager.destroy()
             unregisterReceiver(videoChangeReceiver)
         }
 
@@ -605,7 +755,7 @@ class UndeadWallpaperService : WallpaperService() {
             visibilityJob = kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
                 kotlinx.coroutines.delay(33L) // Give Device 33ms to stop spamming
 
-                // If this job was cancelled by another rapid-fire event, stop here.
+                // If this job was canceled by another rapid-fire event, stop here.
                 if (!isActive) return@launch
 
                 FileLogger.i(TAG, "onVisibilityChanged (Debounced): visible = $visible isPreview = $isPreview, playbackMode = $currentPlaybackMode")
@@ -626,8 +776,7 @@ class UndeadWallpaperService : WallpaperService() {
                         // If the user wants a restart, reset playhead BEFORE init
                         // so bindPlaylistToPlayer doesn't seek to the old paused position.
                         if (prefs.getStartTime() == StartTime.RESTART) {
-                            playheadTime = 0L
-                            hasPlaybackCompleted = false
+                            resetPlaybackTimeline()
                         }
 
                         initializePlayer()
@@ -641,15 +790,11 @@ class UndeadWallpaperService : WallpaperService() {
                         when (startTimePref) {
                             StartTime.RESUME -> {
                                 if (currentPlaybackMode == PlaybackMode.ONE_SHOT && hasPlaybackCompleted && !isPreview()) {
-                                    playheadTime = 0L
-                                    wallpaperPlayer.seekToDefaultPosition()
-                                    hasPlaybackCompleted = false
+                                    resetPlaybackTimeline(seekPlayerToStart = true)
                                 }
                             }
                             StartTime.RESTART -> {
-                                playheadTime = 0L
-                                wallpaperPlayer.seekToDefaultPosition()
-                                hasPlaybackCompleted = false
+                                resetPlaybackTimeline(seekPlayerToStart = true)
                             }
                             StartTime.RANDOM -> {
                                 val duration = wallpaperPlayer.duration
@@ -658,8 +803,7 @@ class UndeadWallpaperService : WallpaperService() {
                                     playheadTime = randomPos
                                     wallpaperPlayer.seekTo(wallpaperPlayer.currentMediaItemIndex, randomPos)
                                 } else {
-                                    playheadTime = 0L
-                                    wallpaperPlayer.seekToDefaultPosition()
+                                    resetPlaybackTimeline()
                                 }
                                 hasPlaybackCompleted = false
                             }
@@ -672,7 +816,8 @@ class UndeadWallpaperService : WallpaperService() {
 
                     // The "Play" Command: Just set the flag.
                     // ExoPlayer will start natively as soon as it reaches STATE_READY.
-                    wallpaperPlayer.playWhenReady = true
+                    // Must be left to pause if user manually paused with touch events
+                    wallpaperPlayer.playWhenReady = !isUserManuallyPaused // leaving it paused on user pause touch event
 
                     wallpaperPlayer.getPlayerInstance()?.let { playerInstance ->
                         playbackWatchdog.start(playerInstance, renderer) // Monitor for playback running
@@ -680,7 +825,7 @@ class UndeadWallpaperService : WallpaperService() {
 
                 } else {
                     playbackWatchdog.stop()
-
+                    gestureManager.destroy()
                     if (isPreview) {
                         FileLogger.i(TAG, "Preview hidden. Releasing player to save decoders.")
                         releasePlayer()
@@ -698,6 +843,7 @@ class UndeadWallpaperService : WallpaperService() {
         override fun onCreate(surfaceHolder: SurfaceHolder) {
             super.onCreate(surfaceHolder)
             FileLogger.i(TAG, "Engine onCreate")
+
             // Turn on filter to start listening
             val intentFilter = IntentFilter().apply {
                 addAction(ACTION_VIDEO_URI_CHANGED)

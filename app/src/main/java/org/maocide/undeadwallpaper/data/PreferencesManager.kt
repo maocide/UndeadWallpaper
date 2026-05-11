@@ -13,6 +13,8 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import android.net.Uri
+import org.maocide.undeadwallpaper.model.GestureType
+import org.maocide.undeadwallpaper.model.WallpaperAction
 
 /**
  * Manages SharedPreferences for the application.
@@ -26,6 +28,9 @@ class PreferencesManager(context: Context) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     private val jsonParser = Json { ignoreUnknownKeys = true }
+
+    private var cachedPlaylistSettingsString: String? = null
+    private var cachedPlaylistSettings: List<VideoSettings>? = null
 
     companion object {
         private const val PREFS_NAME = "DEFAULT"
@@ -49,6 +54,12 @@ class PreferencesManager(context: Context) {
 
         private const val KEY_RECENT_FILES_LIST = "recent_files_list"
         private const val KEY_PLAYLIST_SETTINGS = "playlist_settings"
+
+        private const val KEY_ACTION_DOUBLE_TAP = "action_double_tap"
+
+        private const val KEY_ACTION_TRIPLE_TAP = "action_triple_tap"
+
+        private const val KEY_ACTION_LONG_PRESS = "action_long_press"
     }
 
     init {
@@ -150,13 +161,26 @@ class PreferencesManager(context: Context) {
         }
     }
 
+    /**
+     * Getter for playlist video settings implementing a caching to avoid json decoding each call.
+     * the cache is updated/invalidated by the save method.
+     */
     fun getPlaylistSettings(): List<VideoSettings> {
         val jsonString = sharedPrefs.getString(KEY_PLAYLIST_SETTINGS, null)
         if (jsonString.isNullOrBlank()) {
+            cachedPlaylistSettingsString = null
+            cachedPlaylistSettings = null
             return emptyList()
         }
+        val cachedSettings = cachedPlaylistSettings
+        if (jsonString == cachedPlaylistSettingsString && cachedSettings != null) {
+            return cachedSettings
+        }
         return try {
-            jsonParser.decodeFromString<List<VideoSettings>>(jsonString)
+            val decoded = jsonParser.decodeFromString<List<VideoSettings>>(jsonString)
+            cachedPlaylistSettingsString = jsonString
+            cachedPlaylistSettings = decoded
+            decoded
         } catch (e: Exception) {
             emptyList()
         }
@@ -164,6 +188,8 @@ class PreferencesManager(context: Context) {
 
     fun savePlaylistSettings(playlist: List<VideoSettings>) {
         val jsonString = jsonParser.encodeToString(playlist)
+        cachedPlaylistSettingsString = jsonString
+        cachedPlaylistSettings = playlist
         sharedPrefs.edit(commit = true)
         { putString(KEY_PLAYLIST_SETTINGS, jsonString) }
     }
@@ -291,6 +317,28 @@ class PreferencesManager(context: Context) {
 
     fun isLoggingEnabled(): Boolean {
         return sharedPrefs.getBoolean(KEY_LOGGING_ENABLED, false)
+    }
+
+    /**
+     * Gets the action bound to a specific gesture.
+     * Default for ALL gestures is NONE.
+     */
+    fun getActionForGesture(gesture: GestureType): WallpaperAction {
+        val key = when (gesture) {
+            GestureType.DOUBLE_TAP -> KEY_ACTION_DOUBLE_TAP
+            GestureType.TRIPLE_TAP -> KEY_ACTION_TRIPLE_TAP
+        }
+
+        val storedOrdinal = sharedPrefs.getInt(key, WallpaperAction.NONE.ordinal)
+        return WallpaperAction.entries.getOrElse(storedOrdinal) { WallpaperAction.NONE }
+    }
+
+    fun setActionForGesture(gesture: GestureType, action: WallpaperAction) {
+        val key = when (gesture) {
+            GestureType.DOUBLE_TAP -> KEY_ACTION_DOUBLE_TAP
+            GestureType.TRIPLE_TAP -> KEY_ACTION_TRIPLE_TAP
+        }
+        sharedPrefs.edit { putInt(key, action.ordinal) }
     }
 
 }

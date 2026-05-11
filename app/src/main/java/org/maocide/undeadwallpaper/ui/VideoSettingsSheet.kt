@@ -215,14 +215,33 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
         }
     }
 
+    /**
+     * Safely sets the value of a Material Slider, preventing crashes from out-of-range/step values.
+     *
+     * This extension function ensures that any value assigned to the slider is first clamped
+     * to be within the slider's `valueFrom` and `valueTo` range. If the slider has a `stepSize`
+     * defined, the function will also snap the clamped value to the nearest valid step.
+     *
+     * This is useful for programmatically setting slider values that might come from external
+     * sources (like saved preferences) without causing an `IllegalArgumentException`.
+     *
+     * @param newValue The desired new value for the slider.
+     */
     private fun Slider.setValueSafe(newValue: Float) {
+        // Clamp: Ensure value is strictly between valueFrom and valueTo
         val clampedValue = newValue.coerceIn(valueFrom, valueTo)
+
+        // Snap: If a stepSize is defined, ensure the value fits the step
         val finalValue = if (stepSize > 0) {
+            // Calculate how many "steps" we are from the start
             val steps = ((clampedValue - valueFrom) / stepSize).roundToInt()
+            // Reconstruct the value based on exact steps
             valueFrom + (steps * stepSize)
         } else {
             clampedValue
         }
+
+        // Apply: Only now is it safe to set the value
         this.value = finalValue
     }
 

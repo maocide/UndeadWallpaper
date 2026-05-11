@@ -50,6 +50,15 @@
     <string name="reset">Restablecer</string>
     <string name="rotation">Rotación</string>
 
+    <!-- Home Screen Gestures -->
+    <string name="gesture_controls_header">Gestos en Inicio</string>
+    <string name="double_tap_label">Doble Toque</string>
+    <string name="triple_tap_label">Triple Toque</string>
+    <string name="gesture_action_none">Ninguno</string>
+    <string name="gesture_action_pause_play">Pausa/Reproducir</string>
+    <string name="gesture_action_skip">Saltar</string>
+    <string name="gesture_launcher_warning">Nota: Algunos lanzadores pueden bloquear los gestos del fondo de pantalla.</string>
+
     <!-- Error and Warning Messages -->
     <string name="error_permission_failed">No se pudo obtener el permiso para el archivo seleccionado.</string>
     <string name="warning_4k_video">Advertencia: los videos en 4K pueden causar cierres inesperados o lentitud en algunos dispositivos.</string>
@@ -59,6 +68,8 @@
     <string name="error_file_picker_not_available">¡El selector de archivos no está disponible en el sistema!</string>
     <string name="error_could_not_read_video_duration">No se pudo leer la duración del video.</string>
     <string name="warning_random_start_time_delay">Aleatorio puede causar retrasos debido a la búsqueda</string>
+    <string name="error_video_too_large">Video demasiado grande! La resolución máxima admitida es 4K (UHD).</string>
+    <string name="error_open_settings_failed">No se pudieron abrir los ajustes</string>
     <!-- Status Bar Icon Color Settings -->
     <string name="status_bar_icons_label">Íconos de la Barra de Estado</string>
     <string name="status_bar_auto">Automático</string>

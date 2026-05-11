@@ -68,6 +68,20 @@ data class VideoSettings(
     }
 
     /**
+     * Checks if this video shares the exact same OpenGL visual transforms as another video.
+     * This is used to determine if ExoPlayer can gapless-transition between them without
+     * a visual snap from the renderer matrix updating.
+     */
+    fun hasSameVisualTransformsAs(other: VideoSettings): Boolean {
+        return this.scalingMode == other.scalingMode &&
+                this.positionX == other.positionX &&
+                this.positionY == other.positionY &&
+                this.zoom == other.zoom &&
+                this.rotation == other.rotation &&
+                this.brightness == other.brightness
+    }
+
+    /**
      * Applies a quadratic curve to the linear volume slider value.
      * This mimics the logarithmic perception of human hearing.
      */

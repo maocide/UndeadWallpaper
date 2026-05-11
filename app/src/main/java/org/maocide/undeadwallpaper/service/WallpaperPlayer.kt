@@ -118,6 +118,27 @@ class WallpaperPlayer(
         return player
     }
 
+    /**
+     * Atomic replace + prepare for skipping chunks.
+     * Loads newMediaSources, attaches them as the sole media list,
+     * seeks to media index 0 position 0, prepares, and returns.
+     * Preserves volume, speed, repeat/shuffle mode, and decoder instances.
+     */
+    @OptIn(UnstableApi::class)
+    fun loadAndPlayNewChunk(newMediaSources: List<MediaSource>) {
+        val p = player ?: return
+
+        p.setMediaSources(newMediaSources)
+        p.seekTo(0, 0L)
+        p.prepare()
+
+        // We do NOT set playWhenReady here. The Engine handles that based on visibility.
+    }
+
+    /**
+     * Main player initialization code,
+     * includes buffering settings, seek mode, and wires events.
+     */
     @OptIn(UnstableApi::class)
     fun initialize(
         surface: Surface?,
