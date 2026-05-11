@@ -266,6 +266,7 @@ class UndeadWallpaperService : WallpaperService() {
                     // Will be called by changing video
                     ACTION_VIDEO_URI_CHANGED -> {
                         FileLogger.i(TAG, "Broadcast received: Video uri changed, full re-initialization requested.")
+                        isUserManuallyPaused = false // CLEAR PAUSE STATE
                         resetPlaybackTimeline()
                         initializePlayer() // force Reinit
                     }
@@ -273,6 +274,7 @@ class UndeadWallpaperService : WallpaperService() {
                     // Will be called by changing scaling, playback mode, all things requiring a reinit
                     ACTION_PLAYBACK_MODE_CHANGED -> {
                         FileLogger.i(TAG, "Broadcast received: Playback mode change, full re-initialization requested.")
+                        isUserManuallyPaused = false // CLEAR PAUSE STATE
                         resetPlaybackTimeline()
                         initializePlayer() // force Reinit
                     }
@@ -295,6 +297,7 @@ class UndeadWallpaperService : WallpaperService() {
 
                     ACTION_VIDEO_SETTINGS_CHANGED -> {
                         FileLogger.i(TAG, "Broadcast received: Video settings changed, full re-initialization requested.")
+                        isUserManuallyPaused = false // CLEAR PAUSE STATE
                         // Ensure settings apply completely identical to a URI change to avoid syncing bugs
                         resetPlaybackTimeline()
                         initializePlayer() // force Reinit
