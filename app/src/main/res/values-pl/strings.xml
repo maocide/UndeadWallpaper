@@ -1,0 +1,141 @@
+<resources>
+    <string name="app_name">Undead Wallpaper</string>
+    <string name="action_settings">O Undead</string>
+    <string name="action_battery_optimization">Optymalizacja Baterii</string>
+
+    <!-- Strings used for fragments for navigation -->
+    <string name="first_fragment_label">Ustawienia Undead</string>
+    <string name="second_fragment_label">O Undead</string>
+    <string name="previous">Wróć</string>
+
+    <!-- UI Strings -->
+    <string name="pick_video">Wybierz Wideo</string>
+    <string name="trim_video">Przytnij Wideo</string>
+    <string name="setting_audio_enabled">Włącz Audio</string>
+    <string name="playback_mode_setting">Tryb Odtwarzania</string>
+    <string name="recent_files">Playtista / Niedawne Media</string>
+    <string name="playlist_instructions">Przytrzymaj żeby zmienić kolejność. Przesuń w lewo lub w prawo żeby usunąć.</string>
+    <string name="error_cannot_remove_last_video">Nie można usunąć ostatniego wideo na playliście.</string>
+    <string name="apply_trim">Ustaw</string>
+    <string name="wallpaper_description">Żywa tapeta odtwarzająca wideo.</string>
+    <string name="activating_wallpaper_message">Włączanie tapety…</string>
+    <string name="select_video_first_message">Najpierw zaznacz wideo</string>
+
+    <!-- SharedPreferences Keys. These are not meant for translation. -->
+    <string name="video_uri" translatable="false">video_uri</string>
+    <string name="video_audio_enabled" translatable="false">video_audio_enabled</string>
+    <string name="playback_mode" translatable="false">playback_mode</string>
+    <string name="video_zoom_level" translatable="false">video_zoom_level</string>
+    <string name="video_start_ms" translatable="false">video_start_ms</string>
+    <string name="video_end_ms" translatable="false">video_end_ms</string>
+
+    <string name="default_video_filename" translatable="false">zombillie_default.mp4</string>
+    <string name="profile_image_content_description">Profilowe dewelopera</string>
+    <string name="github_profile_text"><a href="https://github.com/maocide/">GitHub: maocide</a></string>
+    <string name="github_profile_url" translatable="false">https://github.com/maocide/</string>
+    <string name="license_text"><a href="https://www.gnu.org/licenses/gpl-3.0.en.html">Na licencji GNU GPL v3.0</a></string>
+    <string name="license_url" translatable="false">https://www.gnu.org/licenses/gpl-3.0.en.html</string>
+
+    <!-- About Page Strings -->
+    <string name="about_header_story">Historia za Nazwą</string>
+    <string name="about_story_content">To nie tylko sprytna gra słów nawiązująca do <b>live</b> wallpaper. Nazwa <b>UndeadWallpaper</b> ma charakter osobisty. Po długiej, wymuszonej przerwie od kodowania, ten projekt był pierwszym znakiem życia — momentem, w którym pasja, która została pogrzebana, wygrzebała się z powrotem na powierzchnię. Ta aplikacja nie jest po prostu <b>live</b>; to symbol twórcy powracającego z martwych. Jest <b>undead</b>, bo niektóre rzeczy są zbyt uparte, by po prostu umrzeć.</string>
+    <string name="about_header_features">Co potrafi</string>
+    <string name="about_feature_loops">• Jedwabiście płynne pętle: Zmień dowolny film ze swojego telefonu w płynną, pozbawioną zacięć animowaną tapetę.</string>
+    <string name="about_feature_freedom">• Pełna wolność: <b>Zero</b> reklam, <b>zero</b> mikropłatności, <b>zero</b> ściemy. <b>Nigdy</b>.</string>
+    <string name="about_feature_control">• Ty masz moc: Obsługuje przełączniki dźwięku i zapamiętuje ostatnio używane media, pozwalając na ich szybką zmianę.</string>
+    <string name="playback_mode_loop">Powtarzaj jeden</string>
+    <string name="playback_mode_oneshot">Tylko raz (💡neShot haha...)</string>
+    <string name="playback_mode_loop_all">Powtarzaj wszystko</string>
+    <string name="playback_mode_shuffle">Losowo</string>
+    <string name="scaling_mode">Tryb Skalowania</string>
+    <string name="scaling_mode_fit">Dopasuj</string>
+    <string name="scaling_mode_fill">Wypełnij</string>
+    <string name="scaling_mode_stretch">Rozciągnij</string>
+    <string name="advanced">Zaawansowane</string>
+    <string name="horizontal_position">Pozycja Pozioma</string>
+    <string name="vertical_position">Pozycja Pionowa</string>
+    <string name="zoom">Przybliżenie</string>
+    <string name="brightness">Jasność</string>
+    <string name="speed">Szybkość</string>
+    <string name="reset">Resetuj</string>
+    <string name="rotation">Obrócenie</string>
+
+    <!-- Home Screen Gestures -->
+    <string name="gesture_controls_header">Gesty Ekranu Głównego</string>
+    <string name="double_tap_label">Podwójne Stuknięcie</string>
+    <string name="triple_tap_label">Potrójne Stuknięcie</string>
+    <string name="gesture_action_none">Brak</string>
+    <string name="gesture_action_pause_play">Wstrzymaj/Odtwórz</string>
+    <string name="gesture_action_skip">Pomiń</string>
+    <string name="gesture_launcher_warning">Uwaga: Gesty mogą nie działać w niektórych launcherach.</string>
+
+    <!-- Error and Warning Messages -->
+    <string name="error_permission_failed">Brak uprawnień do wybranego pliku.</string>
+    <string name="warning_4k_video">Uwaga: Filmy 4K mogą lagować lub crashować na niektórych telefonach.</string>
+    <string name="error_copy_failed">Błąd kopiowania wideo.</string>
+    <string name="error_cannot_play_video">Nie można odtworzyć tego wideo.</string>
+    <string name="warning_high_speed_stuttering">Duża szybkość może obniżyć płynność filmów o wysokiej jakości.</string>
+    <string name="error_file_picker_not_available">W systemie brakuje przeglądarki plików!</string>
+    <string name="error_could_not_read_video_duration">Nie udało się odczytać długości filmu.</string>
+    <string name="warning_random_start_time_delay">Tryb losowy może powodować opóźnienia</string>
+    <string name="error_video_too_large">Wideo jest za duże! Maksymalna obsługiwana rozdzielczość to 4K (UHD).</string>
+    <string name="error_open_settings_failed">Nie udało się otworzyć ustawień</string>
+    <!-- Status Bar Icon Color Settings -->
+    <string name="status_bar_icons_label">Ikony paska stanu</string>
+    <string name="status_bar_auto">Auto</string>
+    <string name="status_bar_white_icons">Białe</string>
+    <string name="status_bar_black_icons">Czarne</string>
+
+    <!-- UI Headers & Sections -->
+    <string name="custom_settings_header">Ustawienia niestandardowe</string>
+    <string name="positioning_header">Pozycja</string>
+    <string name="general_header">Główne</string>
+    <string name="volume_label">Głośność</string>
+    <string name="global_settings_header">Ustawienia Globalne</string>
+    <string name="debug_options_header">Opcje debugowania</string>
+    <string name="debug_logging_description">Zapisuj logi błędów w pamięci urządzenia. Zaleca się zostawić tę opcję wyłączoną, chyba że występują problemy.</string>
+    <string name="debug_enable_logging">Włącz logowanie do pliku</string>
+    <string name="debug_clear_log">Wyczyść Logi</string>
+    <string name="debug_share_log">Udostępnij Logi</string>
+    <string name="breadcrumb_placeholder" translatable="false">Vol, Pan, Speed</string>
+
+    <!-- Start Time Settings -->
+    <string name="start_time_label">Gdy Widoczne</string>
+    <string name="start_time_resume">Wznów</string>
+    <string name="start_time_restart">Restartuj</string>
+    <string name="start_time_random">Losowo</string>
+
+    <string name="breadcrumb_zoom">Przybliżenie</string>
+    <string name="breadcrumb_pan">Panorama</string>
+    <string name="breadcrumb_rotation">Obrócenie</string>
+    <string name="breadcrumb_brightness">Jasność</string>
+    <string name="breadcrumb_speed">Szybkość</string>
+    <string name="breadcrumb_volume">Głośność</string>
+    <string name="breadcrumb_more">+%1$d więcej</string>
+
+    <string name="remove_file_title">Usuń Wideo</string>
+    <string name="remove_file_message">Czy na pewno chcesz usunąć %s z aplikacji?</string>
+    <string name="remove_action">Usuń</string>
+    <string name="cancel">Anuluj</string>
+
+    <!-- Battery Optimization Warning -->
+    <string name="battery_warning_title">Zezwalaj Na Działanie W Tle</string>
+    <string name="battery_warning_desc">Pozwól Undead Wallpaper działać w tle, aby system jej nie wyłączał.</string>
+    <string name="battery_warning_btn">Napraw</string>
+    <string name="battery_instruction_step_1">1. Tapnij Wykorzystanie baterii przez aplikacje</string>
+    <string name="battery_instruction_step_2">2. Tapnij Zezwalaj na użycie w tle</string>
+    <string name="battery_instruction_step_3">3. Wybierz opcję Bez ograniczeń</string>
+    <string name="battery_warning_go_to_settings">Idź do Ustawień</string>
+
+    <!-- Debug Logger -->
+    <string name="log_enabled_toast">Logowanie Do Pliku Włączone</string>
+    <string name="log_disabled_toast">Logowanie Do Pliku Wyłączone</string>
+    <string name="share_log_title">Udostępnij Logi</string>
+    <string name="share_log_warning">Logi mogą zawierać wrażliwe informacje, takie jak nazwy plików lub szczegóły urządzenia. Czy na pewno chcesz je udostępnić?</string>
+    <string name="share_log_confirm">Udostępnij</string>
+    <string name="share_log_cancel">Cancel</string>
+    <string name="share_log_intent_title">Udostępnij Logi</string>
+    <string name="log_empty_toast">Nie znaleziono logów lub są one puste</string>
+    <string name="log_cleared_toast">Logi usunięte</string>
+
+</resources>
