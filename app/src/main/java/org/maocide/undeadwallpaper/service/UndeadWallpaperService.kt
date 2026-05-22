@@ -741,7 +741,11 @@ class UndeadWallpaperService : WallpaperService() {
             releasePlayer()
             releaseRenderer()
             gestureManager.destroy()
-            unregisterReceiver(videoChangeReceiver)
+            try {
+                unregisterReceiver(videoChangeReceiver)
+            } catch (e: IllegalArgumentException) {
+                FileLogger.w(TAG, "Receiver was not registered, skipping unregister.")
+            }
         }
 
 
@@ -814,13 +818,18 @@ class UndeadWallpaperService : WallpaperService() {
                     // the user edited them in the UI while the wallpaper was hidden.
                     refreshRenderer()
 
-                    // The "Play" Command: Just set the flag.
-                    // ExoPlayer will start natively as soon as it reaches STATE_READY.
-                    // Must be left to pause if user manually paused with touch events
-                    wallpaperPlayer.playWhenReady = !isUserManuallyPaused // leaving it paused on user pause touch event
+                    try {
+                        // The "Play" Command: Just set the flag.
+                        // ExoPlayer will start natively as soon as it reaches STATE_READY.
+                        // Must be left to pause if user manually paused with touch events
+                        wallpaperPlayer.playWhenReady = !isUserManuallyPaused // leaving it paused on user pause touch event
 
-                    wallpaperPlayer.getPlayerInstance()?.let { playerInstance ->
-                        playbackWatchdog.start(playerInstance, renderer) // Monitor for playback running
+                        wallpaperPlayer.getPlayerInstance()?.let { playerInstance ->
+                            playbackWatchdog.start(playerInstance, renderer) // Monitor for playback running
+                        }
+                    } catch (e: IllegalStateException) {
+                        FileLogger.e(TAG, "WakeUp Crash Prevented: ExoPlayer thread died silently during sleep. Forcing re-init.")
+                        initializePlayer()
                     }
 
                 } else {

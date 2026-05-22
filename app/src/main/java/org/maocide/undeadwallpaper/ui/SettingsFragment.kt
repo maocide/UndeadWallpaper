@@ -33,7 +33,6 @@ import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.MediaController
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.OptIn
@@ -60,8 +59,6 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.upstream.DefaultAllocator
 import org.maocide.undeadwallpaper.model.GestureType
 import org.maocide.undeadwallpaper.model.WallpaperAction
-
-import kotlin.math.roundToInt
 
 /**
  * A simple [Fragment] subclass as the default destination in the navigation.
@@ -176,33 +173,13 @@ class SettingsFragment : Fragment() {
 
     }
 
-    private suspend fun setPreviewVideo(uri: Uri) {
-        // Clear any previous trimming data
-        preferencesManager.removeClippingTimes() // Now actually removed, might re implement
-
-        // Update ViewModel (Holds the state for the FAB)
-        sharedViewModel.selectedVideoUri = uri
-
-        // Get duration and update UI
-        currentVideoDurationMs = getVideoDuration(uri)
-        if (currentVideoDurationMs == 0L) {
-            Toast.makeText(context, R.string.error_could_not_read_video_duration, Toast.LENGTH_LONG).show()
-        }
-
-        // Update the video preview player
-        setupVideoPreview(uri)
-
-        // Refresh recent files (since we likely just added one)
-        loadRecentFiles()
-    }
-
     /**
      * Centralized function to handle setting or changing the video source.
      * This function ensures that whenever a new video is selected, the UI and
      * preferences are reset and updated correctly.
      *
      * @param uri The URI of the new video file.
-     * @param sendBroadcast Weather to send a broadcast to the service to cause a video reload.
+     * @param forceChange Weather to send a broadcast to the service to cause a video reload.
      */
     private suspend fun updateVideoSource(uri: Uri, forceChange: Boolean) {
         // Clear any previous trimming data
@@ -414,6 +391,9 @@ class SettingsFragment : Fragment() {
                 // Switch back to Main thread to update Prefs safely
                 withContext(Dispatchers.Main) {
                     preferencesManager.saveActiveVideoUri(defaultUri.toString())
+                    // Force the UI to load this new video
+                    // No forceChange, since the live wallpaper service hasn't actually been started yet
+                    updateVideoSource(defaultUri, forceChange = false)
                 }
             }
         }
@@ -776,8 +756,6 @@ class SettingsFragment : Fragment() {
                         retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
                     val heightStr =
                         retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
-                    val rotationStr =
-                        retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)
 
                     val width = widthStr?.toIntOrNull() ?: 0
                     val height = heightStr?.toIntOrNull() ?: 0
@@ -956,7 +934,7 @@ class SettingsFragment : Fragment() {
         releasePreviewPlayer()
         try {
             requireContext().unregisterReceiver(videoSettingsChangedReceiver)
-        } catch (e: IllegalArgumentException) {
+        } catch (_: IllegalArgumentException) {
             // Receiver not registered
         }
     }

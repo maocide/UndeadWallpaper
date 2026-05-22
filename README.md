@@ -34,11 +34,7 @@ Some Android ROMs are absolutely ruthless. They will try to double-tap this app 
 
 A built-in **"Allow Background Performance"** card directly in the app will warn you. Just tap "Fix" to dive straight into your phone's app settings and **disable battery optimizations** for UndeadWallpaper. Tell the OS to back off and leave the dead alone!
 
-
-
 > **Having weird OS issues? Screen freezing? Icons the wrong color? [Check out The Horde's Survival Guide (FAQ)](FAQ.md) for workarounds to annoying OEM limitations.**
-
-
 
 ## Join the Horde! (Contribute & Connect)
 
@@ -59,6 +55,7 @@ This whole shebang is licensed under the **GNU General Public License v3.0**. Fr
 
 * **Google Play Store:** [From the Play Store](https://play.google.com/store/apps/details?id=org.maocide.undeadwallpaper)
 * **GitHub Releases:** [Grab the bleeding-edge APKs here!](https://github.com/maocide/UndeadWallpaper/releases/)
+* **Obtainium:** <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22org.maocide.undeadwallpaper%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Fmaocide%2FUndeadWallpaper%22%2C%22author%22%3A%22maocide%22%2C%22name%22%3A%22Undead%20Wallpaper%22%2C%22preferredApkIndex%22%3A0%2C%22additionalSettings%22%3A%22%7B%5C%22includePrereleases%5C%22%3Afalse%2C%5C%22fallbackToOlderReleases%5C%22%3Atrue%2C%5C%22filterReleaseTitlesByRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22filterReleaseNotesByRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22verifyLatestTag%5C%22%3Afalse%2C%5C%22sortMethodChoice%5C%22%3A%5C%22date%5C%22%2C%5C%22useLatestAssetDateAsReleaseDate%5C%22%3Afalse%2C%5C%22releaseTitleAsVersion%5C%22%3Afalse%2C%5C%22trackOnly%5C%22%3Afalse%2C%5C%22versionExtractionRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22matchGroupToUse%5C%22%3A%5C%22%5C%22%2C%5C%22versionDetection%5C%22%3Atrue%2C%5C%22releaseDateAsVersion%5C%22%3Afalse%2C%5C%22useVersionCodeAsOSVersion%5C%22%3Afalse%2C%5C%22apkFilterRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22invertAPKFilter%5C%22%3Afalse%2C%5C%22autoApkFilterByArch%5C%22%3Atrue%2C%5C%22appName%5C%22%3A%5C%22%5C%22%2C%5C%22appAuthor%5C%22%3A%5C%22%5C%22%2C%5C%22shizukuPretendToBeGooglePlay%5C%22%3Afalse%2C%5C%22allowInsecure%5C%22%3Afalse%2C%5C%22exemptFromBackgroundUpdates%5C%22%3Afalse%2C%5C%22skipUpdateNotifications%5C%22%3Afalse%2C%5C%22about%5C%22%3A%5C%22%5C%22%2C%5C%22refreshBeforeDownload%5C%22%3Afalse%2C%5C%22includeZips%5C%22%3Afalse%2C%5C%22zippedApkFilterRegEx%5C%22%3A%5C%22%5C%22%7D%22%2C%22overrideSource%22%3Anull%7D">Add direct tracking to Obtainium</a>
 
 ### The Graveyard Shift (Special Thanks) 🪦
 
@@ -70,6 +67,7 @@ Bringing a project back from the dead takes a village (or at least a few good so
 * **@DerpOtron9k** - For submitting the early prototype PR that sparked the transition to per-video settings.
 * **Trick_Equipment_6938** - For sparking the original concept that eventually evolved into the v1.2.0 Dynamic Playlist Engine.
 * **@AmazingKo** - For excellent feature suggestions that helped shape the development backlog.
+* **@playagain96** - For providing the full Polish localization and making the app accessible to more users worldwide.
 * **Everyone** who has taken the time to report an issue, leave a review on the Play Store, or test a beta build. Your support keeps the undead alive!
 
 ---
