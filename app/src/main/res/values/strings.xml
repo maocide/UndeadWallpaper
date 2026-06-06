@@ -138,4 +138,11 @@
     <string name="log_empty_toast">Log file not found or empty</string>
     <string name="log_cleared_toast">Log file cleared</string>
 
+    <!-- Parallax -->
+    <string name="parallax_icon_description">Experimental</string>
+    <string name="parallax_card_title">Parallax Experiment</string>
+    <string name="parallax_toggle_label">Home Screen Parallax</string>
+    <string name="parallax_description">Makes the video shift as you swipe pages. Zoom in the video slightly to hide black edges. Note: Not supported by all custom system launchers.</string>
+    <string name="parallax_strength_label">Parallax Strength</string>
+
 </resources>

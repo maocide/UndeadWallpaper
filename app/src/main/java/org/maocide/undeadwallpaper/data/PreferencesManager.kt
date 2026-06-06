@@ -60,6 +60,9 @@ class PreferencesManager(context: Context) {
         private const val KEY_ACTION_TRIPLE_TAP = "action_triple_tap"
 
         private const val KEY_ACTION_LONG_PRESS = "action_long_press"
+
+        private const val KEY_PARALLAX_ENABLED = "parallax_enabled"
+        private const val KEY_PARALLAX_STRENGTH = "parallax_strength"
     }
 
     init {
@@ -339,6 +342,22 @@ class PreferencesManager(context: Context) {
             GestureType.TRIPLE_TAP -> KEY_ACTION_TRIPLE_TAP
         }
         sharedPrefs.edit { putInt(key, action.ordinal) }
+    }
+
+    fun setParallaxEnabled(enabled: Boolean) {
+        sharedPrefs.edit { putBoolean(KEY_PARALLAX_ENABLED, enabled) }
+    }
+
+    fun isParallaxEnabled(): Boolean {
+        return sharedPrefs.getBoolean(KEY_PARALLAX_ENABLED, false)
+    }
+
+    fun setParallaxStrength(strength: Float) {
+        sharedPrefs.edit { putFloat(KEY_PARALLAX_STRENGTH, strength) }
+    }
+
+    fun getParallaxStrength(): Float {
+        return sharedPrefs.getFloat(KEY_PARALLAX_STRENGTH, 0.5f)
     }
 
 }

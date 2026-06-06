@@ -40,7 +40,7 @@
     <string name="about_feature_freedom">• Pełna wolność: <b>Zero</b> reklam, <b>zero</b> mikropłatności, <b>zero</b> kompromisów. <b>Nigdy</b>.</string>
     <string name="about_feature_control">• Ty masz moc: Obsługuje przełączniki dźwięku i zapamiętuje ostatnio używane media, pozwalając na ich szybką zmianę.</string>
     <string name="playback_mode_loop">Powtarzaj jeden</string>
-    <string name="playback_mode_oneshot">Jeden strzał</string>
+    <string name="playback_mode_oneshot">Jednorazowo</string>
     <string name="playback_mode_loop_all">Powtarzaj wszystko</string>
     <string name="playback_mode_shuffle">Losowo</string>
     <string name="scaling_mode">Tryb Skalowania</string>
@@ -127,5 +127,12 @@
     <string name="share_log_intent_title">Udostępnij Logi</string>
     <string name="log_empty_toast">Nie znaleziono logów lub są one puste</string>
     <string name="log_cleared_toast">Logi usunięte</string>
+
+    <!-- Parallax -->
+    <string name="parallax_icon_description">Eksperymentalne</string>
+    <string name="parallax_card_title">Eksperyment: Paralaksa</string>
+    <string name="parallax_toggle_label">Paralaksa ekranu głównego</string>
+    <string name="parallax_description">Przesuwa wideo podczas przewijania stron. Zbliż nieco wideo, aby ukryć czarne krawędzie. Uwaga: funkcja może nie być obsługiwana przez niektóre niestandardowe launchery.</string>
+    <string name="parallax_strength_label">Siła paralaksy</string>
 
 </resources>
