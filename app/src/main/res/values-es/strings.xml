@@ -127,4 +127,11 @@
     <string name="log_empty_toast">Archivo de registro no encontrado o vacío</string>
     <string name="log_cleared_toast">Archivo de registro borrado</string>
 
+    <!-- Parallax -->
+    <string name="parallax_icon_description">Experimental</string>
+    <string name="parallax_card_title">Experimento: Paralaje</string>
+    <string name="parallax_toggle_label">Paralaje de Pantalla de Inicio</string>
+    <string name="parallax_description">Hace que el video se desplace al deslizar las páginas. Acerca ligeramente el video para ocultar los bordes negros. Nota: No es compatible con todos los launchers personalizados.</string>
+    <string name="parallax_strength_label">Intensidad del Paralaje</string>
+
 </resources>
