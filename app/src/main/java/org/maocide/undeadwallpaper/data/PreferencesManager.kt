@@ -357,7 +357,7 @@ class PreferencesManager(context: Context) {
     }
 
     fun getParallaxStrength(): Float {
-        return sharedPrefs.getFloat(KEY_PARALLAX_STRENGTH, 0.5f)
+        return sharedPrefs.getFloat(KEY_PARALLAX_STRENGTH, 0.4f)
     }
 
 }
