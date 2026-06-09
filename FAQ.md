@@ -9,9 +9,11 @@
 
 **Q: Can I set a different video for the Lock Screen and the Home Screen?**
 
-**A:** Not currently, and this is due to Android OS limitations. Android's native engine, for a wallpaper running in the background, provides no stable way to detect if it is running on the Home or Lock screen.
+**A:** No, and it is a deliberate architectural choice to protect your battery and sanity. Android’s native Live Wallpaper API is fundamentally disconnected. The system intent completely lacks destination flags (it cannot tell the app *where* it is rendering), and setting a new wallpaper from within an app natively unbinds or overrides the other screen.
 
-* Furthermore, manufacturers like **Asus (ROG UI)** are aggressively hardcoded to override third-party apps, forcing the "Both" behavior. Many custom ROMs lock down the lock screen to force you into their monetized theme stores. The app runs in a sandbox and cannot bypass this.
+* **The not so clean Workarounds:** To trick the system, an app has to register two entirely separate background services. Because the app-side intent can't handle both at once, you are forced to leave the app, dive into your system menus, and blindly guess which identical service to assign to which screen.
+* **Resource Starvation:** Managing two separate services means keeping two independent video decoding instances alive in memory while simultaneously tracking two separate playlist queues. This doubles memory requirements, causes battery drain and begs the Android memory manager to assassinate the app in the background.
+* **The Verdict:** It would actually take less effort to maintain two completely separate cloned packages of the app than to hack dual-services into a single clean engine. Until Android introduces a standardized, unified API built specifically for dual-stream live wallpapers, UndeadWallpaper will remain focused on a single, perfectly optimized, lightweight pipeline.
 
 **Q: I enabled Home Screen Gestures (Double/Triple Tap), but nothing happens when I tap!**
 
@@ -33,11 +35,11 @@
 
 **A:** UndeadWallpaper actively extracts Material You colors and sends a direct suggestion to your system. If your icons look wrong, your OS is ignoring the app.
 
-* **Samsung Users:** The One UI 8.5 update broke compatibility and ignores standard Android color codes. Instead, it forcefully scans the screen and tries to guess the colors on its own. This still works flawlessly on Pixels, vanilla Android and older One UI versions, but for modern Samsung devices, it is an unfixable OS quirk for now.
+* **Samsung Users:** The One UI 8.5 update broke compatibility and ignores standard Android color codes. Instead, it forcefully scans the screen and tries to guess the colors on its own. This still works flawlessly on Pixels, vanilla Android, and older One UI versions, but for modern Samsung devices, it is an unfixable OS quirk for now.
 
 **Q: The file picker doesn't show video thumbnails, or the picker is missing entirely!**
 
-**A:** UndeadWallpaper strictly uses Android's native system file picker to guarantee security.
+**A:** UndeadWallpaper strictly uses Android's native system file picker to guarantee security and privacy.
 
 * If thumbnails are missing (grey icons), your specific custom ROM likely stripped out the system media indexer.
 * If the file picker crashes or is completely missing, your custom ROM is missing core Android components. Try installing the official **Files by Google** app from the Play Store, or ensure you have properly flashed GApps.
@@ -47,12 +49,12 @@
 **A:** Because a GIF is not really a video... it is an image sequence.
 
 * **The Battery Killer:** Playing a GIF forces your phone's CPU to manually decode and draw every single frame continuously. Apps that allow this cause massive, silent battery drain.
-* **The Video Advantage:** Actual video files (`.mp4`, `.mkv`) use hardware acceleration. Your phone has a dedicated chip just for decoding video, which is incredibly efficient and uses almost zero extra battery.
+* **The Video Advantage:** Actual video files (`.mp4`, `.mkv`) use native hardware acceleration. Your phone has a dedicated silicon chip just for decoding video, which is incredibly efficient and uses almost zero extra battery (perfect for handheld gaming devices and power users!).
 * **The Fix:** If you have a GIF you love, use a free online converter to change it into an `.mp4` file first. Your battery will thank you.
 
 **Q: When I open my app drawer, the background blurs a static image of Zombillie instead of my video. Why?**
 
-**A:** Your phone’s manufacturer is taking a lazy shortcut to save battery. 
+**A:** Your phone’s manufacturer is taking a lazy shortcut to save battery.
 
-* **The Technical Reason:** Blurring live video in real-time requires GPU power. Aggressive custom interfaces (like Infinix's XOS or certain Xiaomi builds) refuse to do this. Instead, their launcher asks the OS for the app's default, hardcoded static thumbnail—our mascot, Zombillie—and just blurs that image instead. 
+* **The Technical Reason:** Blurring live video in real-time requires constant GPU power. Aggressive custom interfaces (like Infinix's XOS or certain Xiaomi builds) refuse to do this. Instead, their launcher asks the OS for the app's default, hardcoded static thumbnail—our mascot, Zombillie—and just blurs that image instead.
 * **The Fix:** Because Android requires that fallback thumbnail to be permanently baked into the app's installation file, third-party apps cannot dynamically change it to match your video. To get a true, live video blur, you either have to switch to a well-behaved custom launcher (like **Nova** or **Smart Launcher**) or just embrace your new zombie app drawer companion!

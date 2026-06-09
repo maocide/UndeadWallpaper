@@ -126,4 +126,11 @@
     <string name="log_empty_toast">File di log non trovato o vuoto</string>
     <string name="log_cleared_toast">File di log cancellato</string>
 
+    <!-- Parallax -->
+    <string name="parallax_icon_description">Sperimentale</string>
+    <string name="parallax_card_title">Esperimento Parallasse</string>
+    <string name="parallax_toggle_label">Parallasse Home Screen</string>
+    <string name="parallax_description">Sposta il video mentre scorri le pagine. Zoomma leggermente il video per nascondere i bordi neri. Nota: potrebbe non funzionare con alcuni launcher personalizzati.</string>
+    <string name="parallax_strength_label">Intensità Parallasse</string>
+
 </resources>

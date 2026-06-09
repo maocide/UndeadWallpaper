@@ -125,4 +125,11 @@
     <string name="log_empty_toast">ログファイルが見つからないか、空です</string>
     <string name="log_cleared_toast">ログファイルがクリアされました</string>
 
+    <!-- Parallax -->
+    <string name="parallax_icon_description">実験的機能</string>
+    <string name="parallax_card_title">視差効果（実験的）</string>
+    <string name="parallax_toggle_label">ホーム画面の視差効果</string>
+    <string name="parallax_description">ページをスワイプすると動画が連動して動きます。動画を少しズームインして黒い縁を隠してください。注意：一部のカスタムランチャーではサポートされていません。</string>
+    <string name="parallax_strength_label">視差効果の強さ</string>
+
 </resources>

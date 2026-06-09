@@ -75,6 +75,9 @@ class GLVideoRenderer(private val context: Context) {
     private val projectionMatrix = FloatArray(16)
     private val viewMatrix = FloatArray(16)
 
+    // Parallax offset variables.
+    @Volatile private var parallaxTranslateX = 0.0f;
+
 
 
     private val vertexShaderCode = """
@@ -185,6 +188,15 @@ class GLVideoRenderer(private val context: Context) {
      */
     fun requestRender() {
         renderSignal.trySend(Unit)
+    }
+
+    fun setParallaxOffset(xOffsetFromCenter: Float) {
+        // xOffsetFromCenter should be a value like -0.2 to 0.2
+        if(parallaxTranslateX != xOffsetFromCenter) {
+            parallaxTranslateX = xOffsetFromCenter
+            isPendingMatrixUpdate = true
+            requestRender() // Force a draw even if paused!
+        }
     }
 
     fun onSurfaceChanged(width: Int, height: Int) {
@@ -393,7 +405,7 @@ class GLVideoRenderer(private val context: Context) {
         Matrix.setIdentityM(viewMatrix, 0)
 
         // Translate
-        val transX = userTranslateX * (screenWidth / 2f)
+        val transX = (userTranslateX + parallaxTranslateX) * (screenWidth / 2f)
         val transY = userTranslateY * (screenHeight / 2f)
         Matrix.translateM(viewMatrix, 0, transX, transY, 0f)
 

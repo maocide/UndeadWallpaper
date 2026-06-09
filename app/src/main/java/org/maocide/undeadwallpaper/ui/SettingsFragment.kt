@@ -453,6 +453,12 @@ class SettingsFragment : Fragment() {
                 WallpaperAction.SKIP_NEXT -> binding.tripleTapGroup.check(binding.tripleTapSkip.id)
             }
 
+            // Experimental Parallax
+            val isParallaxEnabled = preferencesManager.isParallaxEnabled()
+            binding.switchParallax.isChecked = isParallaxEnabled
+            binding.sliderParallaxStrength.value = preferencesManager.getParallaxStrength()
+            binding.layoutParallaxStrength.visibility = if (isParallaxEnabled) View.VISIBLE else View.GONE
+
             // Regardless of having a selected video or not, we need to load the recent files
             // into the RecyclerView adapter ONCE during UI initialization.
             loadRecentFiles()
@@ -644,6 +650,35 @@ class SettingsFragment : Fragment() {
                 setPackage(requireContext().packageName)
             }
             requireContext().applicationContext.sendBroadcast(intent)
+        }
+
+        // Parallax Toggle
+        binding.switchParallax.setOnCheckedChangeListener { _, isChecked ->
+            if (isUpdatingUi) return@setOnCheckedChangeListener
+
+            preferencesManager.setParallaxEnabled(isChecked)
+
+            // Animation
+            android.transition.TransitionManager.beginDelayedTransition(binding.cardParallax as android.view.ViewGroup)
+
+            // Changing visibility will make TransitionManager animate
+            binding.layoutParallaxStrength.visibility = if (isChecked) View.VISIBLE else View.GONE
+
+            if (!isChecked) {
+                val intent = Intent(UndeadWallpaperService.ACTION_VIDEO_SETTINGS_CHANGED).apply {
+                    setPackage(requireContext().packageName)
+                }
+                requireContext().applicationContext.sendBroadcast(intent)
+            }
+        }
+
+        // Parallax Strength Slider
+        binding.sliderParallaxStrength.addOnChangeListener { _, value, fromUser ->
+            if (fromUser) {
+                preferencesManager.setParallaxStrength(value)
+                // No need to broadcast here. The Engine reads the preference live
+                // inside onOffsetsChanged(), so the strength updates instantly on next swipe
+            }
         }
 
         // Video Picker

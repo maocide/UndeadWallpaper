@@ -298,6 +298,13 @@ class UndeadWallpaperService : WallpaperService() {
                     ACTION_VIDEO_SETTINGS_CHANGED -> {
                         FileLogger.i(TAG, "Broadcast received: Video settings changed, full re-initialization requested.")
                         isUserManuallyPaused = false // CLEAR PAUSE STATE
+
+                        // Reset the parallax offset if the user turned it off so the renderer
+                        // doesn't keep applying the last scroll value on every frame.
+                        if (!prefs.isParallaxEnabled()) {
+                            renderer?.setParallaxOffset(0f)
+                        }
+
                         // Ensure settings apply completely identical to a URI change to avoid syncing bugs
                         resetPlaybackTimeline()
                         initializePlayer() // force Reinit
@@ -490,6 +497,24 @@ class UndeadWallpaperService : WallpaperService() {
         override fun onRenderedFirstFrame() {
             FileLogger.i(TAG, "SUCCESS: onRenderedFirstFrame called. Decoder actually pushed a frame to the screen!")
             refreshRenderer() // Applies as late as possible a matrix/uniform recomputation on openGL engine
+        }
+
+        /**
+         * Handles parallax by processing launcher events.
+         */
+        override fun onOffsetsChanged(
+            xOffset: Float, yOffset: Float,
+            xOffsetStep: Float, yOffsetStep: Float,
+            xPixelOffset: Int, yPixelOffset: Int
+        ) {
+            super.onOffsetsChanged(xOffset, yOffset, xOffsetStep, yOffsetStep, xPixelOffset, yPixelOffset)
+
+            if (!prefs.isParallaxEnabled()) return
+
+            val shiftX = (0.5f - xOffset) * prefs.getParallaxStrength()
+            renderer?.setParallaxOffset(shiftX)
+
+            //FileLogger.i(TAG, "PARALLAX offset event SHIFT: $shiftX")
         }
 
         @OptIn(UnstableApi::class)

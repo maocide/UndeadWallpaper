@@ -8,6 +8,7 @@ import android.util.Log
 
 import java.io.File
 import kotlin.random.Random
+import androidx.core.net.toUri
 
 /**
  * Manages playback sequence logic for LOOP_ALL and SHUFFLE modes.
@@ -96,9 +97,14 @@ class PlaylistManager(
             return chunkUris
         }
 
-        val baseUriParsed = Uri.parse(currentUri)
+        // Map generation before the loop (O(N) operation done once)
+        val settingsMap = prefs.getPlaylistSettings().associateBy { it.fileName }
+
+        val baseUriParsed = currentUri.toUri()
         val baseFileName = baseUriParsed.lastPathSegment ?: ""
-        val baseSettings = prefs.getVideoSettings(baseFileName)
+
+        // Map lookup
+        val baseSettings = settingsMap[baseFileName] ?: prefs.getVideoSettings(baseFileName)
 
         // Figure out our current position in the sequence
         var currentIndex = playlistUris.indexOf(currentUri)
@@ -107,7 +113,7 @@ class PlaylistManager(
         val sequenceOrder = if (playbackMode == PlaybackMode.SHUFFLE) {
             getShuffleOrder(playlistUris.size)
         } else {
-            (0 until playlistUris.size).toList() // Linear order 0, 1, 2, ...
+            (0 until playlistUris.size).toList()
         }
 
         // Find where our current video sits in this sequence
@@ -130,15 +136,17 @@ class PlaylistManager(
             val nextLogicalIndex = sequenceOrder[wrappedPositionInSequence]
 
             val nextUriStr = playlistUris[nextLogicalIndex]
-            val nextUriParsed = Uri.parse(nextUriStr)
+            val nextUriParsed = nextUriStr.toUri()
             val nextFileName = nextUriParsed.lastPathSegment ?: ""
-            val nextSettings = prefs.getVideoSettings(nextFileName)
+
+            // O(1) Map lookup inside the loop
+            val nextSettings = settingsMap[nextFileName] ?: prefs.getVideoSettings(nextFileName)
 
             // Check transforms difference in VideoSettings model that would require GL matrix/uniforms updates
             if (baseSettings.hasSameVisualTransformsAs(nextSettings)) {
                 chunkUris.add(nextUriStr)
             } else {
-                // Settings differ! Break the batch.
+                // Settings differ, break
                 break
             }
         }
