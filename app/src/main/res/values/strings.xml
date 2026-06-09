@@ -145,4 +145,27 @@
     <string name="parallax_description">Makes the video shift as you swipe pages. Zoom in the video slightly to hide black edges. Note: Not supported by all custom system launchers.</string>
     <string name="parallax_strength_label">Parallax Strength</string>
 
+    <!-- Per-screen wallpaper -->
+    <string name="per_screen_card_title">Per-Screen Wallpaper</string>
+    <string name="per_screen_toggle_label">Enable Per-Screen Videos</string>
+    <string name="per_screen_description">Play a different video on each home screen page. The video fades to a bridge image while you swipe, then the next page\'s video fades in. Note: Requires a launcher that reports wallpaper scrolling (most do; Pixel Launcher does not).</string>
+    <string name="per_screen_bridge_label">Bridge image (shown while swiping)</string>
+    <string name="bridge_mode_frozen">Frozen frame</string>
+    <string name="bridge_mode_shared">Single image</string>
+    <string name="bridge_mode_per_page">Per-screen image</string>
+    <string name="per_screen_pick_shared_image">Pick bridge image</string>
+    <string name="per_screen_screens_label">Screens</string>
+    <string name="per_screen_screens_instructions">Screen 1 is your first home page, Screen 2 the next, and so on. Extra pages reuse the last screen.</string>
+    <string name="per_screen_add_screen">Add screen</string>
+    <string name="per_screen_remove_screen">Remove</string>
+    <string name="per_screen_screen_number">Screen %1$d</string>
+    <string name="per_screen_pick_video">Choose video</string>
+    <string name="per_screen_pick_image">Choose image</string>
+    <string name="per_screen_no_video">No video selected</string>
+    <string name="per_screen_no_image">No image selected</string>
+    <string name="per_screen_select_video_title">Select a video for this screen</string>
+    <string name="per_screen_need_videos">Add videos to your playlist first.</string>
+    <string name="per_screen_icon_description">Experimental</string>
+    <string name="per_screen_thumbnail_description">Selected bridge image</string>
+
 </resources>

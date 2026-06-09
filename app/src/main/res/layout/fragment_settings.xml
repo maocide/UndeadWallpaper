@@ -596,6 +596,173 @@
         </com.google.android.material.card.MaterialCardView>
 
         <com.google.android.material.card.MaterialCardView
+            android:id="@+id/card_per_screen"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            app:cardCornerRadius="24dp"
+            app:strokeWidth="0dp"
+            app:cardElevation="8dp"
+            app:cardBackgroundColor="?attr/colorSurface"
+            app:layout_constraintTop_toBottomOf="@id/card_parallax"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="8dp">
+
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_science"
+                        app:tint="?attr/colorPrimary"
+                        android:layout_marginEnd="8dp"
+                        android:contentDescription="@string/per_screen_icon_description" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/per_screen_card_title"
+                        android:textAppearance="?attr/textAppearanceTitleMedium"
+                        android:textStyle="bold"
+                        android:textColor="?attr/colorPrimary" />
+                </LinearLayout>
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/switch_per_screen"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/per_screen_toggle_label"
+                    android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/per_screen_description"
+                    android:textAppearance="?attr/textAppearanceCaption"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:layout_marginBottom="12dp" />
+
+                <LinearLayout
+                    android:id="@+id/layout_per_screen_options"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/per_screen_bridge_label" />
+
+                    <com.google.android.material.chip.ChipGroup
+                        android:id="@+id/bridge_mode_group"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        app:singleSelection="true"
+                        app:selectionRequired="true"
+                        app:chipSpacingHorizontal="8dp">
+
+                        <com.google.android.material.chip.Chip
+                            android:id="@+id/bridge_mode_frozen"
+                            style="@style/Widget.MaterialComponents.Chip.Choice"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="true"
+                            android:text="@string/bridge_mode_frozen" />
+
+                        <com.google.android.material.chip.Chip
+                            android:id="@+id/bridge_mode_shared"
+                            style="@style/Widget.MaterialComponents.Chip.Choice"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/bridge_mode_shared" />
+
+                        <com.google.android.material.chip.Chip
+                            android:id="@+id/bridge_mode_per_page"
+                            style="@style/Widget.MaterialComponents.Chip.Choice"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/bridge_mode_per_page" />
+                    </com.google.android.material.chip.ChipGroup>
+
+                    <LinearLayout
+                        android:id="@+id/layout_shared_image"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:layout_marginTop="8dp"
+                        android:visibility="gone">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/button_pick_shared_image"
+                            style="@style/Widget.Material3.Button.TonalButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/per_screen_pick_shared_image"
+                            app:icon="@android:drawable/ic_menu_report_image" />
+
+                        <ImageView
+                            android:id="@+id/image_shared_bridge"
+                            android:layout_width="match_parent"
+                            android:layout_height="100dp"
+                            android:layout_marginTop="8dp"
+                            android:scaleType="centerCrop"
+                            android:visibility="gone"
+                            android:contentDescription="@string/per_screen_thumbnail_description" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:text="@string/per_screen_screens_label"
+                        android:textAppearance="?attr/textAppearanceTitleSmall"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="@string/per_screen_screens_instructions"
+                        android:textAppearance="?attr/textAppearanceCaption"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/recycler_view_screens"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:nestedScrollingEnabled="false"
+                        android:layout_marginTop="8dp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/button_add_screen"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="end"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/per_screen_add_screen"
+                        app:icon="@android:drawable/ic_input_add" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
             android:id="@+id/card_playlist"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
@@ -603,7 +770,7 @@
             app:cardCornerRadius="24dp"
             app:strokeWidth="0dp"
             app:cardElevation="8dp"
-            app:layout_constraintTop_toBottomOf="@id/card_parallax"
+            app:layout_constraintTop_toBottomOf="@id/card_per_screen"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent">
 

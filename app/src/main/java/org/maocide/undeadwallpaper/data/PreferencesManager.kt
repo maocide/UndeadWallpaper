@@ -13,7 +13,9 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import android.net.Uri
+import org.maocide.undeadwallpaper.model.BridgeMode
 import org.maocide.undeadwallpaper.model.GestureType
+import org.maocide.undeadwallpaper.model.ScreenSlot
 import org.maocide.undeadwallpaper.model.WallpaperAction
 
 /**
@@ -63,6 +65,12 @@ class PreferencesManager(context: Context) {
 
         private const val KEY_PARALLAX_ENABLED = "parallax_enabled"
         private const val KEY_PARALLAX_STRENGTH = "parallax_strength"
+
+        // Per-screen wallpaper feature
+        private const val KEY_PER_SCREEN_ENABLED = "per_screen_enabled"
+        private const val KEY_BRIDGE_MODE = "per_screen_bridge_mode"
+        private const val KEY_SHARED_BRIDGE_IMAGE = "per_screen_shared_image"
+        private const val KEY_SCREEN_SLOTS = "per_screen_slots"
     }
 
     init {
@@ -358,6 +366,54 @@ class PreferencesManager(context: Context) {
 
     fun getParallaxStrength(): Float {
         return sharedPrefs.getFloat(KEY_PARALLAX_STRENGTH, 0.4f)
+    }
+
+    // ---------------------------------------------------------------------
+    // Per-screen wallpaper
+    // ---------------------------------------------------------------------
+
+    fun setPerScreenEnabled(enabled: Boolean) {
+        sharedPrefs.edit { putBoolean(KEY_PER_SCREEN_ENABLED, enabled) }
+    }
+
+    fun isPerScreenEnabled(): Boolean {
+        return sharedPrefs.getBoolean(KEY_PER_SCREEN_ENABLED, false)
+    }
+
+    fun setBridgeMode(mode: BridgeMode) {
+        sharedPrefs.edit { putInt(KEY_BRIDGE_MODE, mode.ordinal) }
+    }
+
+    fun getBridgeMode(): BridgeMode {
+        val storedOrdinal = sharedPrefs.getInt(KEY_BRIDGE_MODE, BridgeMode.FROZEN_FRAME.ordinal)
+        return BridgeMode.entries.getOrElse(storedOrdinal) { BridgeMode.FROZEN_FRAME }
+    }
+
+    /** Filename (in the app images dir) of the shared bridge image, or null if unset. */
+    fun setSharedBridgeImage(fileName: String?) {
+        sharedPrefs.edit {
+            if (fileName.isNullOrBlank()) remove(KEY_SHARED_BRIDGE_IMAGE)
+            else putString(KEY_SHARED_BRIDGE_IMAGE, fileName)
+        }
+    }
+
+    fun getSharedBridgeImage(): String? {
+        return sharedPrefs.getString(KEY_SHARED_BRIDGE_IMAGE, null)
+    }
+
+    fun getScreenSlots(): List<ScreenSlot> {
+        val jsonString = sharedPrefs.getString(KEY_SCREEN_SLOTS, null)
+        if (jsonString.isNullOrBlank()) return emptyList()
+        return try {
+            jsonParser.decodeFromString<List<ScreenSlot>>(jsonString)
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    fun saveScreenSlots(slots: List<ScreenSlot>) {
+        val jsonString = jsonParser.encodeToString(slots)
+        sharedPrefs.edit(commit = true) { putString(KEY_SCREEN_SLOTS, jsonString) }
     }
 
 }

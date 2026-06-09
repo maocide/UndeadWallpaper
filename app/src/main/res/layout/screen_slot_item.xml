@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="8dp"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="0dp"
+    app:strokeWidth="1dp"
+    app:strokeColor="?attr/colorOutlineVariant"
+    app:cardBackgroundColor="?attr/colorSurfaceVariant">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="12dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/text_screen_number"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textAppearance="?attr/textAppearanceTitleSmall"
+                android:textStyle="bold"
+                android:textColor="?attr/colorOnSurface"
+                tools:text="Screen 1" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/button_remove_screen"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/per_screen_remove_screen" />
+        </LinearLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/button_choose_video"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="@string/per_screen_pick_video"
+            app:icon="@android:drawable/ic_menu_gallery" />
+
+        <TextView
+            android:id="@+id/text_selected_video"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:ellipsize="middle"
+            android:singleLine="true"
+            android:textAppearance="?attr/textAppearanceCaption"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:text="@string/per_screen_no_video" />
+
+        <LinearLayout
+            android:id="@+id/layout_per_page_image"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="8dp"
+            android:visibility="gone">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/button_choose_image"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/per_screen_pick_image"
+                app:icon="@android:drawable/ic_menu_report_image" />
+
+            <ImageView
+                android:id="@+id/image_slot_thumbnail"
+                android:layout_width="match_parent"
+                android:layout_height="80dp"
+                android:layout_marginTop="4dp"
+                android:scaleType="centerCrop"
+                android:visibility="gone"
+                android:contentDescription="@string/per_screen_thumbnail_description" />
+        </LinearLayout>
+
+    </LinearLayout>
+
+</com.google.android.material.card.MaterialCardView>

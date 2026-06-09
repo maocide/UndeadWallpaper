@@ -5,9 +5,12 @@ import org.maocide.undeadwallpaper.databinding.FragmentSettingsBinding
 import org.maocide.undeadwallpaper.R
 import org.maocide.undeadwallpaper.BuildConfig
 
+import org.maocide.undeadwallpaper.data.ImageFileManager
 import org.maocide.undeadwallpaper.data.PreferencesManager
 import org.maocide.undeadwallpaper.data.VideoFileManager
+import org.maocide.undeadwallpaper.model.BridgeMode
 import org.maocide.undeadwallpaper.model.PlaybackMode
+import org.maocide.undeadwallpaper.model.ScreenSlot
 import org.maocide.undeadwallpaper.model.RecentFile
 import org.maocide.undeadwallpaper.model.StartTime
 import org.maocide.undeadwallpaper.model.StatusBarColor
@@ -71,7 +74,11 @@ class SettingsFragment : Fragment() {
     private val tag: String = javaClass.simpleName
     private lateinit var preferencesManager: PreferencesManager
     private lateinit var videoFileManager: VideoFileManager
+    private lateinit var imageFileManager: ImageFileManager
     private lateinit var recentFilesAdapter: RecentFilesAdapter
+    private var screenSlotAdapter: ScreenSlotAdapter? = null
+    private val screenSlots = mutableListOf<ScreenSlot>()
+    private var pendingImageSlotIndex = -1 // -1 means the shared bridge image
     private val recentFiles = mutableListOf<RecentFile>()
     private var currentVideoDurationMs: Long = 0L
     private var previewPlayer: ExoPlayer? = null
@@ -104,6 +111,17 @@ class SettingsFragment : Fragment() {
         if (result.resultCode == Activity.RESULT_OK) {
             result.data?.data?.let { uri ->
                 handleSelectedMedia(uri)
+            }
+        }
+    }
+
+    /**
+     * Launcher for picking a bridge image (per-screen wallpaper feature).
+     */
+    private val pickImageLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            result.data?.data?.let { uri ->
+                handleSelectedImage(uri)
             }
         }
     }
@@ -151,6 +169,7 @@ class SettingsFragment : Fragment() {
         _binding = FragmentSettingsBinding.inflate(inflater, container, false)
         preferencesManager = PreferencesManager(requireContext())
         videoFileManager = VideoFileManager(requireContext())
+        imageFileManager = ImageFileManager(requireContext())
         return binding.root
     }
 
@@ -459,6 +478,22 @@ class SettingsFragment : Fragment() {
             binding.sliderParallaxStrength.value = preferencesManager.getParallaxStrength()
             binding.layoutParallaxStrength.visibility = if (isParallaxEnabled) View.VISIBLE else View.GONE
 
+            // Per-screen wallpaper
+            val isPerScreenEnabled = preferencesManager.isPerScreenEnabled()
+            binding.switchPerScreen.isChecked = isPerScreenEnabled
+            binding.layoutPerScreenOptions.visibility = if (isPerScreenEnabled) View.VISIBLE else View.GONE
+
+            val bridgeMode = preferencesManager.getBridgeMode()
+            when (bridgeMode) {
+                BridgeMode.FROZEN_FRAME -> binding.bridgeModeGroup.check(binding.bridgeModeFrozen.id)
+                BridgeMode.SHARED_IMAGE -> binding.bridgeModeGroup.check(binding.bridgeModeShared.id)
+                BridgeMode.PER_PAGE_IMAGE -> binding.bridgeModeGroup.check(binding.bridgeModePerPage.id)
+            }
+            binding.layoutSharedImage.visibility =
+                if (bridgeMode == BridgeMode.SHARED_IMAGE) View.VISIBLE else View.GONE
+            updateSharedImageThumbnail()
+            setupScreenSlotsRecycler()
+
             // Regardless of having a selected video or not, we need to load the recent files
             // into the RecyclerView adapter ONCE during UI initialization.
             loadRecentFiles()
@@ -681,11 +716,185 @@ class SettingsFragment : Fragment() {
             }
         }
 
+        // Per-screen master toggle
+        binding.switchPerScreen.setOnCheckedChangeListener { _, isChecked ->
+            if (isUpdatingUi) return@setOnCheckedChangeListener
+
+            preferencesManager.setPerScreenEnabled(isChecked)
+
+            android.transition.TransitionManager.beginDelayedTransition(binding.cardPerScreen as android.view.ViewGroup)
+            binding.layoutPerScreenOptions.visibility = if (isChecked) View.VISIBLE else View.GONE
+
+            broadcastPerScreenChanged()
+        }
+
+        // Bridge image mode
+        binding.bridgeModeGroup.setOnCheckedStateChangeListener { _, checkedIds ->
+            if (isUpdatingUi || checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
+
+            val mode = when (checkedIds[0]) {
+                binding.bridgeModeShared.id -> BridgeMode.SHARED_IMAGE
+                binding.bridgeModePerPage.id -> BridgeMode.PER_PAGE_IMAGE
+                else -> BridgeMode.FROZEN_FRAME
+            }
+            preferencesManager.setBridgeMode(mode)
+            binding.layoutSharedImage.visibility =
+                if (mode == BridgeMode.SHARED_IMAGE) View.VISIBLE else View.GONE
+            screenSlotAdapter?.setBridgeMode(mode)
+            broadcastPerScreenChanged()
+        }
+
+        binding.buttonPickSharedImage.setOnClickListener {
+            pendingImageSlotIndex = -1
+            openImagePicker()
+        }
+
+        binding.buttonAddScreen.setOnClickListener {
+            addScreenSlot()
+        }
+
         // Video Picker
         binding.buttonPickVideo.setOnClickListener {
             checkPermissionAndOpenFilePicker()
         }
 
+    }
+
+    // ---------------------------------------------------------------------
+    // Per-screen wallpaper UI
+    // ---------------------------------------------------------------------
+
+    private fun broadcastPerScreenChanged() {
+        val intent = Intent(UndeadWallpaperService.ACTION_PER_SCREEN_CHANGED).apply {
+            setPackage(requireContext().packageName)
+        }
+        requireContext().applicationContext.sendBroadcast(intent)
+    }
+
+    private fun saveScreenSlots() {
+        preferencesManager.saveScreenSlots(screenSlots.toList())
+    }
+
+    private fun setupScreenSlotsRecycler() {
+        screenSlots.clear()
+        screenSlots.addAll(preferencesManager.getScreenSlots())
+        if (screenSlots.isEmpty()) {
+            // Seed with a single empty slot so the user has something to configure.
+            screenSlots.add(ScreenSlot())
+        }
+
+        val adapter = ScreenSlotAdapter(
+            screenSlots,
+            imageFileManager,
+            preferencesManager.getBridgeMode(),
+            onChooseVideo = { index -> showVideoChooserDialog(index) },
+            onChooseImage = { index ->
+                pendingImageSlotIndex = index
+                openImagePicker()
+            },
+            onRemove = { index -> removeScreenSlot(index) }
+        )
+        screenSlotAdapter = adapter
+        binding.recyclerViewScreens.layoutManager = LinearLayoutManager(context)
+        binding.recyclerViewScreens.adapter = adapter
+    }
+
+    private fun addScreenSlot() {
+        screenSlots.add(ScreenSlot())
+        saveScreenSlots()
+        screenSlotAdapter?.notifyItemInserted(screenSlots.size - 1)
+    }
+
+    private fun removeScreenSlot(index: Int) {
+        if (index !in screenSlots.indices) return
+        val removed = screenSlots.removeAt(index)
+        imageFileManager.deleteImage(removed.bridgeImageFileName)
+        saveScreenSlots()
+        screenSlotAdapter?.notifyItemRemoved(index)
+        // Refresh the "Screen N" labels for the rows that shifted up.
+        screenSlotAdapter?.notifyItemRangeChanged(index, screenSlots.size)
+        broadcastPerScreenChanged()
+    }
+
+    private fun showVideoChooserDialog(index: Int) {
+        val videos = preferencesManager.getPlaylistSettings().map { it.fileName }
+        if (videos.isEmpty()) {
+            Toast.makeText(requireContext(), R.string.per_screen_need_videos, Toast.LENGTH_LONG).show()
+            return
+        }
+
+        val current = screenSlots.getOrNull(index)?.videoFileName
+        val checked = videos.indexOf(current)
+
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.per_screen_select_video_title)
+            .setSingleChoiceItems(videos.toTypedArray(), checked) { dialog, which ->
+                if (index in screenSlots.indices) {
+                    screenSlots[index] = screenSlots[index].copy(videoFileName = videos[which])
+                    saveScreenSlots()
+                    screenSlotAdapter?.notifyItemChanged(index)
+                    broadcastPerScreenChanged()
+                }
+                dialog.dismiss()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun openImagePicker() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "image/*"
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        try {
+            pickImageLauncher.launch(intent)
+        } catch (e: ActivityNotFoundException) {
+            FileLogger.e(tag, "Failed to open image picker", e)
+            Toast.makeText(context, R.string.error_file_picker_not_available, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun handleSelectedImage(uri: Uri) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            val file = withContext(Dispatchers.IO) {
+                imageFileManager.createImageFromContentUri(uri)
+            }
+            if (file == null) {
+                Toast.makeText(context, R.string.error_copy_failed, Toast.LENGTH_LONG).show()
+                return@launch
+            }
+
+            if (pendingImageSlotIndex == -1) {
+                // Shared bridge image
+                val old = preferencesManager.getSharedBridgeImage()
+                preferencesManager.setSharedBridgeImage(file.name)
+                if (old != null && old != file.name) imageFileManager.deleteImage(old)
+                updateSharedImageThumbnail()
+            } else {
+                val idx = pendingImageSlotIndex
+                if (idx in screenSlots.indices) {
+                    val old = screenSlots[idx].bridgeImageFileName
+                    screenSlots[idx] = screenSlots[idx].copy(bridgeImageFileName = file.name)
+                    if (old != null && old != file.name) imageFileManager.deleteImage(old)
+                    saveScreenSlots()
+                    screenSlotAdapter?.notifyItemChanged(idx)
+                }
+            }
+            broadcastPerScreenChanged()
+        }
+    }
+
+    private fun updateSharedImageThumbnail() {
+        val name = preferencesManager.getSharedBridgeImage()
+        val bmp = imageFileManager.loadBitmap(name, 320, 320)
+        if (bmp != null) {
+            binding.imageSharedBridge.setImageBitmap(bmp)
+            binding.imageSharedBridge.visibility = View.VISIBLE
+        } else {
+            binding.imageSharedBridge.setImageDrawable(null)
+            binding.imageSharedBridge.visibility = View.GONE
+        }
     }
 
     /**

@@ -2,14 +2,17 @@ package org.maocide.undeadwallpaper.service
 
 import org.maocide.undeadwallpaper.BuildConfig
 
+import org.maocide.undeadwallpaper.data.ImageFileManager
 import org.maocide.undeadwallpaper.data.PlaylistManager
 import org.maocide.undeadwallpaper.data.PreferencesManager
+import org.maocide.undeadwallpaper.model.BridgeMode
 import org.maocide.undeadwallpaper.model.PlaybackMode
 import org.maocide.undeadwallpaper.model.ScalingMode
 import org.maocide.undeadwallpaper.model.StartTime
 import org.maocide.undeadwallpaper.model.StatusBarColor
 import org.maocide.undeadwallpaper.utils.FileLogger
 
+import android.animation.ValueAnimator
 import android.app.WallpaperColors
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -20,9 +23,11 @@ import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.os.UserManager
+import java.io.File
 import android.service.wallpaper.WallpaperService
 import android.util.Log
 import android.view.MotionEvent
@@ -72,6 +77,12 @@ class UndeadWallpaperService : WallpaperService() {
         const val ACTION_STATUS_BAR_COLOR_CHANGED = "org.maocide.undeadwallpaper.STATUS_BAR_COLOR_CHANGED"
         const val ACTION_PLAYLIST_REORDERED = "org.maocide.undeadwallpaper.PLAYLIST_REORDERED"
         const val ACTION_VIDEO_SETTINGS_CHANGED = "org.maocide.undeadwallpaper.VIDEO_SETTINGS_CHANGED"
+        const val ACTION_PER_SCREEN_CHANGED = "org.maocide.undeadwallpaper.PER_SCREEN_CHANGED"
+
+        // Duration of the per-screen video <-> bridge-image crossfade.
+        private const val PER_SCREEN_FADE_MS = 120L
+        // How close xOffset must be to a page step to count as "settled".
+        private const val PER_SCREEN_SETTLE_EPSILON = 0.01f
     }
 
     override fun onCreateEngine(): Engine {
@@ -106,6 +117,16 @@ class UndeadWallpaperService : WallpaperService() {
         private var hasPlaybackCompleted = false
 
         private var renderer: GLVideoRenderer? = null
+
+        // Per-screen wallpaper state
+        private val imageFileManager by lazy { ImageFileManager(baseContext) }
+        private var isPerScreenMode = false
+        private var bridgeMode = BridgeMode.FROZEN_FRAME
+        private var screenSlots: List<org.maocide.undeadwallpaper.model.ScreenSlot> = emptyList()
+        private var currentPageIndex = 0
+        private var perScreenTransitionActive = false
+        private var pendingFadeInOnFirstFrame = false
+        private var alphaAnimator: ValueAnimator? = null
 
         // Hardware Info
         private val isVivoDevice = Build.MANUFACTURER.equals("vivo", ignoreCase = true)
@@ -310,6 +331,13 @@ class UndeadWallpaperService : WallpaperService() {
                         initializePlayer() // force Reinit
                     }
 
+                    ACTION_PER_SCREEN_CHANGED -> {
+                        FileLogger.i(TAG, "Broadcast received: Per-screen settings changed, full re-initialization requested.")
+                        isUserManuallyPaused = false
+                        resetPlaybackTimeline()
+                        initializePlayer()
+                    }
+
                     Intent.ACTION_USER_UNLOCKED -> {
                         FileLogger.i(TAG, "Broadcast received: User Unlocked. Initializing player safely.")
                         initializePlayer()
@@ -466,6 +494,12 @@ class UndeadWallpaperService : WallpaperService() {
                 Player.STATE_ENDED -> {
                     FileLogger.i(TAG, "Playback ended!")
 
+                    if (isPerScreenMode) {
+                        // Per-screen videos loop in place; never auto-advance.
+                        wallpaperPlayer.seekToDefaultPosition()
+                        return
+                    }
+
                     if (currentPlaybackMode == PlaybackMode.ONE_SHOT) {
                         hasPlaybackCompleted = true
                         wallpaperPlayer.pause()
@@ -497,10 +531,18 @@ class UndeadWallpaperService : WallpaperService() {
         override fun onRenderedFirstFrame() {
             FileLogger.i(TAG, "SUCCESS: onRenderedFirstFrame called. Decoder actually pushed a frame to the screen!")
             refreshRenderer() // Applies as late as possible a matrix/uniform recomputation on openGL engine
+
+            // Per-screen: now that the new page's first frame is on the GPU, fade it
+            // in over the bridge image so we never flash a black/stale frame.
+            if (pendingFadeInOnFirstFrame) {
+                pendingFadeInOnFirstFrame = false
+                animateVideoAlpha(0f, 1f) { perScreenTransitionActive = false }
+            }
         }
 
         /**
-         * Handles parallax by processing launcher events.
+         * Handles launcher scroll events: parallax (shift within a page) and,
+         * when enabled, the per-screen wallpaper transitions (swap video per page).
          */
         override fun onOffsetsChanged(
             xOffset: Float, yOffset: Float,
@@ -509,12 +551,170 @@ class UndeadWallpaperService : WallpaperService() {
         ) {
             super.onOffsetsChanged(xOffset, yOffset, xOffsetStep, yOffsetStep, xPixelOffset, yPixelOffset)
 
-            if (!prefs.isParallaxEnabled()) return
+            if (prefs.isParallaxEnabled()) {
+                val shiftX = (0.5f - xOffset) * prefs.getParallaxStrength()
+                renderer?.setParallaxOffset(shiftX)
+            }
 
-            val shiftX = (0.5f - xOffset) * prefs.getParallaxStrength()
-            renderer?.setParallaxOffset(shiftX)
+            if (!isPerScreenMode) return
+            // Need at least two configured screens to transition between.
+            if (screenSlots.size < 2) return
+            // xOffsetStep is 1/(pageCount-1); <=0 means a single page (no scrolling).
+            if (xOffsetStep <= 0f || xOffsetStep > 1f) return
 
-            //FileLogger.i(TAG, "PARALLAX offset event SHIFT: $shiftX")
+            val page = Math.round(xOffset / xOffsetStep)
+            val settled = kotlin.math.abs(xOffset - page * xOffsetStep) < PER_SCREEN_SETTLE_EPSILON
+
+            if (settled) {
+                onSettledOnPage(page)
+            } else {
+                // Mid-swipe: fade the video out to reveal the bridge image.
+                startPerScreenFadeOut()
+            }
+        }
+
+        // ---- Per-screen wallpaper helpers ----
+
+        private fun refreshPerScreenConfig() {
+            isPerScreenMode = prefs.isPerScreenEnabled()
+            bridgeMode = prefs.getBridgeMode()
+            screenSlots = prefs.getScreenSlots()
+        }
+
+        private fun screenWidthPx(): Int = baseContext.resources.displayMetrics.widthPixels
+        private fun screenHeightPx(): Int = baseContext.resources.displayMetrics.heightPixels
+
+        /** Maps a home-page index to a slot, clamping extra pages to the last slot. */
+        private fun slotForPage(page: Int): org.maocide.undeadwallpaper.model.ScreenSlot? {
+            if (screenSlots.isEmpty()) return null
+            val idx = page.coerceIn(0, screenSlots.size - 1)
+            return screenSlots[idx]
+        }
+
+        private fun uriForVideoFileName(name: String?): String? {
+            if (name.isNullOrBlank()) return null
+            val dir = File(getExternalFilesDir(Environment.DIRECTORY_MOVIES), "videos")
+            val f = File(dir, name)
+            return if (f.exists()) Uri.fromFile(f).toString() else null
+        }
+
+        /** Resolves the video URI string for a given page, or null if unassigned/missing. */
+        private fun perScreenUriForPage(page: Int): String? {
+            val slot = slotForPage(page) ?: return null
+            return uriForVideoFileName(slot.videoFileName)
+        }
+
+        @OptIn(UnstableApi::class)
+        private fun bindPerScreenPage(keepCurrentPlayback: Boolean) {
+            val uriStr = loadedVideoUriString
+            if (uriStr.isBlank()) return
+            val dataSourceFactory = DefaultDataSource.Factory(baseContext)
+            val mediaSourceFactory = ProgressiveMediaSource.Factory(dataSourceFactory)
+            val item = MediaItem.Builder().setUri(uriStr.toUri()).setMediaId(uriStr).build()
+            val src = mediaSourceFactory.createMediaSource(item)
+            // Each page's video simply loops in place; no auto-advance in per-screen mode.
+            wallpaperPlayer.setRepeatMode(Player.REPEAT_MODE_ONE)
+            wallpaperPlayer.setMediaSources(listOf(src))
+            wallpaperPlayer.seekTo(0, if (keepCurrentPlayback) wallpaperPlayer.currentPosition else 0L)
+        }
+
+        /**
+         * Populates the static bridge layer to represent the page we are leaving,
+         * according to the user's BridgeMode. Falls back to a frozen frame if an
+         * image is missing.
+         */
+        private fun prepareBridgeForCurrentPage() {
+            when (bridgeMode) {
+                BridgeMode.FROZEN_FRAME -> renderer?.captureCurrentFrameToStatic()
+                BridgeMode.SHARED_IMAGE -> {
+                    val bmp = imageFileManager.loadBitmap(prefs.getSharedBridgeImage(), screenWidthPx(), screenHeightPx())
+                    if (bmp != null) renderer?.setStaticBitmap(bmp) else renderer?.captureCurrentFrameToStatic()
+                }
+                BridgeMode.PER_PAGE_IMAGE -> {
+                    val name = slotForPage(currentPageIndex)?.bridgeImageFileName
+                    val bmp = imageFileManager.loadBitmap(name, screenWidthPx(), screenHeightPx())
+                    if (bmp != null) renderer?.setStaticBitmap(bmp) else renderer?.captureCurrentFrameToStatic()
+                }
+            }
+        }
+
+        private fun animateVideoAlpha(from: Float, to: Float, onEnd: (() -> Unit)? = null) {
+            alphaAnimator?.cancel()
+            renderer?.setVideoAlpha(from)
+            val anim = ValueAnimator.ofFloat(from, to).apply {
+                duration = PER_SCREEN_FADE_MS
+                addUpdateListener { renderer?.setVideoAlpha(it.animatedValue as Float) }
+                addListener(object : android.animation.AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: android.animation.Animator) {
+                        onEnd?.invoke()
+                    }
+                })
+            }
+            alphaAnimator = anim
+            anim.start()
+        }
+
+        private fun startPerScreenFadeOut() {
+            if (perScreenTransitionActive) return
+            perScreenTransitionActive = true
+            prepareBridgeForCurrentPage()
+            animateVideoAlpha(1f, 0f) {
+                // Pause the decoder while only the bridge image is visible to save power.
+                if (isPerScreenMode && perScreenTransitionActive) {
+                    wallpaperPlayer.playWhenReady = false
+                }
+            }
+        }
+
+        private fun onSettledOnPage(page: Int) {
+            if (screenSlots.isEmpty()) return
+            val targetIndex = page.coerceIn(0, screenSlots.size - 1)
+            val pageChanged = targetIndex != currentPageIndex
+
+            if (!pageChanged) {
+                // Same page: if we faded out (swiped and returned), fade the video back in.
+                if (perScreenTransitionActive) {
+                    perScreenTransitionActive = false
+                    wallpaperPlayer.playWhenReady = isVisible
+                    animateVideoAlpha(0f, 1f)
+                }
+                return
+            }
+
+            // Page changed. If a fade-out never ran (launcher only reports settled
+            // offsets), set up the bridge now and hide the video instantly.
+            if (!perScreenTransitionActive) {
+                prepareBridgeForCurrentPage()
+                renderer?.setVideoAlpha(0f)
+                perScreenTransitionActive = true
+            }
+
+            currentPageIndex = targetIndex
+
+            val newUri = perScreenUriForPage(targetIndex)
+            if (newUri == null) {
+                // No video assigned/found for this page: leave the bridge image visible.
+                FileLogger.w(TAG, "Per-screen: no video for page $targetIndex")
+                return
+            }
+
+            // In per-page image mode, swap the backdrop to the NEW page's image so it
+            // shows behind the loading video.
+            if (bridgeMode == BridgeMode.PER_PAGE_IMAGE) {
+                val name = slotForPage(targetIndex)?.bridgeImageFileName
+                val bmp = imageFileManager.loadBitmap(name, screenWidthPx(), screenHeightPx())
+                if (bmp != null) renderer?.setStaticBitmap(bmp)
+            }
+
+            loadedVideoUriString = newUri
+            prefs.saveActiveVideoUri(newUri)
+            resetPlaybackTimeline()
+            bindPerScreenPage(keepCurrentPlayback = false)
+            applyNonVisualSettings(getSettingsForUri(loadedVideoUriString))
+            wallpaperPlayer.prepare()
+            wallpaperPlayer.playWhenReady = isVisible
+            // Fade the new video in once its first frame is actually rendered.
+            pendingFadeInOnFirstFrame = true
         }
 
         @OptIn(UnstableApi::class)
@@ -549,10 +749,22 @@ class UndeadWallpaperService : WallpaperService() {
 
             // Load prefs
             currentPlaybackMode = prefs.getPlaybackMode()
+            refreshPerScreenConfig()
 
             hasPlaybackCompleted = false
 
-            val mediaUri = getMediaUri()
+            // Reset any in-flight per-screen fade state for a clean (re)start.
+            alphaAnimator?.cancel()
+            perScreenTransitionActive = false
+            pendingFadeInOnFirstFrame = false
+            renderer?.setVideoAlpha(1f)
+            renderer?.clearStatic()
+
+            val mediaUri: Uri? = if (isPerScreenMode) {
+                (perScreenUriForPage(currentPageIndex) ?: getMediaUri()?.toString())?.toUri()
+            } else {
+                getMediaUri()
+            }
             loadedVideoUriString = mediaUri?.toString() ?: ""
 
             // Status bar color refresh, material you notify
@@ -571,12 +783,18 @@ class UndeadWallpaperService : WallpaperService() {
             val initialVolume = activeSettings.getPerceivedVolume()
             speed = activeSettings.speed
 
-            wallpaperPlayer.initialize(null, initialVolume, speed, currentPlaybackMode)
+            // In per-screen mode each page is a single looping video (REPEAT_MODE_ONE).
+            val effectivePlaybackMode = if (isPerScreenMode) PlaybackMode.LOOP else currentPlaybackMode
+            wallpaperPlayer.initialize(null, initialVolume, speed, effectivePlaybackMode)
 
             if (!isPlayerInitialized) return
 
-            // Call the helper to load playlist
-            bindPlaylistToPlayer(keepCurrentPlayback = false)
+            // Bind the media: single page video for per-screen, otherwise the playlist.
+            if (isPerScreenMode) {
+                bindPerScreenPage(keepCurrentPlayback = false)
+            } else {
+                bindPlaylistToPlayer(keepCurrentPlayback = false)
+            }
 
             // Send all values to renderer updating it, will be used for matrix calc.
             // refreshRenderer() // Removed from initialization, as it's called on first frame
@@ -752,6 +970,7 @@ class UndeadWallpaperService : WallpaperService() {
             super.onSurfaceDestroyed(holder)
             FileLogger.i(TAG, "onSurfaceDestroyed")
             visibilityJob?.cancel()
+            alphaAnimator?.cancel()
             playbackWatchdog.stop()
             releasePlayer()
             releaseRenderer()
@@ -762,6 +981,7 @@ class UndeadWallpaperService : WallpaperService() {
             super.onDestroy()
             FileLogger.i(TAG, "Engine onDestroy")
             visibilityJob?.cancel()
+            alphaAnimator?.cancel()
             playbackWatchdog.stop() // Kill the playback watchdog
             releasePlayer()
             releaseRenderer()
@@ -885,6 +1105,7 @@ class UndeadWallpaperService : WallpaperService() {
                 addAction(ACTION_STATUS_BAR_COLOR_CHANGED)
                 addAction(ACTION_PLAYLIST_REORDERED)
                 addAction(ACTION_VIDEO_SETTINGS_CHANGED)
+                addAction(ACTION_PER_SCREEN_CHANGED)
                 addAction(Intent.ACTION_USER_UNLOCKED)
             }
             // Registering the broadcast receiver with ContextCompat.RECEIVER_NOT_EXPORTED
@@ -989,6 +1210,7 @@ class UndeadWallpaperService : WallpaperService() {
             if (action == ACTION_PLAYBACK_MODE_CHANGED ||
                 action == ACTION_VIDEO_URI_CHANGED ||
                 action == ACTION_VIDEO_SETTINGS_CHANGED ||
+                action == ACTION_PER_SCREEN_CHANGED ||
                 action == "android.wallpaper.reapply") {
 
                 FileLogger.i(TAG, "Command received -> Re-initializing player.")
