@@ -1,14 +1,123 @@
-name: Prepare Build For Release
+name: Build & Release
 
 on:
+  # Manual trigger: pick a semver bump (or pass an explicit version) and the
+  # whole pipeline runs end-to-end: bump -> commit -> build -> tag -> release.
   workflow_dispatch:
     inputs:
+      bump:
+        description: 'Semver part to bump (ignored if "version" is set)'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: patch
       version:
-        description: 'Version to tag (e.g., v1.0.0)'
-        required: true
+        description: 'Explicit version override, e.g. 1.4.0 (leave blank to auto-bump)'
+        required: false
+        default: ''
+      draft:
+        description: 'Create the GitHub release as a draft instead of publishing'
+        type: boolean
+        default: false
+
+# Default to least privilege; jobs that need more opt in explicitly.
+permissions:
+  contents: read
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # 1. Determine the next version, write it into the Gradle build file, and
+  #    commit it back so the tag, the APK's versionName, and master all agree.
+  # ---------------------------------------------------------------------------
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      # Needed to push the version-bump commit back to the branch.
+      contents: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      # Compute the next versionName / versionCode from the Gradle file (the
+      # single source of truth). An explicit "version" input wins over the bump.
+      - name: Compute next version
+        id: version
+        run: |
+          set -euo pipefail
+          GRADLE_FILE="app/build.gradle.kts"
+
+          CURRENT=$(grep -oP 'versionName\s*=\s*"\K[^"]+' "$GRADLE_FILE")
+          CURRENT_CODE=$(grep -oP 'versionCode\s*=\s*\K[0-9]+' "$GRADLE_FILE")
+          echo "Current version: $CURRENT (code $CURRENT_CODE)"
+
+          OVERRIDE="${{ github.event.inputs.version }}"
+          if [ -n "$OVERRIDE" ]; then
+            NEW="${OVERRIDE#v}"   # tolerate a leading "v"
+          else
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+            case "${{ github.event.inputs.bump }}" in
+              major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+              minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+              patch) PATCH=$((PATCH + 1)) ;;
+            esac
+            NEW="$MAJOR.$MINOR.$PATCH"
+          fi
+
+          if ! [[ "$NEW" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Computed version '$NEW' is not valid semver (X.Y.Z)."
+            exit 1
+          fi
+
+          NEW_CODE=$((CURRENT_CODE + 1))
+          TAG="v$NEW"
+
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "::error::Tag $TAG already exists. Bump to a new version."
+            exit 1
+          fi
+
+          echo "current=$CURRENT"           >> "$GITHUB_OUTPUT"
+          echo "current_code=$CURRENT_CODE" >> "$GITHUB_OUTPUT"
+          echo "version=$NEW"               >> "$GITHUB_OUTPUT"
+          echo "code=$NEW_CODE"             >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG"                   >> "$GITHUB_OUTPUT"
+          echo "New version: $NEW (code $NEW_CODE), tag $TAG"
+
+      # Rewrite versionName / versionCode in the Gradle file.
+      - name: Bump version in Gradle
+        run: |
+          set -euo pipefail
+          GRADLE_FILE="app/build.gradle.kts"
+          sed -i -E "s/versionName\s*=\s*\"${{ steps.version.outputs.current }}\"/versionName = \"${{ steps.version.outputs.version }}\"/" "$GRADLE_FILE"
+          sed -i -E "s/versionCode\s*=\s*${{ steps.version.outputs.current_code }}/versionCode = ${{ steps.version.outputs.code }}/" "$GRADLE_FILE"
+          echo "--- Updated version fields ---"
+          grep -E 'versionName|versionCode' "$GRADLE_FILE"
+
+      # Commit the bump so the released APK and the tagged commit match exactly.
+      - name: Commit version bump
+        id: commit
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/build.gradle.kts
+          git commit -m "chore: release ${{ steps.version.outputs.tag }}"
+          git push origin "HEAD:${{ github.ref_name }}"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  # ---------------------------------------------------------------------------
+  # 2. Build the (signed) release APK from the bumped commit.
+  # ---------------------------------------------------------------------------
   build:
+    needs: prepare
     runs-on: ubuntu-latest
     permissions:
       # Minimal permissions for build job - only read access needed
@@ -24,6 +133,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        with:
+          # Build the exact commit produced by the prepare job.
+          ref: ${{ needs.prepare.outputs.sha }}
 
       # Set up JDK 17 for Android build compatibility
       - name: Set up JDK 17
@@ -62,36 +174,52 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: ./gradlew assembleRelease
 
+      # Give the APK a versioned, human-friendly name for the release assets.
+      - name: Rename APK
+        run: |
+          set -euo pipefail
+          APK=$(find app/build/outputs/apk/release -name '*.apk' | head -n 1)
+          if [ -z "$APK" ]; then
+            echo "::error::No APK found after build."
+            exit 1
+          fi
+          cp "$APK" "UndeadWallpaper-${{ needs.prepare.outputs.tag }}.apk"
+
       # Upload APK as artifact for download from workflow runs
       - name: Upload APK artifact
         uses: actions/upload-artifact@v6
         with:
           name: app-release
-          path: app/build/outputs/apk/release/*.apk
+          path: UndeadWallpaper-${{ needs.prepare.outputs.tag }}.apk
           if-no-files-found: error
 
         # Generate build provenance attestations so we can confirm a given binary was built using github action
       - name: Attest APK Builds
         uses: actions/attest-build-provenance@v3
         with:
-          subject-path: app/build/outputs/apk/release/*.apk
+          subject-path: UndeadWallpaper-${{ needs.prepare.outputs.tag }}.apk
 
       # Clean up keystore file after build for security
       - name: Cleanup keystore
         if: ${{ always() && env.SIGNING_ENABLED == 'true' }}
         run: rm -f app/keystore.jks
 
+  # ---------------------------------------------------------------------------
+  # 3. Tag the bumped commit and publish the GitHub release with the APK.
+  # ---------------------------------------------------------------------------
   release:
-    needs: build
+    needs: [prepare, build]
     runs-on: ubuntu-latest
     permissions:
-      # Required for gh CLI to create draft releases and upload assets
+      # Required for gh CLI to create the tag, release, and upload assets
       contents: write
 
     steps:
-      # Checkout required for gh CLI to work with the repository
+      # Checkout the bumped commit so the tag points at the released code.
       - name: Checkout repository
         uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
 
       # Download the APK built in the build job
       - name: Download APK artifact
@@ -100,16 +228,25 @@ jobs:
           name: app-release
           path: release-apk
 
-      # Create a tag for the release
+      # Create the version tag on the bumped commit
       - name: Create version tag
         run: |
-          git tag ${{ github.event.inputs.version }}
-          git push origin ${{ github.event.inputs.version }}
+          set -euo pipefail
+          git tag "${{ needs.prepare.outputs.tag }}" "${{ needs.prepare.outputs.sha }}"
+          git push origin "${{ needs.prepare.outputs.tag }}"
 
-      # Create a draft release with the APK
-      # Draft releases allow maintainers to review before publishing
-      - name: Create draft release
+      # Create the GitHub release with auto-generated notes and the APK attached.
+      # Published by default; pass draft=true on dispatch to stage it for review.
+      - name: Create release
         env:
           GH_TOKEN: ${{ github.token }} # User token must have WRITE permission granted
         run: |
-          gh release create ${{ github.event.inputs.version }} release-apk/*.apk --draft --generate-notes
+          set -euo pipefail
+          DRAFT_FLAG=""
+          if [ "${{ github.event.inputs.draft }}" = "true" ]; then
+            DRAFT_FLAG="--draft"
+          fi
+          gh release create "${{ needs.prepare.outputs.tag }}" release-apk/*.apk \
+            --title "${{ needs.prepare.outputs.tag }}" \
+            --generate-notes \
+            $DRAFT_FLAG
