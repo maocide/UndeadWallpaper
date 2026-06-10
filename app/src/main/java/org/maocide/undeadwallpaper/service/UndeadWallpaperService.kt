@@ -706,6 +706,8 @@ class UndeadWallpaperService : WallpaperService() {
                 if (bmp != null) renderer?.setStaticBitmap(bmp)
             }
 
+            FileLogger.i(TAG, "Per-screen: settled on page $targetIndex, swapping video.")
+
             loadedVideoUriString = newUri
             prefs.saveActiveVideoUri(newUri)
             resetPlaybackTimeline()
@@ -1097,6 +1099,11 @@ class UndeadWallpaperService : WallpaperService() {
         override fun onCreate(surfaceHolder: SurfaceHolder) {
             super.onCreate(surfaceHolder)
             FileLogger.i(TAG, "Engine onCreate")
+
+            // Opt in to launcher scroll callbacks. Without this, onOffsetsChanged()
+            // is never delivered, so neither parallax nor the per-screen page swap
+            // can react to home-screen swipes.
+            setOffsetNotificationsEnabled(true)
 
             // Turn on filter to start listening
             val intentFilter = IntentFilter().apply {
