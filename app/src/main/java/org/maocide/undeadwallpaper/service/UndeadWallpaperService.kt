@@ -127,6 +127,7 @@ class UndeadWallpaperService : WallpaperService() {
         private var perScreenTransitionActive = false
         private var pendingFadeInOnFirstFrame = false
         private var alphaAnimator: ValueAnimator? = null
+        private var offsetDiagnosticShown = false
 
         // Hardware Info
         private val isVivoDevice = Build.MANUFACTURER.equals("vivo", ignoreCase = true)
@@ -559,11 +560,31 @@ class UndeadWallpaperService : WallpaperService() {
             if (!isPerScreenMode) return
             // Need at least two configured screens to transition between.
             if (screenSlots.size < 2) return
-            // xOffsetStep is 1/(pageCount-1); <=0 means a single page (no scrolling).
-            if (xOffsetStep <= 0f || xOffsetStep > 1f) return
 
-            val page = Math.round(xOffset / xOffsetStep)
-            val settled = kotlin.math.abs(xOffset - page * xOffsetStep) < PER_SCREEN_SETTLE_EPSILON
+            // One-time visible confirmation that the launcher actually delivers
+            // scroll offsets (the whole feature is impossible without them).
+            if (!offsetDiagnosticShown) {
+                offsetDiagnosticShown = true
+                FileLogger.i(TAG, "Per-screen: first offset event xOffset=$xOffset step=$xOffsetStep")
+                Handler(Looper.getMainLooper()).post {
+                    Toast.makeText(
+                        baseContext,
+                        "Per-screen: scroll detected (step=$xOffsetStep)",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+
+            // Some launchers report xOffset but leave xOffsetStep at 0. In that case
+            // fall back to spreading the scroll range evenly across the configured screens.
+            val step = if (xOffsetStep > 0f && xOffsetStep <= 1f) {
+                xOffsetStep
+            } else {
+                1f / (screenSlots.size - 1)
+            }
+
+            val page = Math.round(xOffset / step)
+            val settled = kotlin.math.abs(xOffset - page * step) < PER_SCREEN_SETTLE_EPSILON
 
             if (settled) {
                 onSettledOnPage(page)
@@ -763,7 +784,11 @@ class UndeadWallpaperService : WallpaperService() {
             renderer?.clearStatic()
 
             val mediaUri: Uri? = if (isPerScreenMode) {
-                (perScreenUriForPage(currentPageIndex) ?: getMediaUri()?.toString())?.toUri()
+                val perScreenUri = perScreenUriForPage(currentPageIndex) ?: getMediaUri()?.toString()
+                // Keep the persisted "active video" in sync with the current page so the
+                // visibility-change re-init check doesn't think the URI drifted.
+                if (perScreenUri != null) prefs.saveActiveVideoUri(perScreenUri)
+                perScreenUri?.toUri()
             } else {
                 getMediaUri()
             }
