@@ -16,7 +16,8 @@ This isn't just a clever pun on "live" wallpaper. The name **UndeadWallpaper** i
 * **The New Engine (Gapless & Smooth):** Ripped out the old guts and built a custom OpenGL + ExoPlayer pipeline. The new batching engine groups videos with identical settings, allowing for seamless, gapless transitions between your favorite clips with zero buffering or black screens.
 * **Dynamic UI Colors (Material You):** Your phone, your vibe. As you set a video, the app extracts the dominant colors from your wallpaper and seamlessly themes your Android system to match. 
 * **Sleek Material 3 UI:** Wrapped in a custom "Zombie Glass" dark theme, everything from the tonal chips to the smooth bottom sheets is designed to look native, premium, and easy to use with one hand.
-* **Interactive Playlist:** Your recent files are a fully drag-and-drop playground. Swipe to delete, reorder on the fly, and hit `Loop All` or `Shuffle` modes for endless visual chaos. 
+* **Interactive Playlist:** Your recent files are a fully drag-and-drop playground. Swipe to delete, reorder on the fly, and hit `Loop All` or `Shuffle` modes for endless visual chaos.
+* **Video Parallax:** Give your home screen real depth. The custom OpenGL engine intercepts your launcher's events, smoothly shifting your video's perspective as you scroll through your pages, all without tanking your frame rate or eating your battery.
 * **Smart Start Times:** Customize what your wallpaper does when you unlock your phone. Resume where you left off, restart for that dramatic intro, or jump to a random frame.
 * **One-Shot Mode:** Want a "Live Photo" vibe? Set your video to play once and freeze on the final frame. Perfect for cinematic intros.
 * **Zombillie is Here:** Fresh install? We got you covered with a default Zombillie animation so your screen isn't naked while you look for your own clips.
