@@ -81,6 +81,9 @@ class UndeadWallpaperService : WallpaperService() {
 
         // Duration of the per-screen video <-> bridge-image crossfade.
         private const val PER_SCREEN_FADE_MS = 120L
+        // Force the fade-in even if onRenderedFirstFrame never arrives, so the
+        // wallpaper can never get stuck showing only the bridge image.
+        private const val PER_SCREEN_FADE_IN_TIMEOUT_MS = 800L
         // How close xOffset must be to a page step to count as "settled".
         private const val PER_SCREEN_SETTLE_EPSILON = 0.01f
     }
@@ -128,6 +131,8 @@ class UndeadWallpaperService : WallpaperService() {
         private var pendingFadeInOnFirstFrame = false
         private var alphaAnimator: ValueAnimator? = null
         private var offsetDiagnosticShown = false
+        private val perScreenHandler = Handler(Looper.getMainLooper())
+        private var fadeInSafetyRunnable: Runnable? = null
 
         // Hardware Info
         private val isVivoDevice = Build.MANUFACTURER.equals("vivo", ignoreCase = true)
@@ -535,10 +540,7 @@ class UndeadWallpaperService : WallpaperService() {
 
             // Per-screen: now that the new page's first frame is on the GPU, fade it
             // in over the bridge image so we never flash a black/stale frame.
-            if (pendingFadeInOnFirstFrame) {
-                pendingFadeInOnFirstFrame = false
-                animateVideoAlpha(0f, 1f) { perScreenTransitionActive = false }
-            }
+            fadeInPerScreenVideo()
         }
 
         /**
@@ -575,16 +577,18 @@ class UndeadWallpaperService : WallpaperService() {
                 }
             }
 
-            // Some launchers report xOffset but leave xOffsetStep at 0. In that case
-            // fall back to spreading the scroll range evenly across the configured screens.
-            val step = if (xOffsetStep > 0f && xOffsetStep <= 1f) {
-                xOffsetStep
-            } else {
-                1f / (screenSlots.size - 1)
+            // Require a usable page step. For N home pages the launcher reports
+            // step = 1/(N-1), so the valid range is (0, 1]. A step of 0 (or >1)
+            // means the launcher isn't reporting real multi-page scrolling (e.g. a
+            // resting offset of ~0.5 with step 0). In that case keep the video fully
+            // visible instead of getting stuck on the bridge image.
+            if (xOffsetStep <= 0f || xOffsetStep > 1f) {
+                restoreVideoIfBridged()
+                return
             }
 
-            val page = Math.round(xOffset / step)
-            val settled = kotlin.math.abs(xOffset - page * step) < PER_SCREEN_SETTLE_EPSILON
+            val page = Math.round(xOffset / xOffsetStep)
+            val settled = kotlin.math.abs(xOffset - page * xOffsetStep) < PER_SCREEN_SETTLE_EPSILON
 
             if (settled) {
                 onSettledOnPage(page)
@@ -679,12 +683,38 @@ class UndeadWallpaperService : WallpaperService() {
             if (perScreenTransitionActive) return
             perScreenTransitionActive = true
             prepareBridgeForCurrentPage()
-            animateVideoAlpha(1f, 0f) {
-                // Pause the decoder while only the bridge image is visible to save power.
-                if (isPerScreenMode && perScreenTransitionActive) {
-                    wallpaperPlayer.playWhenReady = false
-                }
-            }
+            // Keep the player running behind the bridge image. Pausing here proved
+            // fragile (the resume could race the fade and leave the video hidden),
+            // and the brief extra decoding during a swipe is negligible.
+            animateVideoAlpha(1f, 0f)
+        }
+
+        /**
+         * Forces the video layer back to fully visible and tears down any bridge
+         * state. Used when the launcher stops reporting a usable page step so we
+         * never get stuck showing only the bridge image.
+         */
+        private fun restoreVideoIfBridged() {
+            if (!perScreenTransitionActive && !pendingFadeInOnFirstFrame) return
+            perScreenTransitionActive = false
+            pendingFadeInOnFirstFrame = false
+            fadeInSafetyRunnable?.let { perScreenHandler.removeCallbacks(it) }
+            alphaAnimator?.cancel()
+            renderer?.setVideoAlpha(1f)
+            renderer?.clearStatic()
+            wallpaperPlayer.playWhenReady = isVisible
+        }
+
+        /**
+         * Fades the new page's video in. Called from onRenderedFirstFrame, but also
+         * from a safety timeout so a missing first-frame callback can never leave the
+         * wallpaper stuck on the bridge image.
+         */
+        private fun fadeInPerScreenVideo() {
+            if (!pendingFadeInOnFirstFrame) return
+            pendingFadeInOnFirstFrame = false
+            fadeInSafetyRunnable?.let { perScreenHandler.removeCallbacks(it) }
+            animateVideoAlpha(0f, 1f) { perScreenTransitionActive = false }
         }
 
         private fun onSettledOnPage(page: Int) {
@@ -736,8 +766,15 @@ class UndeadWallpaperService : WallpaperService() {
             applyNonVisualSettings(getSettingsForUri(loadedVideoUriString))
             wallpaperPlayer.prepare()
             wallpaperPlayer.playWhenReady = isVisible
-            // Fade the new video in once its first frame is actually rendered.
+
+            // Fade the new video in once its first frame is rendered. A safety
+            // timeout guarantees the fade-in still happens even if onRenderedFirstFrame
+            // doesn't fire, so we never get stuck showing only the bridge image.
             pendingFadeInOnFirstFrame = true
+            fadeInSafetyRunnable?.let { perScreenHandler.removeCallbacks(it) }
+            val safety = Runnable { fadeInPerScreenVideo() }
+            fadeInSafetyRunnable = safety
+            perScreenHandler.postDelayed(safety, PER_SCREEN_FADE_IN_TIMEOUT_MS)
         }
 
         @OptIn(UnstableApi::class)
@@ -998,6 +1035,7 @@ class UndeadWallpaperService : WallpaperService() {
             FileLogger.i(TAG, "onSurfaceDestroyed")
             visibilityJob?.cancel()
             alphaAnimator?.cancel()
+            perScreenHandler.removeCallbacksAndMessages(null)
             playbackWatchdog.stop()
             releasePlayer()
             releaseRenderer()
@@ -1009,6 +1047,7 @@ class UndeadWallpaperService : WallpaperService() {
             FileLogger.i(TAG, "Engine onDestroy")
             visibilityJob?.cancel()
             alphaAnimator?.cancel()
+            perScreenHandler.removeCallbacksAndMessages(null)
             playbackWatchdog.stop() // Kill the playback watchdog
             releasePlayer()
             releaseRenderer()
