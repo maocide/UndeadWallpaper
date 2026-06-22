@@ -794,16 +794,18 @@ class UndeadWallpaperService : WallpaperService() {
                     val isSurfaceDead = surfaceHolder?.surface?.isValid != true
                     var wasJustInitialized = false
 
-                    // Check if we need to (re)initialize
-                    if (currentUriOnDisk != loadedVideoUriString || !isPlayerInitialized || isSurfaceDead) {
-                        if (currentUriOnDisk != loadedVideoUriString) {
+                    // Check if player is initialized AND if the internal thread survived the sleep
+                    val isThreadDead = isPlayerInitialized && !wallpaperPlayer.isPlaybackThreadAlive
+                    if (currentUriOnDisk != loadedVideoUriString || !isPlayerInitialized || isSurfaceDead || isThreadDead) {
+                        if (isThreadDead) {
+                            FileLogger.e(TAG, "WakeUp Check: ExoPlayer internal thread was killed by OS. Forcing restart.")
+                        } else if (currentUriOnDisk != loadedVideoUriString) {
                             FileLogger.i(TAG, "WakeUp Check: URI changed while sleeping! Reloading.")
                         } else if (isSurfaceDead) {
                             FileLogger.w(TAG, "WakeUp Check: Surface died silently. Forcing restart.")
                         }
 
                         // If the user wants a restart, reset playhead BEFORE init
-                        // so bindPlaylistToPlayer doesn't seek to the old paused position.
                         if (prefs.getStartTime() == StartTime.RESTART) {
                             resetPlaybackTimeline()
                         }

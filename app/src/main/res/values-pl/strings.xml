@@ -2,6 +2,7 @@
     <string name="app_name">Undead Wallpaper</string>
     <string name="action_settings">O Undead</string>
     <string name="action_battery_optimization">Optymalizacja Baterii</string>
+    <string name="action_faq">Pomoc / FAQ</string>
 
     <string name="first_fragment_label">Ustawienia Undead</string>
     <string name="second_fragment_label">O Undead</string>
@@ -74,6 +75,7 @@
     <string name="warning_random_start_time_delay">Tryb losowy może powodować opóźnienia</string>
     <string name="error_video_too_large">Wideo jest za duże! Maksymalna obsługiwana rozdzielczość to 4K (UHD).</string>
     <string name="error_open_settings_failed">Nie udało się otworzyć ustawień</string>
+    <string name="error_no_browser">Nie można otworzyć przeglądarki</string>
 
     <string name="status_bar_icons_label">Ikony paska stanu</string>
     <string name="status_bar_auto">Auto</string>

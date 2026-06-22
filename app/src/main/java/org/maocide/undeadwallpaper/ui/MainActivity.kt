@@ -25,8 +25,7 @@ import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.navigateUp
 import androidx.navigation.ui.setupActionBarWithNavController
 import com.google.android.material.snackbar.Snackbar
-
-
+import androidx.core.net.toUri
 
 
 class MainActivity : AppCompatActivity() {
@@ -83,11 +82,22 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
         val navController = findNavController(R.id.nav_host_fragment_content_main)
         return when (item.itemId) {
+            R.id.action_faq -> {
+                try {
+                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                        data =
+                            "https://github.com/maocide/UndeadWallpaper/blob/master/FAQ.md".toUri()
+                    }
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    FileLogger.e("MainActivity", "Failed to open FAQ browser link", e)
+                    
+                    Toast.makeText(this, getString(R.string.error_no_browser), Toast.LENGTH_SHORT).show()
+                }
+                true
+            }
             R.id.action_battery_optimization -> {
                 try {
                     val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {

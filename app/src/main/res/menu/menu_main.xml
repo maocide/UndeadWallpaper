@@ -2,11 +2,19 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     tools:context="org.maocide.undeadwallpaper.ui.MainActivity">
+
+    <item
+        android:id="@+id/action_faq"
+        android:orderInCategory="40"
+        android:title="@string/action_faq"
+        app:showAsAction="never" />
+
     <item
         android:id="@+id/action_battery_optimization"
         android:orderInCategory="50"
         android:title="@string/action_battery_optimization"
         app:showAsAction="never" />
+
     <item
         android:id="@+id/action_settings"
         android:orderInCategory="100"

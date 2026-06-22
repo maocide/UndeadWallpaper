@@ -2,6 +2,7 @@
     <string name="app_name">Undead Wallpaper</string>
     <string name="action_settings">Sobre</string>
     <string name="action_battery_optimization">Otimização de Bateria</string>
+    <string name="action_faq">Ajuda / FAQ</string>
 
     <!-- Strings used for fragments for navigation -->
     <string name="first_fragment_label">Configurações do Undead</string>
@@ -78,6 +79,8 @@
     <string name="warning_random_start_time_delay">O modo aleatório pode causar atrasos devido à busca no vídeo</string>
     <string name="error_video_too_large">Vídeo muito grande! A resolução máxima suportada é 4K (UHD).</string>
     <string name="error_open_settings_failed">Falha ao abrir as configurações</string>
+    <string name="error_no_browser">Não foi possível abrir o navegador</string>
+
     <!-- Status Bar Icon Color Settings -->
     <string name="status_bar_icons_label">Ícones da Barra de Status</string>
     <string name="status_bar_auto">Automático</string>

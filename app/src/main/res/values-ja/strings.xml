@@ -2,6 +2,7 @@
     <string name="app_name">Undead Wallpaper</string>
     <string name="action_settings">情報</string>
     <string name="action_battery_optimization">バッテリーの最適化</string>
+    <string name="action_faq">ヘルプ / FAQ</string>
 
     <!-- Strings used for fragments for navigation -->
     <string name="first_fragment_label">Undead設定</string>
@@ -69,6 +70,8 @@
     <string name="error_video_too_large">ビデオが大きすぎます！最大対応解像度は4K（UHD）です。</string>
     <string name="error_cannot_remove_last_video">プレイリストの最後の動画は外せません</string>
     <string name="error_open_settings_failed">設定を開けませんでした</string>
+    <string name="error_no_browser">ブラウザを開けません</string>
+
     <!-- Status Bar Icon Color Settings -->
     <string name="status_bar_icons_label">ステータスバーのアイコン</string>
     <string name="status_bar_auto">自動</string>
