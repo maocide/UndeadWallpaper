@@ -72,6 +72,10 @@ class WallpaperPlayer(
             player?.videoScalingMode = value
         }
 
+    val isPlaybackThreadAlive: Boolean
+        @OptIn(UnstableApi::class)
+        get() = player?.playbackLooper?.thread?.isAlive ?: false
+
     @OptIn(UnstableApi::class)
     fun setMediaSources(mediaSources: List<MediaSource>) {
         player?.setMediaSources(mediaSources)
