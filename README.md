@@ -26,8 +26,8 @@ This isn't just a clever pun on "live" wallpaper. The name **UndeadWallpaper** i
 ## Getting Started (It's scary simple)
 
 1. **Pick Your Poison:** Tap the "Pick Video" button and choose your masterpiece.
-2. **Tweak It:** Tap the gear icon next to your video. Use the advanced settings to fit, fill, or stretch it. Zoom in, move it around, make it perfect.
-3. **Smash the Button:** Like what you see? Hit that floating button and bring your screen to glorious un-life.
+2. **Smash the Button:** Like what you see? Hit that floating button and bring your screen to glorious un-life, you are done!
+3. **Tweak It:** Tap the gear icon next to your video. Use the advanced settings to fit, fill, or stretch it. Zoom in, move it around, make it perfect. You can even peek at your home screen to see what you changed on the fly.
 
 ### Keep It Alive (Disable Battery Optimizations) 🧟‍♂️
 
@@ -39,14 +39,15 @@ A built-in **"Allow Background Performance"** card directly in the app will warn
 
 ## Join the Horde! (Contribute & Connect)
 
-This project clawed its way back from the dead, but it was the **people** that truly gave it a soul.
+This project clawed its way back from the dead, but it was the **people** that truly gave it a soul. 
 
-* Want to see what the horde is saying? **[Dive into the main feedback thread right here!](https://www.reddit.com/r/androidapps/comments/1nl2zwj/i_made_a_free_noads_opensource_app_that_lets_you/)**
+Want to see what the horde is saying? **[Dive into the main feedback thread right here!](https://www.reddit.com/r/androidapps/comments/1nl2zwj/i_made_a_free_noads_opensource_app_that_lets_you/)**
 
-Got your own ideas? Found a bug? Wanna make this thing even more badass? Contributions are not just welcome; they're celebrated!
+Got your own ideas? Found a bug? Wanna make this thing even more badass? Contributions are celebrated, but we play by a strict set of rules to keep the app fast and bloat-free.
 
-* Spotted a glitch? Got a genius feature idea? **[Open an issue](https://github.com/maocide/UndeadWallpaper/issues/new/choose)** and let's talk about it.
-* Wanna get your hands dirty with some code? **Fork the repo** and hit me with a pull request!
+* **[Read the CONTRIBUTING.md Guide BEFORE opening an issue or PR!](CONTRIBUTING.md)** This covers our strict UI rules, battery performance requirements, and bug reporting steps.
+* Spotted a glitch? Got the logs to prove it? **[Open an issue](https://github.com/maocide/UndeadWallpaper/issues/new/choose)**.
+* Ready to code? **Fork the repo** and hit me with a pull request!
 
 ## License
 
