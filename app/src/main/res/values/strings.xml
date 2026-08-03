@@ -91,6 +91,7 @@
 
     <!-- UI Headers & Sections -->
     <string name="custom_settings_header">Custom Settings</string>
+    <string name="importing_video">Importing Video</string>
     <string name="positioning_header">Positioning</string>
     <string name="general_header">General</string>
     <string name="volume_label">Volume</string>

@@ -46,6 +46,7 @@ import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -837,46 +838,54 @@ class SettingsFragment : Fragment() {
                 return@launch
             }
 
-            // Copy the file to internal storage in a background thread
-            val copiedFilePair = withContext(Dispatchers.IO) {
-                videoFileManager.createFileFromContentUri(uri)
-            }
-            if (copiedFilePair != null) {
-                val copiedFile = copiedFilePair.first
-                val originalName = copiedFilePair.second
-                
-                // Immediately save the VideoSettings with the displayName
-                withContext(Dispatchers.IO) {
-                    preferencesManager.updateVideoSettings(copiedFile.name) {
-                        it.copy(displayName = originalName, expectedFileSize = copiedFile.length())
+            // Wrap the entire copy operation in our new Loading Overlay
+            withLoadingOverlay(getString(R.string.importing_video)) {
+                val copiedFilePair = try {
+                    withContext(Dispatchers.IO) {
+                        videoFileManager.createFileFromContentUri(uri)
                     }
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    null // Return null to skip the success block
                 }
                 
-                val savedFileUri = Uri.fromFile(copiedFile)
-                if (BuildConfig.DEBUG) {
-                    FileLogger.d(tag, "File copied to: $savedFileUri")
-                } else {
-                    FileLogger.d(tag, "File copied to local storage")
+                if (copiedFilePair != null) {
+                    val copiedFile = copiedFilePair.first
+                    val originalName = copiedFilePair.second
+                    
+                    // Immediately save the VideoSettings with the displayName
+                    withContext(Dispatchers.IO) {
+                        preferencesManager.updateVideoSettings(copiedFile.name) {
+                            it.copy(displayName = originalName, expectedFileSize = copiedFile.length())
+                        }
+                    }
+                    
+                    val savedFileUri = Uri.fromFile(copiedFile)
+                    if (BuildConfig.DEBUG) {
+                        FileLogger.d(tag, "File copied to: $savedFileUri")
+                    } else {
+                        FileLogger.d(tag, "File copied to local storage")
+                    }
+    
+                    // Load the new file into the RecyclerView
+                    loadRecentFiles()
+    
+                    // Update the current video (now that the file is in the adapter)
+                    updateVideoSource(savedFileUri, true) // Automatically set as active wallpaper
+    
+                    // Notifies the service of a change in the playlist
+                    val intent = Intent(UndeadWallpaperService.ACTION_PLAYLIST_REORDERED).apply {
+                        setPackage(requireContext().packageName)
+                    }
+                    requireContext().applicationContext.sendBroadcast(intent)
+                } else if (kotlinx.coroutines.currentCoroutineContext().isActive) {
+                    // Only show error if the coroutine wasn't cancelled
+                    if (BuildConfig.DEBUG) {
+                        FileLogger.e(tag, "Failed to copy file from URI: $uri")
+                    } else {
+                        FileLogger.e(tag, "Failed to copy file from URI")
+                    }
+                    Toast.makeText(context, getString(R.string.error_copy_failed), Toast.LENGTH_LONG).show()
                 }
-
-                // Load the new file into the RecyclerView
-                loadRecentFiles()
-
-                // Update the current video (now that the file is in the adapter)
-                updateVideoSource(savedFileUri, true) // Automatically set as active wallpaper
-
-                // Notifies the service of a change in the playlist
-                val intent = Intent(UndeadWallpaperService.ACTION_PLAYLIST_REORDERED).apply {
-                    setPackage(requireContext().packageName)
-                }
-                requireContext().applicationContext.sendBroadcast(intent)
-            } else {
-                if (BuildConfig.DEBUG) {
-                    FileLogger.e(tag, "Failed to copy file from URI: $uri")
-                } else {
-                    FileLogger.e(tag, "Failed to copy file from URI")
-                }
-                Toast.makeText(context, getString(R.string.error_copy_failed), Toast.LENGTH_LONG).show()
             }
 
         }

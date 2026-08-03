@@ -82,7 +82,9 @@
     <string name="status_bar_white_icons">Białe</string>
     <string name="status_bar_black_icons">Czarne</string>
 
-    <string name="custom_settings_header">Ustawienia niestandardowe</string>
+    <!-- UI Headers & Sections -->
+    <string name="custom_settings_header">Ustawienia Niestandardowe</string>
+    <string name="importing_video">Importowanie wideo</string>
     <string name="positioning_header">Pozycja</string>
     <string name="general_header">Główne</string>
     <string name="volume_label">Głośność</string>

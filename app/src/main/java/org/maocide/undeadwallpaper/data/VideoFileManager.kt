@@ -22,6 +22,7 @@ import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -48,7 +49,7 @@ class VideoFileManager(private val context: Context) {
      * @param fileName The desired filename (e.g., "zombillie_default.mp4").
      * @return The File object of the created or existing video.
      */
-    fun createDefaultFileFromResource(resourceId: Int): File? {
+    suspend fun createDefaultFileFromResource(resourceId: Int): File? {
         val outputDir = getAppSpecificAlbumStorageDir(context, "videos")
         val outputFile = File(outputDir, "video_${java.util.UUID.randomUUID()}.mp4")
 
@@ -75,7 +76,7 @@ class VideoFileManager(private val context: Context) {
      * @param fileUri The URI of the file to be copied.
      * @return A Pair containing the new File and its original display name, or null if it fails.
      */
-    fun createFileFromContentUri(fileUri: Uri): Pair<File, String>? {
+    suspend fun createFileFromContentUri(fileUri: Uri): Pair<File, String>? {
         var originalFileName = ""
 
         // Try to query the display name
@@ -105,11 +106,20 @@ class VideoFileManager(private val context: Context) {
             context.contentResolver.openInputStream(fileUri)?.use { iStream ->
                 copyStreamToFile(iStream, outputFile)
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            Log.i(tag, "File copy cancelled. Deleting partial file.")
+            if (outputFile.exists()) {
+                outputFile.delete()
+            }
+            throw e
         } catch (e: Exception) {
             if (BuildConfig.DEBUG) {
                 Log.e(tag, "Error copying file from URI: $fileUri", e)
             } else {
                 Log.e(tag, "Error copying file from URI", e)
+            }
+            if (outputFile.exists()) {
+                outputFile.delete()
             }
             return null
         }
@@ -125,7 +135,7 @@ class VideoFileManager(private val context: Context) {
      * @param file The file to be copied.
      * @return The newly created File object.
      */
-    fun copyRecentFile(file: File): Pair<File, String> {
+    suspend fun copyRecentFile(file: File): Pair<File, String> {
         val outputDir = getAppSpecificAlbumStorageDir(context, "videos")
         val newFile = File(outputDir, "video_${java.util.UUID.randomUUID()}.mp4")
         copyStreamToFile(file.inputStream(), newFile)
@@ -213,28 +223,23 @@ class VideoFileManager(private val context: Context) {
 
         val persistedFileNames = persistedSettings.map { it.fileName }.toMutableList()
 
-        // Identify physical files that are NOT in the persisted list (e.g., newly imported)
+        // Identify physical files that are NOT in the persisted list (e.g., injected or orphaned files)
         val physicalFileNames = physicalFiles.map { it.name }.toSet()
-        val newPhysicalFiles = physicalFiles.filter { it.name !in persistedFileNames }
+        val orphanedFiles = physicalFiles.filter { it.name !in persistedFileNames }
 
-        // Sort new files by modification date (newest first)
-        val sortedNewFiles = newPhysicalFiles.sortedByDescending { it.lastModified() }
-        val sortedNewFileNames = sortedNewFiles.map { it.name }
+        // Security / Garbage Collection: Delete unindexed physical files
+        if (orphanedFiles.isNotEmpty()) {
+            for (file in orphanedFiles) {
+                android.util.Log.w(tag, "Deleting unindexed/injected physical file: ${file.name}")
+                file.delete()
+            }
+            // Update the physicalFiles array so we don't try to generate thumbnails for them
+            physicalFiles = physicalFiles.filter { it.name in persistedFileNames }.toTypedArray()
+        }
 
         // Identify files in the persisted list that no longer exist physically
         persistedFileNames.retainAll(physicalFileNames)
         persistedSettings.retainAll { it.fileName in physicalFileNames }
-
-        // Prepend new files to the beginning of the persisted list (to maintain "recent" behavior)
-        if (sortedNewFiles.isNotEmpty()) {
-            persistedFileNames.addAll(0, sortedNewFileNames)
-            // Add corresponding default VideoSettings, locking in the file size
-            val newSettings = sortedNewFiles.map { file ->
-                org.maocide.undeadwallpaper.model.VideoSettings(fileName = file.name, expectedFileSize = file.length())
-            }
-            persistedSettings.addAll(0, newSettings)
-            settingsChanged = true
-        }
 
         // Save the synchronized list back to SharedPreferences if it was changed
         if (settingsChanged || persistedSettings.size != physicalFiles.size) {
@@ -253,6 +258,8 @@ class VideoFileManager(private val context: Context) {
                 async {
                     semaphore.withPermit {
                         try {
+                            kotlinx.coroutines.currentCoroutineContext().ensureActive() // Allow cancellation before heavy processing
+
                             val currentSettings = preferencesManager.getVideoSettings(fileName)
                             val thumbnail = getOrGenerateThumbnail(file)
 
@@ -282,6 +289,7 @@ class VideoFileManager(private val context: Context) {
                             // If metadata is missing, extract and save it
                             if (durationMs == null || width == null || height == null || fps == null) {
                                 try {
+                                    kotlinx.coroutines.currentCoroutineContext().ensureActive() // Check before extracting metadata
                                     val retriever = MediaMetadataRetriever()
                                     try {
                                         retriever.setDataSource(file.path)
@@ -404,12 +412,13 @@ class VideoFileManager(private val context: Context) {
      * @param inputStream The input stream to copy from.
      * @param outputFile The file to copy to.
      */
-    private fun copyStreamToFile(inputStream: InputStream, outputFile: File) {
+    private suspend fun copyStreamToFile(inputStream: InputStream, outputFile: File) {
         inputStream.use { input ->
             FileOutputStream(outputFile).use { output ->
-                val buffer = ByteArray(4 * 1024)
+                val buffer = ByteArray(64 * 1024)
                 var byteCount: Int
                 while (input.read(buffer).also { byteCount = it } != -1) {
+                    kotlinx.coroutines.currentCoroutineContext().ensureActive() // Checks for coroutine cancellation without yielding thread
                     output.write(buffer, 0, byteCount)
                 }
             }

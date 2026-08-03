@@ -80,6 +80,7 @@
 
     <!-- UI Headers & Sections -->
     <string name="custom_settings_header">カスタム設定</string>
+    <string name="importing_video">動画をインポート中</string>
     <string name="positioning_header">配置</string>
     <string name="general_header">一般</string>
     <string name="volume_label">音量</string>

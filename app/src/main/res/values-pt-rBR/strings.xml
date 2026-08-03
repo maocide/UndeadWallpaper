@@ -89,6 +89,7 @@
 
     <!-- UI Headers & Sections -->
     <string name="custom_settings_header">Configurações Personalizadas</string>
+    <string name="importing_video">Importando vídeo</string>
     <string name="positioning_header">Posicionamento</string>
     <string name="general_header">Geral</string>
     <string name="volume_label">Volume</string>

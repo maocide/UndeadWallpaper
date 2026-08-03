@@ -79,7 +79,8 @@
     <string name="status_bar_black_icons">Nere</string>
 
     <!-- UI Headers & Sections -->
-    <string name="custom_settings_header">Impostazioni Personalizzate</string>
+    <string name="custom_settings_header">Impostazioni personalizzate</string>
+    <string name="importing_video">Importazione video</string>
     <string name="positioning_header">Posizionamento</string>
     <string name="general_header">Generali</string>
     <string name="volume_label">Volume</string>
