@@ -27,7 +27,7 @@ class PlaylistManager(
      * Returns a list of valid URIs for all items in the playlist.
      * If a file does not exist on disk, it is excluded.
      */
-    fun getPlaylistUris(): List<String> {
+    suspend fun getPlaylistUris(): List<String> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         val playlistSettings = prefs.getPlaylistSettings()
 
         // If playlist size changes, invalidate the shuffle cache
@@ -36,11 +36,11 @@ class PlaylistManager(
         }
 
         if (playlistSettings.isEmpty()) {
-            return emptyList()
+            return@withContext emptyList()
         }
 
         val videosDir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_MOVIES)?.let { File(it, "videos") }
-        if (videosDir == null) return emptyList()
+        if (videosDir == null) return@withContext emptyList()
 
         // Fetch directory contents once and use a Set for fast O(1) lookups
         val physicalFilesSet = videosDir.list()?.toSet() ?: emptySet()
@@ -54,7 +54,7 @@ class PlaylistManager(
                 Log.w(TAG, "File in playlist not found on disk: ${setting.fileName}")
             }
         }
-        return validUris
+        validUris
     }
 
     /**
@@ -87,8 +87,9 @@ class PlaylistManager(
      * If a video requires a visual change, the chunk ends, forcing the player to
      * hit a playback boundary so the renderer can safely apply the new settings.
      */
-    fun getGaplessChunkUris(currentUri: String, playbackMode: PlaybackMode, playlistUris: List<String> = getPlaylistUris()): List<String> {
-        if (playlistUris.isEmpty()) return emptyList()
+    suspend fun getGaplessChunkUris(currentUri: String, playbackMode: PlaybackMode, playlistUris: List<String>? = null): List<String> {
+        val actualPlaylistUris = playlistUris ?: getPlaylistUris()
+        if (actualPlaylistUris.isEmpty()) return emptyList()
 
         val chunkUris = mutableListOf<String>()
         chunkUris.add(currentUri)
@@ -107,35 +108,35 @@ class PlaylistManager(
         val baseSettings = settingsMap[baseFileName] ?: prefs.getVideoSettings(baseFileName)
 
         // Figure out our current position in the sequence
-        var currentIndex = playlistUris.indexOf(currentUri)
+        var currentIndex = actualPlaylistUris.indexOf(currentUri)
         if (currentIndex == -1) currentIndex = 0
 
         val sequenceOrder = if (playbackMode == PlaybackMode.SHUFFLE) {
-            getShuffleOrder(playlistUris.size)
+            getShuffleOrder(actualPlaylistUris.size)
         } else {
-            (0 until playlistUris.size).toList()
+            (0 until actualPlaylistUris.size).toList()
         }
 
         // Find where our current video sits in this sequence
         val currentPositionInSequence = sequenceOrder.indexOf(currentIndex).takeIf { it != -1 } ?: 0
 
         // Look ahead in the sequence
-        for (i in 1 until playlistUris.size) {
+        for (i in 1 until actualPlaylistUris.size) {
             val nextPositionInSequence = currentPositionInSequence + i
 
             // For SHUFFLE mode, do not cross the sequence boundary (end of the playlist) within a single chunk!
             // Wrapping around inside a chunk breaks true shuffle logic because it re-uses the OLD sequence order.
             // By stopping the chunk strictly at the end of the sequence, we force the player to hit STATE_ENDED.
             // This guarantees getNextUri() will be called, allowing it to correctly regenerate the shuffle order for the next loop.
-            if (playbackMode == PlaybackMode.SHUFFLE && nextPositionInSequence >= playlistUris.size) {
+            if (playbackMode == PlaybackMode.SHUFFLE && nextPositionInSequence >= actualPlaylistUris.size) {
                 break
             }
 
             // For LOOP_ALL, we can safely wrap around the sequence (e.g. from index 2 back to 0).
-            val wrappedPositionInSequence = nextPositionInSequence % playlistUris.size
+            val wrappedPositionInSequence = nextPositionInSequence % actualPlaylistUris.size
             val nextLogicalIndex = sequenceOrder[wrappedPositionInSequence]
 
-            val nextUriStr = playlistUris[nextLogicalIndex]
+            val nextUriStr = actualPlaylistUris[nextLogicalIndex]
             val nextUriParsed = nextUriStr.toUri()
             val nextFileName = nextUriParsed.lastPathSegment ?: ""
 
@@ -158,7 +159,7 @@ class PlaylistManager(
      * Returns the next URI in the playlist sequence.
      * Handles linear looping and non-repeating shuffle advancement.
      */
-    fun getNextUri(currentUri: String, playbackMode: PlaybackMode): String? {
+    suspend fun getNextUri(currentUri: String, playbackMode: PlaybackMode): String? {
         val playlistUris = getPlaylistUris()
         if (playlistUris.isEmpty()) return null
 

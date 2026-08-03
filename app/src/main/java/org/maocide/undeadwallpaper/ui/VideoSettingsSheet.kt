@@ -94,7 +94,8 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        binding.videoFileName.text = fileName
+        val settings = preferencesManager.getVideoSettings(fileName)
+        binding.videoFileName.text = settings.getEffectiveDisplayName()
 
         if (metadata.isNotEmpty()) {
             binding.videoMetadata.text = metadata

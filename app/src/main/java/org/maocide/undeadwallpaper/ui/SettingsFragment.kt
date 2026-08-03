@@ -265,9 +265,10 @@ class SettingsFragment : Fragment() {
                     return
                 }
 
+                val settings = preferencesManager.getVideoSettings(item.file.name)
                 MaterialAlertDialogBuilder(requireContext())
                     .setTitle(getString(R.string.remove_file_title))
-                    .setMessage(getString(R.string.remove_file_message, item.file.name))
+                    .setMessage(getString(R.string.remove_file_message, settings.getEffectiveDisplayName()))
                     .setPositiveButton(getString(R.string.remove_action)) { _, _ ->
                         val deletedUriString = Uri.fromFile(item.file).toString()
                         val uiSelectedUriString = sharedViewModel.selectedVideoUri?.toString() ?: preferencesManager.getActiveVideoUri()
@@ -276,9 +277,16 @@ class SettingsFragment : Fragment() {
                         // Remove from adapter
                         recentFilesAdapter.onItemDismiss(position)
 
-                        // Delete physical file
+                        // Delete physical file and thumbnail
                         if (item.file.exists()) {
                             item.file.delete()
+                            
+                            // Clean up cached thumbnail
+                            val thumbnailsDir = java.io.File(requireContext().getExternalFilesDir(android.os.Environment.DIRECTORY_MOVIES), "thumbnails")
+                            val thumbnailFile = java.io.File(thumbnailsDir, "${item.file.nameWithoutExtension}.jpg")
+                            if (thumbnailFile.exists()) {
+                                thumbnailFile.delete()
+                            }
                         }
 
                         // Save new list order
@@ -350,14 +358,12 @@ class SettingsFragment : Fragment() {
         val currentFileNames = recentFilesAdapter.getItems().map { it.file.name }
         val currentSettings = preferencesManager.getPlaylistSettings()
 
-        // Reorder the settings to match the new file name order
-        val newSettingsList = mutableListOf<org.maocide.undeadwallpaper.model.VideoSettings>()
-        for (fileName in currentFileNames) {
-            val setting = currentSettings.find { it.fileName == fileName }
-            if (setting != null) {
-                newSettingsList.add(setting)
-            }
-        }
+        // Build an indexed map: O(N) complexity
+        val settingsMap = currentSettings.associateBy { it.fileName }
+
+        // Lookups are now O(1), making the whole block O(N) instead of O(N^2)
+        val newSettingsList = currentFileNames.mapNotNull { settingsMap[it] }
+
         preferencesManager.savePlaylistSettings(newSettingsList)
     }
 
@@ -381,12 +387,13 @@ class SettingsFragment : Fragment() {
      */
     private suspend fun ensureDefaultVideoExists() = withContext(Dispatchers.IO) {
         if (preferencesManager.getActiveVideoUri() == null) {
-            val defaultFile = videoFileManager.createDefaultFileFromResource(
-                R.raw.zombillie_default,
-                getString(R.string.default_video_filename)
-            )
+            val defaultFile = videoFileManager.createDefaultFileFromResource(R.raw.zombillie_default)
 
             if (defaultFile != null) {
+                val defaultFileName = getString(R.string.default_video_filename)
+                preferencesManager.updateVideoSettings(defaultFile.name) {
+                    it.copy(displayName = defaultFileName, expectedFileSize = defaultFile.length())
+                }
                 val defaultUri = Uri.fromFile(defaultFile)
                 // Switch back to Main thread to update Prefs safely
                 withContext(Dispatchers.Main) {
@@ -831,10 +838,20 @@ class SettingsFragment : Fragment() {
             }
 
             // Copy the file to internal storage in a background thread
-            val copiedFile = withContext(Dispatchers.IO) {
+            val copiedFilePair = withContext(Dispatchers.IO) {
                 videoFileManager.createFileFromContentUri(uri)
             }
-            if (copiedFile != null) {
+            if (copiedFilePair != null) {
+                val copiedFile = copiedFilePair.first
+                val originalName = copiedFilePair.second
+                
+                // Immediately save the VideoSettings with the displayName
+                withContext(Dispatchers.IO) {
+                    preferencesManager.updateVideoSettings(copiedFile.name) {
+                        it.copy(displayName = originalName, expectedFileSize = copiedFile.length())
+                    }
+                }
+                
                 val savedFileUri = Uri.fromFile(copiedFile)
                 if (BuildConfig.DEBUG) {
                     FileLogger.d(tag, "File copied to: $savedFileUri")
