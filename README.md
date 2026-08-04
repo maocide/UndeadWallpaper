@@ -58,19 +58,6 @@ This whole shebang is licensed under the **GNU General Public License v3.0**. Fr
 * **Google Play Store:** [From the Play Store](https://play.google.com/store/apps/details?id=org.maocide.undeadwallpaper)
 * **GitHub Releases:** [Grab the bleeding-edge APKs here!](https://github.com/maocide/UndeadWallpaper/releases/)
 
-### The Graveyard Shift (Special Thanks) 🪦
-
-Bringing a project back from the dead takes a village (or at least a few good souls). A big thanks to the people and projects that helped piece this monster together:
-
-* **@kitsumed** - For contributing the GitHub Actions CI pipeline and providing brilliant technical insights.
-* **Lucid** - For relentless testing, immense patience, and helping hunt down obscure OEM/custom OS engine crashes.
-* **@sms1sis** - For the great brainstorming about resources and optimization.
-* **@DerpOtron9k** - For submitting the early prototype PR that sparked the transition to per-video settings.
-* **Trick_Equipment_6938** - For sparking the original concept that eventually evolved into the v1.2.0 Dynamic Playlist Engine.
-* **@AmazingKo** - For excellent feature suggestions that helped shape the development backlog.
-* **@playagain96** - For providing the full Polish localization and making the app accessible to more users worldwide.
-* **Everyone** who has taken the time to report an issue, leave a review on the Play Store, or test a beta build. Your support keeps the undead alive!
-
 ---
 
 Thanks for checking out the project. Now go make something awesome. (,,•ω•,,)♡
