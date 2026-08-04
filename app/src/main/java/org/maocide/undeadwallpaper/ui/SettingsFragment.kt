@@ -46,6 +46,7 @@ import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -265,20 +266,28 @@ class SettingsFragment : Fragment() {
                     return
                 }
 
+                val settings = preferencesManager.getVideoSettings(item.file.name)
                 MaterialAlertDialogBuilder(requireContext())
                     .setTitle(getString(R.string.remove_file_title))
-                    .setMessage(getString(R.string.remove_file_message, item.file.name))
+                    .setMessage(getString(R.string.remove_file_message, settings.getEffectiveDisplayName()))
                     .setPositiveButton(getString(R.string.remove_action)) { _, _ ->
                         val deletedUriString = Uri.fromFile(item.file).toString()
                         val uiSelectedUriString = sharedViewModel.selectedVideoUri?.toString() ?: preferencesManager.getActiveVideoUri()
                         val backgroundActiveUriString = preferencesManager.getActiveVideoUri()
 
-                        // Remove from adapter
-                        recentFilesAdapter.onItemDismiss(position)
+                        // Remove from adapter safely using the object reference
+                        recentFilesAdapter.onItemDismiss(item)
 
-                        // Delete physical file
+                        // Delete physical file and thumbnail
                         if (item.file.exists()) {
                             item.file.delete()
+                            
+                            // Clean up cached thumbnail
+                            val thumbnailsDir = java.io.File(requireContext().getExternalFilesDir(android.os.Environment.DIRECTORY_MOVIES), "thumbnails")
+                            val thumbnailFile = java.io.File(thumbnailsDir, "${item.file.nameWithoutExtension}.jpg")
+                            if (thumbnailFile.exists()) {
+                                thumbnailFile.delete()
+                            }
                         }
 
                         // Save new list order
@@ -312,11 +321,11 @@ class SettingsFragment : Fragment() {
                         }
                     }
                     .setNegativeButton(getString(R.string.cancel)) { dialog, _ ->
-                        recentFilesAdapter.notifyItemChanged(position)
+                        recentFilesAdapter.restoreItem(item)
                         dialog.dismiss()
                     }
                     .setOnCancelListener {
-                        recentFilesAdapter.notifyItemChanged(position)
+                        recentFilesAdapter.restoreItem(item)
                     }
                     .show()
             }
@@ -350,14 +359,12 @@ class SettingsFragment : Fragment() {
         val currentFileNames = recentFilesAdapter.getItems().map { it.file.name }
         val currentSettings = preferencesManager.getPlaylistSettings()
 
-        // Reorder the settings to match the new file name order
-        val newSettingsList = mutableListOf<org.maocide.undeadwallpaper.model.VideoSettings>()
-        for (fileName in currentFileNames) {
-            val setting = currentSettings.find { it.fileName == fileName }
-            if (setting != null) {
-                newSettingsList.add(setting)
-            }
-        }
+        // Build an indexed map: O(N) complexity
+        val settingsMap = currentSettings.associateBy { it.fileName }
+
+        // Lookups are now O(1), making the whole block O(N) instead of O(N^2)
+        val newSettingsList = currentFileNames.mapNotNull { settingsMap[it] }
+
         preferencesManager.savePlaylistSettings(newSettingsList)
     }
 
@@ -381,12 +388,13 @@ class SettingsFragment : Fragment() {
      */
     private suspend fun ensureDefaultVideoExists() = withContext(Dispatchers.IO) {
         if (preferencesManager.getActiveVideoUri() == null) {
-            val defaultFile = videoFileManager.createDefaultFileFromResource(
-                R.raw.zombillie_default,
-                getString(R.string.default_video_filename)
-            )
+            val defaultFile = videoFileManager.createDefaultFileFromResource(R.raw.zombillie_default)
 
             if (defaultFile != null) {
+                val defaultFileName = getString(R.string.default_video_filename)
+                preferencesManager.updateVideoSettings(defaultFile.name) {
+                    it.copy(displayName = defaultFileName, expectedFileSize = defaultFile.length())
+                }
                 val defaultUri = Uri.fromFile(defaultFile)
                 // Switch back to Main thread to update Prefs safely
                 withContext(Dispatchers.Main) {
@@ -830,36 +838,54 @@ class SettingsFragment : Fragment() {
                 return@launch
             }
 
-            // Copy the file to internal storage in a background thread
-            val copiedFile = withContext(Dispatchers.IO) {
-                videoFileManager.createFileFromContentUri(uri)
-            }
-            if (copiedFile != null) {
-                val savedFileUri = Uri.fromFile(copiedFile)
-                if (BuildConfig.DEBUG) {
-                    FileLogger.d(tag, "File copied to: $savedFileUri")
-                } else {
-                    FileLogger.d(tag, "File copied to local storage")
+            // Wrap the entire copy operation in our new Loading Overlay
+            withLoadingOverlay(getString(R.string.importing_video)) {
+                val copiedFilePair = try {
+                    withContext(Dispatchers.IO) {
+                        videoFileManager.createFileFromContentUri(uri)
+                    }
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    null // Return null to skip the success block
                 }
-
-                // Load the new file into the RecyclerView
-                loadRecentFiles()
-
-                // Update the current video (now that the file is in the adapter)
-                updateVideoSource(savedFileUri, true) // Automatically set as active wallpaper
-
-                // Notifies the service of a change in the playlist
-                val intent = Intent(UndeadWallpaperService.ACTION_PLAYLIST_REORDERED).apply {
-                    setPackage(requireContext().packageName)
+                
+                if (copiedFilePair != null) {
+                    val copiedFile = copiedFilePair.first
+                    val originalName = copiedFilePair.second
+                    
+                    // Immediately save the VideoSettings with the displayName
+                    withContext(Dispatchers.IO) {
+                        preferencesManager.updateVideoSettings(copiedFile.name) {
+                            it.copy(displayName = originalName, expectedFileSize = copiedFile.length())
+                        }
+                    }
+                    
+                    val savedFileUri = Uri.fromFile(copiedFile)
+                    if (BuildConfig.DEBUG) {
+                        FileLogger.d(tag, "File copied to: $savedFileUri")
+                    } else {
+                        FileLogger.d(tag, "File copied to local storage")
+                    }
+    
+                    // Load the new file into the RecyclerView
+                    loadRecentFiles()
+    
+                    // Update the current video (now that the file is in the adapter)
+                    updateVideoSource(savedFileUri, true) // Automatically set as active wallpaper
+    
+                    // Notifies the service of a change in the playlist
+                    val intent = Intent(UndeadWallpaperService.ACTION_PLAYLIST_REORDERED).apply {
+                        setPackage(requireContext().packageName)
+                    }
+                    requireContext().applicationContext.sendBroadcast(intent)
+                } else if (kotlinx.coroutines.currentCoroutineContext().isActive) {
+                    // Only show error if the coroutine wasn't cancelled
+                    if (BuildConfig.DEBUG) {
+                        FileLogger.e(tag, "Failed to copy file from URI: $uri")
+                    } else {
+                        FileLogger.e(tag, "Failed to copy file from URI")
+                    }
+                    Toast.makeText(context, getString(R.string.error_copy_failed), Toast.LENGTH_LONG).show()
                 }
-                requireContext().applicationContext.sendBroadcast(intent)
-            } else {
-                if (BuildConfig.DEBUG) {
-                    FileLogger.e(tag, "Failed to copy file from URI: $uri")
-                } else {
-                    FileLogger.e(tag, "Failed to copy file from URI")
-                }
-                Toast.makeText(context, getString(R.string.error_copy_failed), Toast.LENGTH_LONG).show()
             }
 
         }
@@ -909,6 +935,29 @@ class SettingsFragment : Fragment() {
                         } else {
                             FileLogger.e(tag, "ExoPlayer error in preview", error)
                         }
+
+                        // Check if the file vanished (happens during UUID migration)
+                        var isFileNotFound = false
+                        var currentCause: Throwable? = error
+                        while (currentCause != null) {
+                            if (currentCause is java.io.FileNotFoundException) {
+                                isFileNotFound = true
+                                break
+                            }
+                            currentCause = currentCause.cause
+                        }
+
+                        if (isFileNotFound) {
+                            // File was migrated. Silently reload the new active URI.
+                            val newUri = preferencesManager.getActiveVideoUri()
+                            if (newUri != null) {
+                                viewLifecycleOwner.lifecycleScope.launch {
+                                    updateVideoSource(android.net.Uri.parse(newUri), false)
+                                }
+                            }
+                            return
+                        }
+
                         if (context != null) {
                             Toast.makeText(context, getString(R.string.error_cannot_play_video), Toast.LENGTH_SHORT).show()
                         }

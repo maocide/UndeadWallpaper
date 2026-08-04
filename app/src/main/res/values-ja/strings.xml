@@ -71,6 +71,7 @@
     <string name="error_cannot_remove_last_video">プレイリストの最後の動画は外せません</string>
     <string name="error_open_settings_failed">設定を開けませんでした</string>
     <string name="error_no_browser">ブラウザを開けません</string>
+    <string name="error_device_not_supported">お使いのデバイスはライブ壁紙をサポートしていません。</string>
 
     <!-- Status Bar Icon Color Settings -->
     <string name="status_bar_icons_label">ステータスバーのアイコン</string>
@@ -80,6 +81,7 @@
 
     <!-- UI Headers & Sections -->
     <string name="custom_settings_header">カスタム設定</string>
+    <string name="importing_video">動画をインポート中</string>
     <string name="positioning_header">配置</string>
     <string name="general_header">一般</string>
     <string name="volume_label">音量</string>

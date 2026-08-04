@@ -20,8 +20,18 @@ data class VideoSettings(
     val primaryColor: Int? = null,
     val secondaryColor: Int? = null,
     val tertiaryColor: Int? = null,
-    val colorHints: Int? = null
+    val colorHints: Int? = null,
+    val expectedFileSize: Long? = null,
+    val displayName: String? = null,
+    val durationMs: Long? = null,
+    val width: Int? = null,
+    val height: Int? = null,
+    val fps: Int? = null
 ) {
+    fun getEffectiveDisplayName(): String {
+        return displayName ?: fileName
+    }
+
     fun getBreadcrumbText(context: Context): String? {
         val defaultSettings = VideoSettings(fileName)
         val changedLabels = mutableListOf<String>()

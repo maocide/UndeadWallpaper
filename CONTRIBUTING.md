@@ -4,6 +4,8 @@ So, you want to join the horde and help build this abomination? Awesome. Contrib
 
 However, this project was brought back from the dead with a very specific vision. To keep the codebase clean, performant, and focused, we play by a strict set of rules. Before you open an issue or submit a Pull Request, read this. 
 
+**Note: We only accept PRs and issue reports for the latest active version. Legacy architectures (v1.3.6 and earlier) are officially deprecated and unsupported.**
+
 ## The Three Pillars of Survival
 
 If your PR breaks any of these, it will be closed without review.
