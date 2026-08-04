@@ -244,6 +244,14 @@ class VideoFileManager(private val context: Context) {
         // Save the synchronized list back to SharedPreferences if it was changed
         if (settingsChanged || persistedSettings.size != physicalFiles.size) {
             preferencesManager.savePlaylistSettings(persistedSettings)
+            
+            // Broadcast intent to notify the background live wallpaper service 
+            // that the playlist or physical files (like a UUID migration) have changed, 
+            // so it can reload the active stream without freezing.
+            val intent = android.content.Intent(org.maocide.undeadwallpaper.service.UndeadWallpaperService.ACTION_PLAYLIST_REORDERED).apply {
+                setPackage(context.packageName)
+            }
+            context.applicationContext.sendBroadcast(intent)
         }
 
         // Create a lookup map for physical files to maintain O(1) access
