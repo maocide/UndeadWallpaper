@@ -61,9 +61,19 @@ class RecentFilesAdapter(
         notifyItemMoved(fromPosition, toPosition)
     }
 
-    fun onItemDismiss(position: Int) {
-        recentFiles.removeAt(position)
-        notifyItemRemoved(position)
+    fun onItemDismiss(item: RecentFile) {
+        val currentPosition = recentFiles.indexOf(item)
+        if (currentPosition != -1) {
+            recentFiles.removeAt(currentPosition)
+            notifyItemRemoved(currentPosition)
+        }
+    }
+
+    fun restoreItem(item: RecentFile) {
+        val currentPosition = recentFiles.indexOf(item)
+        if (currentPosition != -1) {
+            notifyItemChanged(currentPosition)
+        }
     }
 
     fun getItems(): List<RecentFile> {
@@ -94,7 +104,8 @@ class RecentFilesAdapter(
         }
 
         fun bind(recentFile: RecentFile) {
-            fileName.text = recentFile.file.name
+            val settings = preferencesManager.getVideoSettings(recentFile.file.name)
+            fileName.text = settings.getEffectiveDisplayName()
             if (recentFile.thumbnail != null) {
                 thumbnail.setImageBitmap(recentFile.thumbnail)
             } else {
@@ -117,7 +128,6 @@ class RecentFilesAdapter(
             }
 
             // Update Breadcrumb
-            val settings = preferencesManager.getVideoSettings(recentFile.file.name)
             val breadcrumbString = settings.getBreadcrumbText(itemView.context)
 
             if (breadcrumbString == null) {

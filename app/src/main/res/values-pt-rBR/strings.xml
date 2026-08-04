@@ -80,6 +80,7 @@
     <string name="error_video_too_large">Vídeo muito grande! A resolução máxima suportada é 4K (UHD).</string>
     <string name="error_open_settings_failed">Falha ao abrir as configurações</string>
     <string name="error_no_browser">Não foi possível abrir o navegador</string>
+    <string name="error_device_not_supported">O seu dispositivo não suporta papéis de parede animados.</string>
 
     <!-- Status Bar Icon Color Settings -->
     <string name="status_bar_icons_label">Ícones da Barra de Status</string>
@@ -89,6 +90,7 @@
 
     <!-- UI Headers & Sections -->
     <string name="custom_settings_header">Configurações Personalizadas</string>
+    <string name="importing_video">Importando vídeo</string>
     <string name="positioning_header">Posicionamento</string>
     <string name="general_header">Geral</string>
     <string name="volume_label">Volume</string>

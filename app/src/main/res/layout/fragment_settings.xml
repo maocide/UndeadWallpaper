@@ -587,7 +587,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:valueFrom="0.1"
-                        android:valueTo="1.0"
+                        android:valueTo="3.0"
                         android:value="0.5"
                         android:stepSize="0.1" />
                 </LinearLayout>
