@@ -935,6 +935,29 @@ class SettingsFragment : Fragment() {
                         } else {
                             FileLogger.e(tag, "ExoPlayer error in preview", error)
                         }
+
+                        // Check if the file vanished (happens during UUID migration)
+                        var isFileNotFound = false
+                        var currentCause: Throwable? = error
+                        while (currentCause != null) {
+                            if (currentCause is java.io.FileNotFoundException) {
+                                isFileNotFound = true
+                                break
+                            }
+                            currentCause = currentCause.cause
+                        }
+
+                        if (isFileNotFound) {
+                            // File was migrated. Silently reload the new active URI.
+                            val newUri = preferencesManager.getActiveVideoUri()
+                            if (newUri != null) {
+                                viewLifecycleOwner.lifecycleScope.launch {
+                                    updateVideoSource(android.net.Uri.parse(newUri), false)
+                                }
+                            }
+                            return
+                        }
+
                         if (context != null) {
                             Toast.makeText(context, getString(R.string.error_cannot_play_video), Toast.LENGTH_SHORT).show()
                         }
