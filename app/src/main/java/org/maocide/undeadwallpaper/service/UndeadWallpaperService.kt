@@ -413,6 +413,14 @@ class UndeadWallpaperService : WallpaperService() {
 
         // WallpaperPlayerListener implementations
         override fun onPlayerError(error: PlaybackException) {
+            // Check if the file vanished (happens during UUID migration).
+            // We suppress the toast because VideoFileManager will instantly broadcast 
+            // ACTION_PLAYLIST_REORDERED to force a seamless reload.
+            if (error.errorCode == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND) {
+                FileLogger.i(TAG, "Suppressed IO_FILE_NOT_FOUND error (likely a UUID migration in progress).")
+                return
+            }
+
             // Handled mostly by WallpaperPlayer, this is just for non-hardware errors or restart triggers
             Handler(Looper.getMainLooper()).post {
                 Toast.makeText(baseContext, "Error: ${error.errorCodeName}", Toast.LENGTH_LONG).show()
