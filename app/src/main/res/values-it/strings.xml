@@ -71,6 +71,7 @@
     <string name="error_video_too_large">Video troppo grande! La risoluzione massima supportata è 4K (UHD).</string>
     <string name="error_open_settings_failed">Impossibile aprire le impostazioni</string>
     <string name="error_no_browser">Impossibile aprire il browser</string>
+    <string name="error_device_not_supported">Il tuo dispositivo non supporta gli Sfondi Animati.</string>
 
     <!-- Status Bar Icon Color Settings -->
     <string name="status_bar_icons_label">Icone Barra di Stato</string>

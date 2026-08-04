@@ -275,8 +275,8 @@ class SettingsFragment : Fragment() {
                         val uiSelectedUriString = sharedViewModel.selectedVideoUri?.toString() ?: preferencesManager.getActiveVideoUri()
                         val backgroundActiveUriString = preferencesManager.getActiveVideoUri()
 
-                        // Remove from adapter
-                        recentFilesAdapter.onItemDismiss(position)
+                        // Remove from adapter safely using the object reference
+                        recentFilesAdapter.onItemDismiss(item)
 
                         // Delete physical file and thumbnail
                         if (item.file.exists()) {
@@ -321,11 +321,11 @@ class SettingsFragment : Fragment() {
                         }
                     }
                     .setNegativeButton(getString(R.string.cancel)) { dialog, _ ->
-                        recentFilesAdapter.notifyItemChanged(position)
+                        recentFilesAdapter.restoreItem(item)
                         dialog.dismiss()
                     }
                     .setOnCancelListener {
-                        recentFilesAdapter.notifyItemChanged(position)
+                        recentFilesAdapter.restoreItem(item)
                     }
                     .show()
             }

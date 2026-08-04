@@ -113,7 +113,6 @@ class UndeadWallpaperService : WallpaperService() {
         private var renderer: GLVideoRenderer? = null
 
         // Hardware Info
-        private val isVivoDevice = Build.MANUFACTURER.equals("vivo", ignoreCase = true)
 
         private var playerSetupJob: kotlinx.coroutines.Job? = null
 
@@ -121,8 +120,6 @@ class UndeadWallpaperService : WallpaperService() {
             FileLogger.e(TAG, "Watchdog: STALL CONFIRMED. Restarting player.")
             initializePlayer() // Force restart
         }
-
-        private var visibilityJob: kotlinx.coroutines.Job? = null
 
         // Touch Interaction State
         private var isUserManuallyPaused = false
@@ -183,9 +180,7 @@ class UndeadWallpaperService : WallpaperService() {
                 FileLogger.i(TAG, "Play/Pause action unbound. Clearing manual pause state.")
             }
 
-            // VIVO AND CHINESE PHONES FIX: Never request touch events while in the system preview screen,
-            // otherwise Vivo's OS sends the "Apply Wallpaper" button taps to us instead of the system.
-            val wantsTouchEvents = !isPreview && (doubleTapAction != WallpaperAction.NONE || tripleTapAction != WallpaperAction.NONE)
+            val wantsTouchEvents = (doubleTapAction != WallpaperAction.NONE || tripleTapAction != WallpaperAction.NONE)
 
             // ONLY tell the OS to change the touch state if it's different from the current state.
             if (isCurrentlyListeningForTouch != wantsTouchEvents) {
@@ -761,7 +756,6 @@ class UndeadWallpaperService : WallpaperService() {
         override fun onSurfaceDestroyed(holder: SurfaceHolder) {
             super.onSurfaceDestroyed(holder)
             FileLogger.i(TAG, "onSurfaceDestroyed")
-            visibilityJob?.cancel()
             playbackWatchdog.stop()
             releasePlayer()
             releaseRenderer()
@@ -772,7 +766,6 @@ class UndeadWallpaperService : WallpaperService() {
             super.onDestroy()
             FileLogger.i(TAG, "Engine onDestroy")
             serviceScope.cancel()
-            visibilityJob?.cancel()
             playbackWatchdog.stop() // Kill the playback watchdog
             releasePlayer()
             releaseRenderer()
@@ -788,95 +781,90 @@ class UndeadWallpaperService : WallpaperService() {
         override fun onVisibilityChanged(visible: Boolean) {
             super.onVisibilityChanged(visible)
 
-            // Cancel any previous visibility commands that haven't executed yet
-            visibilityJob?.cancel()
+            FileLogger.i(TAG, "onVisibilityChanged: visible = $visible isPreview = $isPreview, playbackMode = $currentPlaybackMode")
 
-            // Launch a new command with a 150ms delay
-            visibilityJob = kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
-                kotlinx.coroutines.delay(33L) // Give Device 33ms to stop spamming
+            if (visible) {
+                val currentUriOnDisk = getMediaUri().toString()
+                val isSurfaceDead = surfaceHolder?.surface?.isValid != true
+                var wasJustInitialized = false
 
-                // If this job was canceled by another rapid-fire event, stop here.
-                if (!isActive) return@launch
-
-                FileLogger.i(TAG, "onVisibilityChanged (Debounced): visible = $visible isPreview = $isPreview, playbackMode = $currentPlaybackMode")
-
-                if (visible) {
-                    val currentUriOnDisk = getMediaUri().toString()
-                    val isSurfaceDead = surfaceHolder?.surface?.isValid != true
-                    var wasJustInitialized = false
-
-                    // Check if player is initialized AND if the internal thread survived the sleep
-                    val isThreadDead = isPlayerInitialized && !wallpaperPlayer.isPlaybackThreadAlive
-                    if (currentUriOnDisk != loadedVideoUriString || !isPlayerInitialized || isSurfaceDead || isThreadDead) {
-                        if (isThreadDead) {
-                            FileLogger.e(TAG, "WakeUp Check: ExoPlayer internal thread was killed by OS. Forcing restart.")
-                        } else if (currentUriOnDisk != loadedVideoUriString) {
-                            FileLogger.i(TAG, "WakeUp Check: URI changed while sleeping! Reloading.")
-                        } else if (isSurfaceDead) {
-                            FileLogger.w(TAG, "WakeUp Check: Surface died silently. Forcing restart.")
-                        }
-
-                        // If the user wants a restart, reset playhead BEFORE init
-                        if (prefs.getStartTime() == StartTime.RESTART) {
-                            resetPlaybackTimeline()
-                        }
-
-                        initializePlayer()
-                        wasJustInitialized = true
+                // Check if player is initialized AND if the internal thread survived the sleep
+                val isThreadDead = isPlayerInitialized && !wallpaperPlayer.isPlaybackThreadAlive
+                if (currentUriOnDisk != loadedVideoUriString || !isPlayerInitialized || isSurfaceDead || isThreadDead) {
+                    if (isThreadDead) {
+                        FileLogger.e(TAG, "WakeUp Check: ExoPlayer internal thread was killed by OS. Forcing restart.")
+                    } else if (currentUriOnDisk != loadedVideoUriString) {
+                        FileLogger.i(TAG, "WakeUp Check: URI changed while sleeping! Reloading.")
+                    } else if (isSurfaceDead) {
+                        FileLogger.w(TAG, "WakeUp Check: Surface died silently. Forcing restart.")
                     }
 
-                    // Handle Timeline
-                    // We only apply timeline manipulations if the player wasn't just freshly initialized.
-                    if (!wasJustInitialized) {
-                        val startTimePref = prefs.getStartTime()
-                        when (startTimePref) {
-                            StartTime.RESUME -> {
-                                if (currentPlaybackMode == PlaybackMode.ONE_SHOT && hasPlaybackCompleted && !isPreview()) {
-                                    resetPlaybackTimeline(seekPlayerToStart = true)
-                                }
-                            }
-                            StartTime.RESTART -> {
+                    // If the user wants a restart, reset playhead BEFORE init
+                    if (prefs.getStartTime() == StartTime.RESTART) {
+                        resetPlaybackTimeline()
+                    }
+
+                    initializePlayer()
+                    wasJustInitialized = true
+                }
+
+                // Handle Timeline
+                // We only apply timeline manipulations if the player wasn't just freshly initialized.
+                if (!wasJustInitialized) {
+                    val startTimePref = prefs.getStartTime()
+                    when (startTimePref) {
+                        StartTime.RESUME -> {
+                            if (currentPlaybackMode == PlaybackMode.ONE_SHOT && hasPlaybackCompleted && !isPreview()) {
                                 resetPlaybackTimeline(seekPlayerToStart = true)
                             }
-                            StartTime.RANDOM -> {
-                                val duration = wallpaperPlayer.duration
-                                if (duration > 0 && duration != C.TIME_UNSET) {
-                                    val randomPos = Random.nextLong(0, duration)
-                                    playheadTime = randomPos
-                                    wallpaperPlayer.seekTo(wallpaperPlayer.currentMediaItemIndex, randomPos)
-                                } else {
-                                    resetPlaybackTimeline()
-                                }
-                                hasPlaybackCompleted = false
+                        }
+                        StartTime.RESTART -> {
+                            resetPlaybackTimeline(seekPlayerToStart = true)
+                        }
+                        StartTime.RANDOM -> {
+                            val duration = wallpaperPlayer.duration
+                            if (duration > 0 && duration != C.TIME_UNSET) {
+                                val randomPos = Random.nextLong(0, duration)
+                                playheadTime = randomPos
+                                wallpaperPlayer.seekTo(wallpaperPlayer.currentMediaItemIndex, randomPos)
+                            } else {
+                                resetPlaybackTimeline()
                             }
+                            hasPlaybackCompleted = false
                         }
                     }
+                }
 
-                    // Always refresh the renderer settings before resuming playback in case
-                    // the user edited them in the UI while the wallpaper was hidden.
-                    refreshRenderer()
+                // Always refresh the renderer settings before resuming playback in case
+                // the user edited them in the UI while the wallpaper was hidden.
+                refreshRenderer()
 
-                    try {
-                        // The "Play" Command: Just set the flag.
-                        // ExoPlayer will start natively as soon as it reaches STATE_READY.
-                        // Must be left to pause if user manually paused with touch events
-                        wallpaperPlayer.playWhenReady = !isUserManuallyPaused // leaving it paused on user pause touch event
+                try {
+                    // The "Play" Command: Just set the flag.
+                    // ExoPlayer will start natively as soon as it reaches STATE_READY.
+                    // Must be left to pause if user manually paused with touch events
+                    wallpaperPlayer.playWhenReady = !isUserManuallyPaused // leaving it paused on user pause touch event
 
-                        wallpaperPlayer.getPlayerInstance()?.let { playerInstance ->
-                            playbackWatchdog.start(playerInstance, renderer) // Monitor for playback running
-                        }
-                    } catch (e: IllegalStateException) {
-                        FileLogger.e(TAG, "WakeUp Crash Prevented: ExoPlayer thread died silently during sleep. Forcing re-init.")
-                        initializePlayer()
+                    wallpaperPlayer.getPlayerInstance()?.let { playerInstance ->
+                        playbackWatchdog.start(playerInstance, renderer) // Monitor for playback running
                     }
+                } catch (e: IllegalStateException) {
+                    FileLogger.e(TAG, "WakeUp Crash Prevented: ExoPlayer thread died silently during sleep. Forcing re-init.")
+                    initializePlayer()
+                }
 
-                } else {
-                    playbackWatchdog.stop()
-                    gestureManager.destroy()
-                    if (isPreview) {
-                        FileLogger.i(TAG, "Preview hidden. Releasing player to save decoders.")
+            } else {
+                playbackWatchdog.stop()
+                gestureManager.destroy()
+                if (isPreview) {
+                    FileLogger.i(TAG, "Preview hidden. Releasing player to save decoders.")
+                    releasePlayer()
+                } else { // It's the live wallpaper
+                    // EXPLICIT CANCELLATION HOOK: Abort any pending async initialization!
+                    if (playerSetupJob?.isActive == true) {
+                        FileLogger.w(TAG, "Screen turned off while player was initializing. Aborting and releasing.")
                         releasePlayer()
-                    } else { // It's the live wallpaper
+                    } else {
                         wallpaperPlayer.pause()
                         wallpaperPlayer.playWhenReady = false
                         if (isPlayerInitialized) {

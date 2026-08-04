@@ -61,9 +61,19 @@ class RecentFilesAdapter(
         notifyItemMoved(fromPosition, toPosition)
     }
 
-    fun onItemDismiss(position: Int) {
-        recentFiles.removeAt(position)
-        notifyItemRemoved(position)
+    fun onItemDismiss(item: RecentFile) {
+        val currentPosition = recentFiles.indexOf(item)
+        if (currentPosition != -1) {
+            recentFiles.removeAt(currentPosition)
+            notifyItemRemoved(currentPosition)
+        }
+    }
+
+    fun restoreItem(item: RecentFile) {
+        val currentPosition = recentFiles.indexOf(item)
+        if (currentPosition != -1) {
+            notifyItemChanged(currentPosition)
+        }
     }
 
     fun getItems(): List<RecentFile> {

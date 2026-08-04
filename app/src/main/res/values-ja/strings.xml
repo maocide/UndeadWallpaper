@@ -71,6 +71,7 @@
     <string name="error_cannot_remove_last_video">プレイリストの最後の動画は外せません</string>
     <string name="error_open_settings_failed">設定を開けませんでした</string>
     <string name="error_no_browser">ブラウザを開けません</string>
+    <string name="error_device_not_supported">お使いのデバイスはライブ壁紙をサポートしていません。</string>
 
     <!-- Status Bar Icon Color Settings -->
     <string name="status_bar_icons_label">ステータスバーのアイコン</string>

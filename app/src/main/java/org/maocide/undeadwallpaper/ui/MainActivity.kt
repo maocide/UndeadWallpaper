@@ -67,7 +67,11 @@ class MainActivity : AppCompatActivity() {
                     WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
                     ComponentName(this, UndeadWallpaperService::class.java)
                 )
-                startActivity(intent)
+                try {
+                    startActivity(intent)
+                } catch (e: android.content.ActivityNotFoundException) {
+                    Toast.makeText(this, getString(R.string.error_device_not_supported), Toast.LENGTH_LONG).show()
+                }
             } else {
                 // Changed from hardcoded string to string resource
                 Toast.makeText(this, getString(R.string.select_video_first_message), Toast.LENGTH_SHORT).show()

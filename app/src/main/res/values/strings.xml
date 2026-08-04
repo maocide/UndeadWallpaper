@@ -82,6 +82,7 @@
     <string name="error_video_too_large">Video too large! Max supported resolution is 4K (UHD).</string>
     <string name="error_open_settings_failed">Unable to open settings</string>
     <string name="error_no_browser">Unable to open browser</string>
+    <string name="error_device_not_supported">Your device does not support Live Wallpapers.</string>
 
     <!-- Status Bar Icon Color Settings -->
     <string name="status_bar_icons_label">Status Bar Icons</string>
