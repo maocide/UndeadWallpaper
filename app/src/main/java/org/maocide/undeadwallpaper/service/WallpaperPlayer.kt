@@ -23,6 +23,7 @@ import androidx.media3.exoplayer.video.VideoFrameMetadataListener
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.android.asCoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -49,33 +50,34 @@ class WallpaperPlayer(
     private var playerListener: Player.Listener? = null
     private val playbackThread = HandlerThread("ExoPlaybackThread").apply { start() }
     val playbackDispatcher: CoroutineDispatcher = Handler(playbackThread.looper).asCoroutineDispatcher("ExoPlaybackDispatcher")
+    private val playbackScope = CoroutineScope(SupervisorJob() + playbackDispatcher)
 
     private var recoveryAttempts = 0
 
     // Expose just enough surface area for UndeadWallpaperService to use
 
-    val duration: Long
-        get() = player?.duration ?: C.TIME_UNSET
+    suspend fun getDurationSuspend(): Long = kotlinx.coroutines.withContext(playbackDispatcher) {
+        player?.duration ?: C.TIME_UNSET
+    }
 
-    val currentPosition: Long
-        get() = player?.currentPosition ?: 0L
+    suspend fun getCurrentPositionSuspend(): Long = kotlinx.coroutines.withContext(playbackDispatcher) {
+        player?.currentPosition ?: 0L
+    }
 
-    val currentMediaItemIndex: Int
-        get() = player?.currentMediaItemIndex ?: 0
+    suspend fun getPlayWhenReadySuspend(): Boolean = kotlinx.coroutines.withContext(playbackDispatcher) {
+        player?.playWhenReady ?: false
+    }
 
-    var playWhenReady: Boolean
-        get() = player?.playWhenReady ?: false
-        set(value) {
-            player?.playWhenReady = value
-        }
+    fun setPlayWhenReadyAsync(playWhenReady: Boolean) = playbackScope.launch {
+        player?.playWhenReady = playWhenReady
+    }
 
-    var videoScalingMode: Int
-        @OptIn(UnstableApi::class)
-        get() = player?.videoScalingMode ?: C.VIDEO_SCALING_MODE_DEFAULT
-        @OptIn(UnstableApi::class)
-        set(value) {
-            player?.videoScalingMode = value
-        }
+
+
+    @OptIn(UnstableApi::class)
+    fun setVideoScalingModeAsync(mode: Int) = playbackScope.launch {
+        player?.videoScalingMode = mode
+    }
 
     val isPlaybackThreadAlive: Boolean
         @OptIn(UnstableApi::class)
@@ -83,6 +85,11 @@ class WallpaperPlayer(
 
     @OptIn(UnstableApi::class)
     fun setMediaSources(mediaSources: List<MediaSource>) {
+        player?.setMediaSources(mediaSources)
+    }
+
+    @OptIn(UnstableApi::class)
+    fun setMediaSourcesAsync(mediaSources: List<MediaSource>) = playbackScope.launch {
         player?.setMediaSources(mediaSources)
     }
 
@@ -95,7 +102,15 @@ class WallpaperPlayer(
         player?.seekTo(positionMs)
     }
 
+    fun seekToAsync(positionMs: Long) = playbackScope.launch {
+        player?.seekTo(positionMs)
+    }
+
     fun seekTo(mediaItemIndex: Int, positionMs: Long) {
+        player?.seekTo(mediaItemIndex, positionMs)
+    }
+
+    fun seekToAsync(mediaItemIndex: Int, positionMs: Long) = playbackScope.launch {
         player?.seekTo(mediaItemIndex, positionMs)
     }
 
@@ -103,7 +118,15 @@ class WallpaperPlayer(
         player?.seekToDefaultPosition()
     }
 
+    fun seekToDefaultPositionAsync() = playbackScope.launch {
+        player?.seekToDefaultPosition()
+    }
+
     fun setVideoSurface(surface: Surface) {
+        player?.setVideoSurface(surface)
+    }
+
+    fun setVideoSurfaceAsync(surface: Surface) = playbackScope.launch {
         player?.setVideoSurface(surface)
     }
 
@@ -111,7 +134,15 @@ class WallpaperPlayer(
         player?.prepare()
     }
 
+    fun prepareAsync() = playbackScope.launch {
+        player?.prepare()
+    }
+
     fun play() {
+        player?.play()
+    }
+
+    fun playAsync() = playbackScope.launch {
         player?.play()
     }
 
@@ -119,8 +150,21 @@ class WallpaperPlayer(
         player?.pause()
     }
 
+    fun pauseAsync() = playbackScope.launch {
+        player?.pause()
+    }
+
     fun setRepeatMode(mode: Int) {
         player?.repeatMode = mode
+    }
+
+    fun setRepeatModeAsync(mode: Int) = playbackScope.launch {
+        player?.repeatMode = mode
+    }
+
+    fun applyNonVisualSettingsAsync(volume: Float, speed: Float) = playbackScope.launch {
+        player?.volume = volume
+        player?.setPlaybackSpeed(speed)
     }
 
     fun getPlayerInstance(): Player? {
@@ -307,5 +351,18 @@ class WallpaperPlayer(
             p.release()
         }
         player = null
+    }
+
+    fun initializeAsync(
+        surface: Surface?,
+        initialVolume: Float,
+        speed: Float,
+        playbackMode: PlaybackMode
+    ) = playbackScope.launch {
+        initialize(surface, initialVolume, speed, playbackMode)
+    }
+
+    fun releaseAsync() = playbackScope.launch {
+        release()
     }
 }

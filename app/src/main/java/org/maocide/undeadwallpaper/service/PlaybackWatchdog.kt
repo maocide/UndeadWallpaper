@@ -5,13 +5,14 @@ import androidx.media3.common.Player
 import org.maocide.undeadwallpaper.utils.FileLogger
 
 class PlaybackWatchdog(
-    private val playbackScope: CoroutineScope,
+    private val playbackDispatcher: CoroutineDispatcher,
     private val onStallDetected: () -> Unit
 ) {
     private val TAG: String = javaClass.simpleName
 
     private var player: Player? = null
     private var renderer: GLVideoRenderer? = null
+    private val watchdogScope = CoroutineScope(SupervisorJob() + playbackDispatcher)
 
     private var lastPosition: Long = 0
     private var lastRenderTimestamp: Long = 0
@@ -25,7 +26,7 @@ class PlaybackWatchdog(
         this.player = player
         this.renderer = renderer
 
-        watchdogJob = playbackScope.launch {
+        watchdogJob = watchdogScope.launch {
             while (isActive) {
                 checkPlaybackStall()
                 delay(2000)

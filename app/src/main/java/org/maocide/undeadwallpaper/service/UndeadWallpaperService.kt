@@ -71,6 +71,7 @@ class UndeadWallpaperService : WallpaperService() {
     companion object {
         const val ACTION_VIDEO_URI_CHANGED = "org.maocide.undeadwallpaper.VIDEO_URI_CHANGED"
         const val ACTION_PLAYBACK_MODE_CHANGED = "org.maocide.undeadwallpaper.ACTION_PLAYBACK_MODE_CHANGED"
+
         // for testing trimming
         const val ACTION_TRIM_TIMES_CHANGED = "org.maocide.undeadwallpaper.TRIM_TIMES_CHANGED"
         const val ACTION_STATUS_BAR_COLOR_CHANGED = "org.maocide.undeadwallpaper.STATUS_BAR_COLOR_CHANGED"
@@ -83,8 +84,6 @@ class UndeadWallpaperService : WallpaperService() {
     }
 
 
-
-
     private inner class MyWallpaperEngine : Engine(), WallpaperPlayerListener {
 
         private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -95,7 +94,6 @@ class UndeadWallpaperService : WallpaperService() {
         private lateinit var currentScalingMode: ScalingMode
 
         private val wallpaperPlayer = WallpaperPlayer(baseContext, this)
-        private val playbackScope = CoroutineScope(SupervisorJob() + wallpaperPlayer.playbackDispatcher)
         private var isPlayerReleasing = false
         private val isPlayerInitialized: Boolean
             get() = wallpaperPlayer.getPlayerInstance() != null && !isPlayerReleasing
@@ -119,7 +117,7 @@ class UndeadWallpaperService : WallpaperService() {
 
         private var playerSetupJob: kotlinx.coroutines.Job? = null
 
-        private val playbackWatchdog = PlaybackWatchdog(playbackScope) {
+        private val playbackWatchdog = PlaybackWatchdog(wallpaperPlayer.playbackDispatcher) {
             FileLogger.e(TAG, "Watchdog: STALL CONFIRMED. Restarting player.")
             initializePlayer() // Force restart
         }
@@ -142,9 +140,7 @@ class UndeadWallpaperService : WallpaperService() {
             playheadTime = 0L
             hasPlaybackCompleted = false
             if (seekPlayerToStart) {
-                playbackScope.launch {
-                    wallpaperPlayer.seekToDefaultPosition()
-                }
+                wallpaperPlayer.seekToDefaultPositionAsync()
             }
         }
 
@@ -153,12 +149,7 @@ class UndeadWallpaperService : WallpaperService() {
          * @param settings VideoSettings object from which to apply non-visual settings
          */
         private fun applyNonVisualSettings(settings: VideoSettings) {
-            playbackScope.launch {
-                wallpaperPlayer.getPlayerInstance()?.let { player ->
-                    player.volume = settings.getPerceivedVolume()
-                    player.setPlaybackSpeed(settings.speed)
-                }
-            }
+            wallpaperPlayer.applyNonVisualSettingsAsync(settings.getPerceivedVolume(), settings.speed)
         }
 
         /**
@@ -181,7 +172,8 @@ class UndeadWallpaperService : WallpaperService() {
 
             // EDGE CASE: If the video is manually paused, but the user just removed
             // the PLAY_PAUSE action from all gestures, we must unpause it so they don't get stuck
-            val canPause = doubleTapAction == WallpaperAction.PLAY_PAUSE || tripleTapAction == WallpaperAction.PLAY_PAUSE
+            val canPause =
+                doubleTapAction == WallpaperAction.PLAY_PAUSE || tripleTapAction == WallpaperAction.PLAY_PAUSE
             if (isUserManuallyPaused && !canPause) {
                 isUserManuallyPaused = false
                 FileLogger.i(TAG, "Play/Pause action unbound. Clearing manual pause state.")
@@ -224,9 +216,7 @@ class UndeadWallpaperService : WallpaperService() {
                         isUserManuallyPaused = !isUserManuallyPaused
                     }
 
-                    playbackScope.launch {
-                        wallpaperPlayer.playWhenReady = !isUserManuallyPaused
-                    }
+                    wallpaperPlayer.setPlayWhenReadyAsync(!isUserManuallyPaused)
                     FileLogger.i(TAG, "User toggled Play/Pause. isUserManuallyPaused: $isUserManuallyPaused")
                 }
             }
@@ -254,23 +244,27 @@ class UndeadWallpaperService : WallpaperService() {
                 mediaSourceFactory.createMediaSource(mediaItem)
             }
 
-            withContext(playbackScope.coroutineContext) {
-                // Full-Playlist Loop Optimization:
-                // If the chunk we built contains every video in the playlist, they all share settings!
-                // We can safely enable ExoPlayer's internal REPEAT_MODE_ALL. This gives perfect gapless looping
-                // without ever hitting STATE_ENDED and incurring the manual flush pause.
-                // NOTE: SHUFFLE mode is excluded because it MUST hit STATE_ENDED to trigger a newly randomized sequence loop.
-                if (currentPlaybackMode == PlaybackMode.LOOP_ALL
-                    && playlistUris.isNotEmpty() && chunkUris.size == playlistUris.size) {
-                    wallpaperPlayer.setRepeatMode(Player.REPEAT_MODE_ALL)
-                } else if (currentPlaybackMode == PlaybackMode.LOOP_ALL || currentPlaybackMode == PlaybackMode.SHUFFLE) {
-                    // If chunk is smaller than playlist, we MUST disable repeat mode so it naturally hits STATE_ENDED.
-                    wallpaperPlayer.setRepeatMode(Player.REPEAT_MODE_OFF)
-                }
-
-                wallpaperPlayer.setMediaSources(mediaSources)
-                wallpaperPlayer.seekTo(0, if (keepCurrentPlayback) wallpaperPlayer.currentPosition else playheadTime)
+            // Full-Playlist Loop Optimization:
+            // If the chunk we built contains every video in the playlist, they all share settings!
+            // We can safely enable ExoPlayer's internal REPEAT_MODE_ALL. This gives perfect gapless looping
+            // without ever hitting STATE_ENDED and incurring the manual flush pause.
+            // NOTE: SHUFFLE mode is excluded because it MUST hit STATE_ENDED to trigger a newly randomized sequence loop.
+            if (currentPlaybackMode == PlaybackMode.LOOP_ALL
+                && playlistUris.isNotEmpty() && chunkUris.size == playlistUris.size
+            ) {
+                wallpaperPlayer.setRepeatModeAsync(Player.REPEAT_MODE_ALL)
+            } else if (currentPlaybackMode == PlaybackMode.LOOP_ALL || currentPlaybackMode == PlaybackMode.SHUFFLE) {
+                wallpaperPlayer.setRepeatModeAsync(Player.REPEAT_MODE_OFF)
             }
+
+            wallpaperPlayer.setMediaSourcesAsync(mediaSources)
+            
+            val pos = if (keepCurrentPlayback) {
+                wallpaperPlayer.getCurrentPositionSuspend()
+            } else {
+                playheadTime
+            }
+            wallpaperPlayer.seekToAsync(0, pos)
         }
 
 
@@ -314,7 +308,10 @@ class UndeadWallpaperService : WallpaperService() {
                     }
 
                     ACTION_VIDEO_SETTINGS_CHANGED -> {
-                        FileLogger.i(TAG, "Broadcast received: Video settings changed, full re-initialization requested.")
+                        FileLogger.i(
+                            TAG,
+                            "Broadcast received: Video settings changed, full re-initialization requested."
+                        )
                         isUserManuallyPaused = false // CLEAR PAUSE STATE
 
                         // Reset the parallax offset if the user turned it off so the renderer
@@ -391,10 +388,8 @@ class UndeadWallpaperService : WallpaperService() {
             val activeSettings = getSettingsForUri(loadedVideoUriString)
             applyNonVisualSettings(activeSettings)
 
-            playbackScope.launch {
-                wallpaperPlayer.prepare()
-                wallpaperPlayer.playWhenReady = if (isManualSkip) isVisible else true
-            }
+            wallpaperPlayer.prepareAsync()
+            wallpaperPlayer.setPlayWhenReadyAsync(if (isManualSkip) isVisible else true)
         }
 
         override fun onTouchEvent(event: MotionEvent?) {
@@ -475,16 +470,20 @@ class UndeadWallpaperService : WallpaperService() {
             // Use ExoPlayer's scaling only if fallback surface is used
             if (useFallbackSurface) {
                 if (!isScalingModeSet) {
-                    FileLogger.i(TAG, "Valid video size detected: ${width}x${height}. Setting scaling mode ONCE for fallback surface.")
+                    FileLogger.i(
+                        TAG,
+                        "Valid video size detected: ${width}x${height}. Setting scaling mode ONCE for fallback surface."
+                    )
 
                     val videoAspectRatio = width.toFloat() / height.toFloat()
                     val isHorizontalVideo = videoAspectRatio > 1.0
 
-                    wallpaperPlayer.videoScalingMode = if (isHorizontalVideo) {
+                    val mode = if (isHorizontalVideo) {
                         VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
                     } else {
                         VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
                     }
+                    wallpaperPlayer.setVideoScalingModeAsync(mode)
 
                     isScalingModeSet = true // SET THE FLAG SO THIS DOESN'T RUN AGAIN
                 }
@@ -498,15 +497,16 @@ class UndeadWallpaperService : WallpaperService() {
 
                     if (currentPlaybackMode == PlaybackMode.ONE_SHOT) {
                         hasPlaybackCompleted = true
-                        wallpaperPlayer.pause()
+                        wallpaperPlayer.pauseAsync()
                     } else if (currentPlaybackMode == PlaybackMode.LOOP_ALL || currentPlaybackMode == PlaybackMode.SHUFFLE) {
                         // Same flow as skip, inside the playback mode is handled
                         skipNextVideo(isManualSkip = false)
                     }
                 }
+
                 Player.STATE_READY -> {
                     if (currentPlaybackMode == PlaybackMode.ONE_SHOT && hasPlaybackCompleted) {
-                        wallpaperPlayer.pause()
+                        wallpaperPlayer.pauseAsync()
                     }
                 }
             }
@@ -602,8 +602,8 @@ class UndeadWallpaperService : WallpaperService() {
             speed = activeSettings.speed
 
             // WAIT for the GL Surface, then attach
-            playerSetupJob = playbackScope.launch {
-                wallpaperPlayer.initialize(null, initialVolume, speed, currentPlaybackMode)
+            playerSetupJob = serviceScope.launch {
+                wallpaperPlayer.initializeAsync(null, initialVolume, speed, currentPlaybackMode).join()
                 if (!isPlayerInitialized) return@launch
 
                 // Call the helper to load playlist
@@ -647,25 +647,25 @@ class UndeadWallpaperService : WallpaperService() {
 
                 if (finalSurface != null) {
                     if (finalSurface.isValid) {
-                        // Apply starting position
-                        if (currentPlaybackMode == PlaybackMode.LOOP_ALL || currentPlaybackMode == PlaybackMode.SHUFFLE) {
-                            wallpaperPlayer.seekTo(wallpaperPlayer.currentMediaItemIndex, playheadTime)
-                        } else {
-                            wallpaperPlayer.seekTo(playheadTime)
-                        }
-
-                        wallpaperPlayer.setVideoSurface(finalSurface)
-                        wallpaperPlayer.prepare()
+                        wallpaperPlayer.setVideoSurfaceAsync(finalSurface)
+                        wallpaperPlayer.prepareAsync()
 
                         // DO NOT call play() here.
                         // Just sync the playWhenReady flag with the current visibility state.
-                        val shouldPlay = if (wallpaperPlayer.playWhenReady) true else isVisible
+                        val currentPlayWhenReady = wallpaperPlayer.getPlayWhenReadySuspend()
+                        val shouldPlay = if (currentPlayWhenReady) true else isVisible
 
-                        FileLogger.i(TAG, "Setup complete. isVisible: $isVisible, playWhenReady: ${wallpaperPlayer.playWhenReady}, shouldPlay: $shouldPlay")
+                        FileLogger.i(
+                            TAG,
+                            "Setup complete. isVisible: $isVisible, playWhenReady: $currentPlayWhenReady, shouldPlay: $shouldPlay"
+                        )
 
-                        wallpaperPlayer.playWhenReady = shouldPlay
+                        wallpaperPlayer.setPlayWhenReadyAsync(shouldPlay)
                     } else {
-                        FileLogger.e(TAG, "Surface became invalid before player setup finished. Aborting setVideoSurface.")
+                        FileLogger.e(
+                            TAG,
+                            "Surface became invalid before player setup finished. Aborting setVideoSurface."
+                        )
                     }
                 }
             }
@@ -685,13 +685,16 @@ class UndeadWallpaperService : WallpaperService() {
 
             isPlayerReleasing = true
 
-            playbackScope.launch {
+            serviceScope.launch {
+                // Fetch the position safely on the background thread before release
                 if (wallpaperPlayer.getPlayerInstance() != null) {
-                    playheadTime = wallpaperPlayer.currentPosition
+                    playheadTime = wallpaperPlayer.getCurrentPositionSuspend()
                 }
-                wallpaperPlayer.release()
+                
+                wallpaperPlayer.releaseAsync().join()
                 isPlayerReleasing = false
             }
+
             isScalingModeSet = false
         }
 
@@ -809,7 +812,10 @@ class UndeadWallpaperService : WallpaperService() {
         override fun onVisibilityChanged(visible: Boolean) {
             super.onVisibilityChanged(visible)
 
-            FileLogger.i(TAG, "onVisibilityChanged: visible = $visible isPreview = $isPreview, playbackMode = $currentPlaybackMode")
+            FileLogger.i(
+                TAG,
+                "onVisibilityChanged: visible = $visible isPreview = $isPreview, playbackMode = $currentPlaybackMode"
+            )
 
             if (visible) {
                 val currentUriOnDisk = getMediaUri().toString()
@@ -846,19 +852,23 @@ class UndeadWallpaperService : WallpaperService() {
                                 resetPlaybackTimeline(seekPlayerToStart = true)
                             }
                         }
+
                         StartTime.RESTART -> {
                             resetPlaybackTimeline(seekPlayerToStart = true)
                         }
+
                         StartTime.RANDOM -> {
-                            val duration = wallpaperPlayer.duration
-                            if (duration > 0 && duration != C.TIME_UNSET) {
-                                val randomPos = Random.nextLong(0, duration)
-                                playheadTime = randomPos
-                                wallpaperPlayer.seekTo(wallpaperPlayer.currentMediaItemIndex, randomPos)
-                            } else {
-                                resetPlaybackTimeline()
+                            serviceScope.launch {
+                                val duration = wallpaperPlayer.getDurationSuspend()
+                                if (duration > 0 && duration != androidx.media3.common.C.TIME_UNSET) {
+                                    val randomPos = kotlin.random.Random.nextLong(0, duration)
+                                    playheadTime = randomPos
+                                    wallpaperPlayer.seekToAsync(0, randomPos)
+                                } else {
+                                    resetPlaybackTimeline()
+                                }
+                                hasPlaybackCompleted = false
                             }
-                            hasPlaybackCompleted = false
                         }
                     }
                 }
@@ -871,14 +881,15 @@ class UndeadWallpaperService : WallpaperService() {
                     // The "Play" Command: Just set the flag.
                     // ExoPlayer will start natively as soon as it reaches STATE_READY.
                     // Must be left to pause if user manually paused with touch events
-                    playbackScope.launch {
-                        wallpaperPlayer.playWhenReady = !isUserManuallyPaused // leaving it paused on user pause touch event
-                        wallpaperPlayer.getPlayerInstance()?.let { playerInstance ->
-                            playbackWatchdog.start(playerInstance, renderer) // Monitor for playback running
-                        }
+                    wallpaperPlayer.setPlayWhenReadyAsync(!isUserManuallyPaused) // leaving it paused on user pause touch event
+                    wallpaperPlayer.getPlayerInstance()?.let { playerInstance ->
+                        playbackWatchdog.start(playerInstance, renderer) // Monitor for playback running
                     }
                 } catch (e: IllegalStateException) {
-                    FileLogger.e(TAG, "WakeUp Crash Prevented: ExoPlayer thread died silently during sleep. Forcing re-init.")
+                    FileLogger.e(
+                        TAG,
+                        "WakeUp Crash Prevented: ExoPlayer thread died silently during sleep. Forcing re-init."
+                    )
                     initializePlayer()
                 }
 
@@ -894,11 +905,11 @@ class UndeadWallpaperService : WallpaperService() {
                         FileLogger.w(TAG, "Screen turned off while player was initializing. Aborting and releasing.")
                         releasePlayer()
                     } else {
-                        playbackScope.launch {
-                            wallpaperPlayer.pause()
-                            wallpaperPlayer.playWhenReady = false
-                            if (isPlayerInitialized) {
-                                playheadTime = wallpaperPlayer.currentPosition
+                        wallpaperPlayer.pauseAsync()
+                        wallpaperPlayer.setPlayWhenReadyAsync(false)
+                        if (isPlayerInitialized) {
+                            serviceScope.launch {
+                                playheadTime = wallpaperPlayer.getCurrentPositionSuspend()
                             }
                         }
                     }
@@ -1021,7 +1032,8 @@ class UndeadWallpaperService : WallpaperService() {
             if (action == ACTION_PLAYBACK_MODE_CHANGED ||
                 action == ACTION_VIDEO_URI_CHANGED ||
                 action == ACTION_VIDEO_SETTINGS_CHANGED ||
-                action == "android.wallpaper.reapply") {
+                action == "android.wallpaper.reapply"
+            ) {
 
                 FileLogger.i(TAG, "Command received -> Re-initializing player.")
                 // Full reset for major changes
