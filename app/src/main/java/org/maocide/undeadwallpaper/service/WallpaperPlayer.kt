@@ -2,6 +2,7 @@ package org.maocide.undeadwallpaper.service
 
 import android.content.Context
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.Looper
 import android.view.Surface
 import androidx.annotation.OptIn
@@ -19,8 +20,10 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder
 import androidx.media3.exoplayer.upstream.DefaultAllocator
 import androidx.media3.exoplayer.video.VideoFrameMetadataListener
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.android.asCoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.maocide.undeadwallpaper.model.PlaybackMode
@@ -44,6 +47,8 @@ class WallpaperPlayer(
 
     private var player: ExoPlayer? = null
     private var playerListener: Player.Listener? = null
+    private val playbackThread = HandlerThread("ExoPlaybackThread").apply { start() }
+    val playbackDispatcher: CoroutineDispatcher = Handler(playbackThread.looper).asCoroutineDispatcher("ExoPlaybackDispatcher")
 
     private var recoveryAttempts = 0
 
@@ -179,7 +184,7 @@ class WallpaperPlayer(
         }
 
         player = ExoPlayer.Builder(context, renderersFactory)
-            .setLooper(Looper.getMainLooper())
+            .setLooper(playbackThread.looper)
             .setLoadControl(loadControl)
             .setSeekParameters(SeekParameters.NEXT_SYNC)
             .build()

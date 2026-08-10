@@ -1,11 +1,11 @@
 package org.maocide.undeadwallpaper.service
 
-import android.os.Handler
-import android.os.Looper
+import kotlinx.coroutines.*
 import androidx.media3.common.Player
 import org.maocide.undeadwallpaper.utils.FileLogger
 
 class PlaybackWatchdog(
+    private val playbackScope: CoroutineScope,
     private val onStallDetected: () -> Unit
 ) {
     private val TAG: String = javaClass.simpleName
@@ -17,14 +17,7 @@ class PlaybackWatchdog(
     private var lastRenderTimestamp: Long = 0
     private var stallCount: Int = 0
 
-    private val watchdogHandler = Handler(Looper.getMainLooper())
-    private val watchdogRunnable = object : Runnable {
-        override fun run() {
-            checkPlaybackStall()
-            // Re-run continuously while visible
-            watchdogHandler.postDelayed(this, 2000) // Check every 2 seconds
-        }
-    }
+    private var watchdogJob: Job? = null
 
     fun start(player: Player, renderer: GLVideoRenderer?) {
         stop() // Ensure we don't double-post
@@ -32,11 +25,17 @@ class PlaybackWatchdog(
         this.player = player
         this.renderer = renderer
 
-        watchdogHandler.post(watchdogRunnable)
+        watchdogJob = playbackScope.launch {
+            while (isActive) {
+                checkPlaybackStall()
+                delay(2000)
+            }
+        }
     }
 
     fun stop() {
-        watchdogHandler.removeCallbacks(watchdogRunnable)
+        watchdogJob?.cancel()
+        watchdogJob = null
         stallCount = 0
 
         // Clear references
@@ -64,7 +63,9 @@ class PlaybackWatchdog(
                 if (stallCount >= 2) { // Stalled for ~4 seconds
                     FileLogger.e(TAG, "Watchdog: STALL CONFIRMED. Triggering callback.")
                     stallCount = 0
-                    onStallDetected()
+                    CoroutineScope(Dispatchers.Main).launch {
+                        onStallDetected()
+                    }
                 }
             } else {
                 // It moved! Reset counters.
