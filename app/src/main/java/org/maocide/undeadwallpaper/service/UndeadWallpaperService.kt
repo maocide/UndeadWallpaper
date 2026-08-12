@@ -1029,25 +1029,11 @@ class UndeadWallpaperService : WallpaperService() {
         ): Bundle? {
             super.onCommand(action, x, y, z, extras, resultRequested)
 
-            if (action == ACTION_PLAYBACK_MODE_CHANGED ||
-                action == ACTION_VIDEO_URI_CHANGED ||
-                action == ACTION_VIDEO_SETTINGS_CHANGED ||
-                action == "android.wallpaper.reapply"
-            ) {
+            if (action == "android.wallpaper.reapply") {
 
                 FileLogger.i(TAG, "Command received -> Re-initializing player.")
                 // Full reset for major changes
                 initializePlayer()
-
-            } else if (action == ACTION_PLAYLIST_REORDERED) {
-
-                FileLogger.i(TAG, "Command received -> Playlist reordered. Syncing silently.")
-
-                if (isPlayerInitialized) {
-                    serviceScope.launch {
-                        bindPlaylistToPlayer(keepCurrentPlayback = true)
-                    }
-                }
 
             }
 
