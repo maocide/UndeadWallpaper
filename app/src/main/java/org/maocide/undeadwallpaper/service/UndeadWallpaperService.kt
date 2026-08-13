@@ -94,15 +94,25 @@ class UndeadWallpaperService : WallpaperService() {
         private lateinit var currentScalingMode: ScalingMode
 
         private val wallpaperPlayer = WallpaperPlayer(baseContext, this)
-        private var isPlayerReleasing = false
-        private val isPlayerInitialized: Boolean
-            get() = wallpaperPlayer.getPlayerInstance() != null && !isPlayerReleasing
+        private val fsm = EngineFSM(baseContext)
+
+        private fun processEvent(event: EngineEvent) {
+            val effect = fsm.transition(event)
+            when (effect) {
+                is EngineEffect.StartInitialization -> initializePlayer(effect.lumaScale)
+                is EngineEffect.ApplyPlayWhenReady -> wallpaperPlayer.setPlayWhenReadyAsync(effect.play)
+                is EngineEffect.StartRelease -> releasePlayer()
+                is EngineEffect.None -> { /* no-op */
+                }
+            }
+        }
 
         private var surfaceHolder: SurfaceHolder? = null
         private var playheadTime: Long = 0L
         private val TAG: String = javaClass.simpleName
         private var isScalingModeSet = false
         private var useFallbackSurface = false
+        private var activeLumaScale: Float = 1.0f
 
         private var currentPlaybackMode = PlaybackMode.LOOP
 
@@ -119,11 +129,10 @@ class UndeadWallpaperService : WallpaperService() {
 
         private val playbackWatchdog = PlaybackWatchdog(wallpaperPlayer.playbackDispatcher) {
             FileLogger.e(TAG, "Watchdog: STALL CONFIRMED. Restarting player.")
-            initializePlayer() // Force restart
+            processEvent(EngineEvent.InitializeRequested) // Force restart
         }
 
         // Touch Interaction State
-        private var isUserManuallyPaused = false
         private var isCurrentlyListeningForTouch = true // Engine onCreate defaults to true
         private val parallaX: Float = 0.5f - (Random.nextFloat() * 0.30f - 0.15f)
 
@@ -174,8 +183,10 @@ class UndeadWallpaperService : WallpaperService() {
             // the PLAY_PAUSE action from all gestures, we must unpause it so they don't get stuck
             val canPause =
                 doubleTapAction == WallpaperAction.PLAY_PAUSE || tripleTapAction == WallpaperAction.PLAY_PAUSE
-            if (isUserManuallyPaused && !canPause) {
-                isUserManuallyPaused = false
+
+            val currentState = fsm.state as? EngineState.Ready
+            if (currentState?.isManuallyPaused == true && !canPause) {
+                processEvent(EngineEvent.UserTogglePause)
                 FileLogger.i(TAG, "Play/Pause action unbound. Clearing manual pause state.")
             }
 
@@ -199,25 +210,29 @@ class UndeadWallpaperService : WallpaperService() {
 
                 WallpaperAction.SKIP_NEXT -> {
                     // UX Rule: If they skip, they want to see the new video. Unpause it.
-                    isUserManuallyPaused = false
+                    val currentState = fsm.state as? EngineState.Ready
+                    if (currentState?.isManuallyPaused == true) {
+                        processEvent(EngineEvent.UserTogglePause)
+                    }
                     skipNextVideo(isManualSkip = true)
                 }
 
                 WallpaperAction.PLAY_PAUSE -> {
-                    if (!isPlayerInitialized) return
+                    if (fsm.state !is EngineState.Ready) return
 
                     // ONE_SHOT CASE: If they "Play" a finished video, restart it!
                     if (currentPlaybackMode == PlaybackMode.ONE_SHOT && hasPlaybackCompleted) {
                         FileLogger.i(TAG, "User triggered Play on a finished ONE_SHOT video. Replaying.")
                         resetPlaybackTimeline(seekPlayerToStart = true)
-                        isUserManuallyPaused = false
+
+                        val currentState = fsm.state as EngineState.Ready
+                        if (currentState.isManuallyPaused) {
+                            processEvent(EngineEvent.UserTogglePause)
+                        }
                     } else {
                         // Normal toggle behavior
-                        isUserManuallyPaused = !isUserManuallyPaused
+                        processEvent(EngineEvent.UserTogglePause)
                     }
-
-                    wallpaperPlayer.setPlayWhenReadyAsync(!isUserManuallyPaused)
-                    FileLogger.i(TAG, "User toggled Play/Pause. isUserManuallyPaused: $isUserManuallyPaused")
                 }
             }
         }
@@ -258,7 +273,7 @@ class UndeadWallpaperService : WallpaperService() {
             }
 
             wallpaperPlayer.setMediaSourcesAsync(mediaSources)
-            
+
             val pos = if (keepCurrentPlayback) {
                 wallpaperPlayer.getCurrentPositionSuspend()
             } else {
@@ -276,17 +291,23 @@ class UndeadWallpaperService : WallpaperService() {
                     // Will be called by changing video
                     ACTION_VIDEO_URI_CHANGED -> {
                         FileLogger.i(TAG, "Broadcast received: Video uri changed, full re-initialization requested.")
-                        isUserManuallyPaused = false // CLEAR PAUSE STATE
+                        val currentState = fsm.state as? EngineState.Ready
+                        if (currentState?.isManuallyPaused == true) {
+                            processEvent(EngineEvent.UserTogglePause)
+                        }
                         resetPlaybackTimeline()
-                        initializePlayer() // force Reinit
+                        processEvent(EngineEvent.InitializeRequested) // force Reinit
                     }
 
                     // Will be called by changing scaling, playback mode, all things requiring a reinit
                     ACTION_PLAYBACK_MODE_CHANGED -> {
                         FileLogger.i(TAG, "Broadcast received: Playback mode change, full re-initialization requested.")
-                        isUserManuallyPaused = false // CLEAR PAUSE STATE
+                        val currentState = fsm.state as? EngineState.Ready
+                        if (currentState?.isManuallyPaused == true) {
+                            processEvent(EngineEvent.UserTogglePause)
+                        }
                         resetPlaybackTimeline()
-                        initializePlayer() // force Reinit
+                        processEvent(EngineEvent.InitializeRequested) // force Reinit
                     }
 
                     ACTION_STATUS_BAR_COLOR_CHANGED -> {
@@ -299,7 +320,7 @@ class UndeadWallpaperService : WallpaperService() {
 
                     ACTION_PLAYLIST_REORDERED -> {
                         FileLogger.i(TAG, "Playlist reordered. Syncing ExoPlayer timeline.")
-                        if (isPlayerInitialized) {
+                        if (fsm.state is EngineState.Ready) {
                             // Call the helper (Keep playing seamlessly)
                             serviceScope.launch {
                                 bindPlaylistToPlayer(keepCurrentPlayback = true)
@@ -312,7 +333,10 @@ class UndeadWallpaperService : WallpaperService() {
                             TAG,
                             "Broadcast received: Video settings changed, full re-initialization requested."
                         )
-                        isUserManuallyPaused = false // CLEAR PAUSE STATE
+                        val currentState = fsm.state as? EngineState.Ready
+                        if (currentState?.isManuallyPaused == true) {
+                            processEvent(EngineEvent.UserTogglePause)
+                        }
 
                         // Reset the parallax offset if the user turned it off so the renderer
                         // doesn't keep applying the last scroll value on every frame.
@@ -322,12 +346,12 @@ class UndeadWallpaperService : WallpaperService() {
 
                         // Ensure settings apply completely identical to a URI change to avoid syncing bugs
                         resetPlaybackTimeline()
-                        initializePlayer() // force Reinit
+                        processEvent(EngineEvent.InitializeRequested) // force Reinit
                     }
 
                     Intent.ACTION_USER_UNLOCKED -> {
                         FileLogger.i(TAG, "Broadcast received: User Unlocked. Initializing player safely.")
-                        initializePlayer()
+                        processEvent(EngineEvent.InitializeRequested)
                     }
                 }
 
@@ -340,7 +364,7 @@ class UndeadWallpaperService : WallpaperService() {
          * matrix changes are not applied on call, but applied later on first frame of the new video.
          */
         private fun skipNextVideo(isManualSkip: Boolean) {
-            if (!isPlayerInitialized) return
+            if (fsm.state !is EngineState.Ready) return
 
             serviceScope.launch {
                 val nextUriString = playlistManager.getNextUri(loadedVideoUriString, currentPlaybackMode)
@@ -358,9 +382,8 @@ class UndeadWallpaperService : WallpaperService() {
                     prefs.saveActiveVideoUri(nextUriString)
 
                     FileLogger.i(TAG, "Single-video mode detected. Performing hard re-initialization for skip.")
-                    releasePlayer()
                     resetPlaybackTimeline()
-                    initializePlayer()
+                    processEvent(EngineEvent.InitializeRequested)
                     return@launch
                 }
 
@@ -420,7 +443,9 @@ class UndeadWallpaperService : WallpaperService() {
                 zoom = activeSettings.zoom,
                 rotation = activeSettings.rotation
             )
-            renderer?.setBrightness(activeSettings.brightness)
+
+            val lumaOffset = -100.0f * (1.0f - activeLumaScale)
+            renderer?.setBrightness((activeSettings.brightness * activeLumaScale) + lumaOffset)
         }
 
         // WallpaperPlayerListener implementations
@@ -450,7 +475,7 @@ class UndeadWallpaperService : WallpaperService() {
 
             if (isDecoderError) {
                 if (isVisible) {
-                    initializePlayer()
+                    processEvent(EngineEvent.InitializeRequested)
                 }
             }
         }
@@ -548,7 +573,9 @@ class UndeadWallpaperService : WallpaperService() {
         }
 
         @OptIn(UnstableApi::class)
-        private fun initializePlayer() {
+        private fun initializePlayer(lumaScale: Float) {
+            this.activeLumaScale = lumaScale
+
             // Direct Boot Check (FBE)
             // If the user hasn't unlocked the phone after a reboot, storage is heavily encrypted.
             // Do not attempt to read preferences or initialize the player.
@@ -561,7 +588,7 @@ class UndeadWallpaperService : WallpaperService() {
             // Cancel any startup issued, avoid race conditions
             playerSetupJob?.cancel()
 
-            if (isPlayerInitialized) {
+            if (wallpaperPlayer.getPlayerInstance() != null) {
                 releasePlayer()
             }
 
@@ -601,10 +628,22 @@ class UndeadWallpaperService : WallpaperService() {
             val initialVolume = activeSettings.getPerceivedVolume()
             speed = activeSettings.speed
 
-            // WAIT for the GL Surface, then attach
+            FileLogger.i(TAG, "Initializing ExoPlayer...")
+            val isPreview = this.isPreview
+
+            playerSetupJob?.cancel()
+
             playerSetupJob = serviceScope.launch {
+                // To prevent race conditions on the playbackDispatcher, we MUST wait for the old 
+                // player to be fully released before we initialize the new one.
+                if (wallpaperPlayer.getPlayerInstance() != null) {
+                    playheadTime = wallpaperPlayer.getCurrentPositionSuspend()
+                    wallpaperPlayer.releaseAsync().join()
+                }
+                isScalingModeSet = false
+
                 wallpaperPlayer.initializeAsync(null, initialVolume, speed, currentPlaybackMode).join()
-                if (!isPlayerInitialized) return@launch
+                if (wallpaperPlayer.getPlayerInstance() == null) return@launch
 
                 // Call the helper to load playlist
                 bindPlaylistToPlayer(keepCurrentPlayback = false)
@@ -627,9 +666,8 @@ class UndeadWallpaperService : WallpaperService() {
                     } catch (e: Exception) {
                         FileLogger.e(TAG, "GL Renderer failed to provide surface, falling back to default surface", e)
                         useFallbackSurface = true
-                        releasePlayer()
                         releaseRenderer()
-                        initializePlayer() // Restart immediately using the fallback
+                        processEvent(EngineEvent.InitializeRequested) // force Reinit
                         return@launch
                     }
                 } else {
@@ -640,7 +678,7 @@ class UndeadWallpaperService : WallpaperService() {
                 if (!isActive) return@launch
 
                 // Check if player is alive, surface is valid, surface is ready.
-                if (!isPlayerInitialized || surfaceHolder == null || surfaceHolder?.surface == null || !surfaceHolder?.surface?.isValid!!) {
+                if (fsm.state !is EngineState.Initializing || surfaceHolder == null || surfaceHolder?.surface == null || !surfaceHolder?.surface?.isValid!!) {
                     FileLogger.w(TAG, "Engine destroyed or surface invalid before player setup completed. Aborting.")
                     return@launch
                 }
@@ -650,17 +688,14 @@ class UndeadWallpaperService : WallpaperService() {
                         wallpaperPlayer.setVideoSurfaceAsync(finalSurface)
                         wallpaperPlayer.prepareAsync()
 
-                        // DO NOT call play() here.
-                        // Just sync the playWhenReady flag with the current visibility state.
-                        val currentPlayWhenReady = wallpaperPlayer.getPlayWhenReadySuspend()
-                        val shouldPlay = if (currentPlayWhenReady) true else isVisible
+                        // DO NOT call play() here manually.
+                        // We tell the FSM that initialization is complete.
+                        processEvent(EngineEvent.InitializationComplete)
 
-                        FileLogger.i(
-                            TAG,
-                            "Setup complete. isVisible: $isVisible, playWhenReady: $currentPlayWhenReady, shouldPlay: $shouldPlay"
-                        )
+                        // We then feed the current visibility state to the FSM so it can 
+                        // compute the correct playWhenReady flag based on its rules!
+                        processEvent(EngineEvent.VisibilityChanged(isVisible))
 
-                        wallpaperPlayer.setPlayWhenReadyAsync(shouldPlay)
                     } else {
                         FileLogger.e(
                             TAG,
@@ -683,16 +718,13 @@ class UndeadWallpaperService : WallpaperService() {
             // Stop any startup jobs
             playerSetupJob?.cancel()
 
-            isPlayerReleasing = true
-
             serviceScope.launch {
                 // Fetch the position safely on the background thread before release
                 if (wallpaperPlayer.getPlayerInstance() != null) {
                     playheadTime = wallpaperPlayer.getCurrentPositionSuspend()
                 }
-                
+
                 wallpaperPlayer.releaseAsync().join()
-                isPlayerReleasing = false
             }
 
             isScalingModeSet = false
@@ -746,7 +778,7 @@ class UndeadWallpaperService : WallpaperService() {
             prefs.saveActiveVideoUri("")
 
             // Kill the player and DO NOT restart it.
-            releasePlayer()
+            processEvent(EngineEvent.HardwareFailure(reason))
         }
 
 
@@ -755,11 +787,11 @@ class UndeadWallpaperService : WallpaperService() {
             FileLogger.i(TAG, "onSurfaceCreated")
             this.surfaceHolder = holder
 
-            // VIVO SHIELD: Funtouch OS spams onSurfaceCreated when touch events change,
-            // WITHOUT calling onSurfaceDestroyed first.
-            // If we already have a renderer, the surface is still perfectly valid. Ignore the spam!
             if (renderer != null) {
-                FileLogger.w(TAG, "Vivo spam detected: onSurfaceCreated called but renderer exists. Ignoring.")
+                FileLogger.w(
+                    TAG,
+                    "INFO: Non-standard lifecycle detected! onSurfaceCreated called without onSurfaceDestroyed. Renderer already exists."
+                )
                 return
             }
 
@@ -770,7 +802,7 @@ class UndeadWallpaperService : WallpaperService() {
                 FileLogger.i(TAG, "Using fallback surface, skipping GL Renderer creation")
             }
 
-            initializePlayer()
+            processEvent(EngineEvent.InitializeRequested)
         }
 
         override fun onSurfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
@@ -788,7 +820,7 @@ class UndeadWallpaperService : WallpaperService() {
             super.onSurfaceDestroyed(holder)
             FileLogger.i(TAG, "onSurfaceDestroyed")
             playbackWatchdog.stop()
-            releasePlayer()
+            processEvent(EngineEvent.ReleaseRequested)
             releaseRenderer()
             this.surfaceHolder = null
         }
@@ -798,7 +830,7 @@ class UndeadWallpaperService : WallpaperService() {
             FileLogger.i(TAG, "Engine onDestroy")
             serviceScope.cancel()
             playbackWatchdog.stop() // Kill the playback watchdog
-            releasePlayer()
+            processEvent(EngineEvent.ReleaseRequested)
             releaseRenderer()
             gestureManager.destroy()
             try {
@@ -823,8 +855,13 @@ class UndeadWallpaperService : WallpaperService() {
                 var wasJustInitialized = false
 
                 // Check if player is initialized AND if the internal thread survived the sleep
-                val isThreadDead = isPlayerInitialized && !wallpaperPlayer.isPlaybackThreadAlive
-                if (currentUriOnDisk != loadedVideoUriString || !isPlayerInitialized || isSurfaceDead || isThreadDead) {
+                val isThreadDead = fsm.state is EngineState.Ready && !wallpaperPlayer.isPlaybackThreadAlive
+
+                // We only force a restart if we are in Ready state and something is corrupted.
+                val forceRestart =
+                    fsm.state is EngineState.Ready && (currentUriOnDisk != loadedVideoUriString || isSurfaceDead || isThreadDead)
+
+                if (forceRestart) {
                     if (isThreadDead) {
                         FileLogger.e(TAG, "WakeUp Check: ExoPlayer internal thread was killed by OS. Forcing restart.")
                     } else if (currentUriOnDisk != loadedVideoUriString) {
@@ -838,7 +875,7 @@ class UndeadWallpaperService : WallpaperService() {
                         resetPlaybackTimeline()
                     }
 
-                    initializePlayer()
+                    processEvent(EngineEvent.VisibilityChanged(isVisible = true, forceRestart = true))
                     wasJustInitialized = true
                 }
 
@@ -878,10 +915,11 @@ class UndeadWallpaperService : WallpaperService() {
                 refreshRenderer()
 
                 try {
-                    // The "Play" Command: Just set the flag.
-                    // ExoPlayer will start natively as soon as it reaches STATE_READY.
-                    // Must be left to pause if user manually paused with touch events
-                    wallpaperPlayer.setPlayWhenReadyAsync(!isUserManuallyPaused) // leaving it paused on user pause touch event
+                    // Tell FSM we are visible
+                    if (!wasJustInitialized) {
+                        processEvent(EngineEvent.VisibilityChanged(isVisible = true, forceRestart = false))
+                    }
+
                     wallpaperPlayer.getPlayerInstance()?.let { playerInstance ->
                         playbackWatchdog.start(playerInstance, renderer) // Monitor for playback running
                     }
@@ -890,7 +928,7 @@ class UndeadWallpaperService : WallpaperService() {
                         TAG,
                         "WakeUp Crash Prevented: ExoPlayer thread died silently during sleep. Forcing re-init."
                     )
-                    initializePlayer()
+                    processEvent(EngineEvent.InitializeRequested)
                 }
 
             } else {
@@ -898,16 +936,15 @@ class UndeadWallpaperService : WallpaperService() {
                 gestureManager.destroy()
                 if (isPreview) {
                     FileLogger.i(TAG, "Preview hidden. Releasing player to save decoders.")
-                    releasePlayer()
+                    processEvent(EngineEvent.ReleaseRequested)
                 } else { // It's the live wallpaper
                     // EXPLICIT CANCELLATION HOOK: Abort any pending async initialization!
                     if (playerSetupJob?.isActive == true) {
                         FileLogger.w(TAG, "Screen turned off while player was initializing. Aborting and releasing.")
-                        releasePlayer()
+                        processEvent(EngineEvent.ReleaseRequested)
                     } else {
-                        wallpaperPlayer.pauseAsync()
-                        wallpaperPlayer.setPlayWhenReadyAsync(false)
-                        if (isPlayerInitialized) {
+                        processEvent(EngineEvent.VisibilityChanged(isVisible = false))
+                        if (fsm.state is EngineState.Ready) {
                             serviceScope.launch {
                                 playheadTime = wallpaperPlayer.getCurrentPositionSuspend()
                             }
@@ -1033,7 +1070,7 @@ class UndeadWallpaperService : WallpaperService() {
 
                 FileLogger.i(TAG, "Command received -> Re-initializing player.")
                 // Full reset for major changes
-                initializePlayer()
+                processEvent(EngineEvent.InitializeRequested)
 
             }
 
