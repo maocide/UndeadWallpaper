@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Undead Wallpaper</string>
+    <string name="action_settings">关于</string>
+    <string name="action_battery_optimization">电池优化</string>
+    <string name="action_faq">帮助 / 常见问题</string>
+
+    <string name="first_fragment_label">亡灵设置</string>
+    <string name="second_fragment_label">关于</string>
+    <string name="previous">返回</string>
+
+    <string name="pick_video">选择视频</string>
+    <string name="trim_video">裁剪视频</string>
+    <string name="setting_audio_enabled">启用音频</string>
+    <string name="playback_mode_setting">播放模式</string>
+    <string name="recent_files">播放列表 / 最近文件</string>
+    <string name="playlist_instructions">长按以重新排序。向左或向右滑动以移除。</string>
+    <string name="error_cannot_remove_last_video">无法移除播放列表中的最后一个视频。</string>
+    <string name="apply_trim">应用</string>
+    <string name="wallpaper_description">播放视频的动态壁纸。</string>
+    <string name="activating_wallpaper_message">正在激活壁纸…</string>
+    <string name="select_video_first_message">请先选择一个视频</string>
+
+    <string name="profile_image_content_description">开发者头像</string>
+    <string name="github_profile_text"><a href="https://github.com/maocide/">GitHub: maocide</a></string>
+    <string name="license_text"><a href="https://www.gnu.org/licenses/gpl-3.0.en.html">许可证: GNU GPL v3.0</a></string>
+
+    <string name="about_header_story">名称背后的故事</string>
+    <string name="about_story_content">这不仅仅是一个关于<b>动态</b>壁纸的双关语。<b>UndeadWallpaper（亡灵壁纸）</b>这个名字带有个人色彩。在经历了漫长的被迫停止编程之后，这个项目是复苏的第一个迹象——那是被埋藏的激情重新浮出水面的时刻。这个应用不仅仅是<b>动态的</b>；它象征着一个创作者死而复生。它是<b>亡灵（undead）</b>，因为有些东西就是太固执，不愿死去。</string>
+    <string name="about_header_features">它的功能</string>
+    <string name="about_feature_loops">• 丝滑循环：将您手机上的任何视频变成无缝、无卡顿的动态壁纸。</string>
+    <string name="about_feature_freedom">• 完全自由：无广告，无应用内购买，无任何废话。永远免费。</string>
+    <string name="about_feature_control">• 一切尽在掌握：支持音频切换，并记录您最近使用的视频以便快速切换。</string>
+    
+    <string name="playback_mode_loop">单曲循环</string>
+    <string name="playback_mode_oneshot">播放一次</string>
+    <string name="playback_mode_loop_all">列表循环</string>
+    <string name="playback_mode_shuffle">随机播放</string>
+    <string name="scaling_mode">缩放模式</string>
+    <string name="scaling_mode_fit">适应屏幕 (Fit)</string>
+    <string name="scaling_mode_fill">填充屏幕 (Fill)</string>
+    <string name="scaling_mode_stretch">拉伸屏幕 (Stretch)</string>
+    <string name="advanced">高级</string>
+    <string name="horizontal_position">水平位置</string>
+    <string name="vertical_position">垂直位置</string>
+    <string name="zoom">缩放</string>
+    <string name="brightness">亮度</string>
+    <string name="speed">速度</string>
+    <string name="reset">重置</string>
+    <string name="rotation">旋转</string>
+
+    <string name="gesture_controls_header">主屏幕手势</string>
+    <string name="double_tap_label">双击</string>
+    <string name="triple_tap_label">三击</string>
+    <string name="gesture_action_none">无</string>
+    <string name="gesture_action_pause_play">暂停/播放</string>
+    <string name="gesture_action_skip">跳过</string>
+    <string name="gesture_launcher_warning">注意：某些桌面应用可能会阻止壁纸手势。</string>
+
+    <string name="error_permission_failed">无法获取所选文件的权限。</string>
+    <string name="warning_4k_video">警告：4K视频可能会在某些设备上导致崩溃或卡顿。</string>
+    <string name="error_copy_failed">复制视频文件失败。</string>
+    <string name="error_cannot_play_video">无法播放此视频文件。</string>
+    <string name="warning_high_speed_stuttering">在播放高分辨率视频时，高速度可能会导致卡顿。</string>
+    <string name="error_file_picker_not_available">系统中没有可用的文件选择器！</string>
+    <string name="error_could_not_read_video_duration">无法读取视频时长。</string>
+    <string name="warning_random_start_time_delay">随机由于跳转可能会导致延迟</string>
+    <string name="error_video_too_large">视频过大！最高支持的分辨率为4K（UHD）。</string>
+    <string name="error_open_settings_failed">无法打开设置</string>
+    <string name="error_no_browser">无法打开浏览器</string>
+    <string name="error_device_not_supported">您的设备不支持动态壁纸。</string>
+
+    <string name="status_bar_icons_label">状态栏图标</string>
+    <string name="status_bar_auto">自动</string>
+    <string name="status_bar_white_icons">白色</string>
+    <string name="status_bar_black_icons">黑色</string>
+
+    <string name="custom_settings_header">自定义设置</string>
+    <string name="importing_video">正在导入视频</string>
+    <string name="positioning_header">定位</string>
+    <string name="general_header">常规</string>
+    <string name="volume_label">音量</string>
+    <string name="global_settings_header">全局设置</string>
+    <string name="debug_options_header">调试选项</string>
+    <string name="debug_logging_description">启用本地文件记录以捕获严重崩溃。除非遇到问题，否则建议关闭此功能。</string>
+    <string name="debug_enable_logging">启用本地文件日志</string>
+    <string name="debug_clear_log">清除日志</string>
+    <string name="debug_share_log">分享日志</string>
+
+    <string name="start_time_label">可见时</string>
+    <string name="start_time_resume">继续</string>
+    <string name="start_time_restart">重新开始</string>
+    <string name="start_time_random">随机</string>
+
+    <string name="breadcrumb_zoom">缩放</string>
+    <string name="breadcrumb_pan">平移</string>
+    <string name="breadcrumb_rotation">旋转</string>
+    <string name="breadcrumb_brightness">亮度</string>
+    <string name="breadcrumb_speed">速度</string>
+    <string name="breadcrumb_volume">音量</string>
+    <string name="breadcrumb_more">+还有 %1$d 项</string>
+
+    <string name="remove_file_title">移除视频</string>
+    <string name="remove_file_message">您确定要从应用中移除 %s 吗？</string>
+    <string name="remove_action">移除</string>
+    <string name="cancel">取消</string>
+
+    <string name="battery_warning_title">允许后台运行</string>
+    <string name="battery_warning_desc">允许 Undead Wallpaper 在后台运行，以防止系统将其关闭。</string>
+    <string name="battery_warning_btn">修复</string>
+    <string name="battery_instruction_step_1">1. 点击 应用电池使用情况</string>
+    <string name="battery_instruction_step_2">2. 点击 允许后台使用</string>
+    <string name="battery_instruction_step_3">3. 允许并选择 无限制</string>
+    <string name="battery_warning_go_to_settings">前往设置</string>
+
+    <string name="log_enabled_toast">已启用本地文件日志</string>
+    <string name="log_disabled_toast">已禁用本地文件日志</string>
+    <string name="share_log_title">分享调试日志</string>
+    <string name="share_log_warning">调试日志可能包含敏感信息，例如文件名或设备详情。您确定要分享吗？</string>
+    <string name="share_log_confirm">分享</string>
+    <string name="share_log_cancel">取消</string>
+    <string name="share_log_intent_title">分享调试日志</string>
+    <string name="log_empty_toast">未找到日志文件或文件为空</string>
+    <string name="log_cleared_toast">日志文件已清除</string>
+
+    <string name="parallax_icon_description">实验性功能</string>
+    <string name="parallax_card_title">视差实验</string>
+    <string name="parallax_toggle_label">主屏幕视差</string>
+    <string name="parallax_description">使视频随您滑动页面而移动。稍微放大视频以隐藏黑边。注意：并非所有自定义系统桌面应用都支持。</string>
+    <string name="parallax_strength_label">视差强度</string>
+
+</resources>
