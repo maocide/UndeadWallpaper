@@ -667,7 +667,7 @@ class SettingsFragment : Fragment() {
             preferencesManager.setParallaxEnabled(isChecked)
 
             // Animation
-            android.transition.TransitionManager.beginDelayedTransition(binding.cardParallax as android.view.ViewGroup)
+            android.transition.TransitionManager.beginDelayedTransition(binding.root as android.view.ViewGroup)
 
             // Changing visibility will make TransitionManager animate
             binding.layoutParallaxStrength.visibility = if (isChecked) View.VISIBLE else View.GONE
@@ -689,8 +689,26 @@ class SettingsFragment : Fragment() {
             }
         }
 
+        // Accordion Toggles
+        binding.headerTouchControls.setOnClickListener {
+            val isVisible = binding.contentTouchControls.visibility == View.VISIBLE
+            android.transition.TransitionManager.beginDelayedTransition(binding.root as android.view.ViewGroup)
+            binding.contentTouchControls.visibility = if (isVisible) View.GONE else View.VISIBLE
+            binding.iconTouchChevron.animate().rotation(if (isVisible) 0f else 180f).setDuration(200).start()
+        }
+
+        binding.headerParallax.setOnClickListener {
+            val isVisible = binding.contentParallax.visibility == View.VISIBLE
+            android.transition.TransitionManager.beginDelayedTransition(binding.root as android.view.ViewGroup)
+            binding.contentParallax.visibility = if (isVisible) View.GONE else View.VISIBLE
+            binding.iconParallaxChevron.animate().rotation(if (isVisible) 0f else 180f).setDuration(200).start()
+        }
+
         // Video Picker
         binding.buttonPickVideo.setOnClickListener {
+            checkPermissionAndOpenFilePicker()
+        }
+        binding.cardVideoPreview.setOnClickListener {
             checkPermissionAndOpenFilePicker()
         }
 

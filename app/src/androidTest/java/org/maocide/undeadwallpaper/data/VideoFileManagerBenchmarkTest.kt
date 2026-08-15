@@ -16,7 +16,7 @@ class VideoFileManagerBenchmarkTest {
     private val TAG = "VideoFileManagerBenchmark"
 
     @Test
-    fun benchmarkLoadRecentFiles() {
+    suspend fun benchmarkLoadRecentFiles() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val videoFileManager = VideoFileManager(context)
 
