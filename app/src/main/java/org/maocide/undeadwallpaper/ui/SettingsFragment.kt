@@ -447,18 +447,25 @@ class SettingsFragment : Fragment() {
                 sharedViewModel.selectedVideoUri = savedUri.toUri()
             }
 
-            // Double Tap Gesture
-            when (preferencesManager.getActionForGesture(GestureType.DOUBLE_TAP)) {
+            val doubleTapAction = preferencesManager.getActionForGesture(GestureType.DOUBLE_TAP)
+            when (doubleTapAction) {
                 WallpaperAction.NONE -> binding.doubleTapGroup.check(binding.doubleTapNone.id)
                 WallpaperAction.PLAY_PAUSE -> binding.doubleTapGroup.check(binding.doubleTapPause.id)
                 WallpaperAction.SKIP_NEXT -> binding.doubleTapGroup.check(binding.doubleTapSkip.id)
             }
 
             // Triple Tap Gesture
-            when (preferencesManager.getActionForGesture(GestureType.TRIPLE_TAP)) {
+            val tripleTapAction = preferencesManager.getActionForGesture(GestureType.TRIPLE_TAP)
+            when (tripleTapAction) {
                 WallpaperAction.NONE -> binding.tripleTapGroup.check(binding.tripleTapNone.id)
                 WallpaperAction.PLAY_PAUSE -> binding.tripleTapGroup.check(binding.tripleTapPause.id)
                 WallpaperAction.SKIP_NEXT -> binding.tripleTapGroup.check(binding.tripleTapSkip.id)
+            }
+
+            // Auto-expand touch controls if enabled
+            if (doubleTapAction != WallpaperAction.NONE || tripleTapAction != WallpaperAction.NONE) {
+                binding.contentTouchControls.visibility = View.VISIBLE
+                binding.iconTouchChevron.rotation = 180f
             }
 
             // Experimental Parallax
@@ -466,6 +473,11 @@ class SettingsFragment : Fragment() {
             binding.switchParallax.isChecked = isParallaxEnabled
             binding.sliderParallaxStrength.value = preferencesManager.getParallaxStrength()
             binding.layoutParallaxStrength.visibility = if (isParallaxEnabled) View.VISIBLE else View.GONE
+            
+            if (isParallaxEnabled) {
+                binding.contentParallax.visibility = View.VISIBLE
+                binding.iconParallaxChevron.rotation = 180f
+            }
 
             // Regardless of having a selected video or not, we need to load the recent files
             // into the RecyclerView adapter ONCE during UI initialization.
@@ -667,7 +679,7 @@ class SettingsFragment : Fragment() {
             preferencesManager.setParallaxEnabled(isChecked)
 
             // Animation
-            android.transition.TransitionManager.beginDelayedTransition(binding.cardParallax as android.view.ViewGroup)
+            android.transition.TransitionManager.beginDelayedTransition(binding.root as android.view.ViewGroup)
 
             // Changing visibility will make TransitionManager animate
             binding.layoutParallaxStrength.visibility = if (isChecked) View.VISIBLE else View.GONE
@@ -689,8 +701,26 @@ class SettingsFragment : Fragment() {
             }
         }
 
+        // Accordion Toggles
+        binding.headerTouchControls.setOnClickListener {
+            val isVisible = binding.contentTouchControls.visibility == View.VISIBLE
+            android.transition.TransitionManager.beginDelayedTransition(binding.root as android.view.ViewGroup)
+            binding.contentTouchControls.visibility = if (isVisible) View.GONE else View.VISIBLE
+            binding.iconTouchChevron.animate().rotation(if (isVisible) 0f else 180f).setDuration(200).start()
+        }
+
+        binding.headerParallax.setOnClickListener {
+            val isVisible = binding.contentParallax.visibility == View.VISIBLE
+            android.transition.TransitionManager.beginDelayedTransition(binding.root as android.view.ViewGroup)
+            binding.contentParallax.visibility = if (isVisible) View.GONE else View.VISIBLE
+            binding.iconParallaxChevron.animate().rotation(if (isVisible) 0f else 180f).setDuration(200).start()
+        }
+
         // Video Picker
         binding.buttonPickVideo.setOnClickListener {
+            checkPermissionAndOpenFilePicker()
+        }
+        binding.cardVideoPreview.setOnClickListener {
             checkPermissionAndOpenFilePicker()
         }
 
