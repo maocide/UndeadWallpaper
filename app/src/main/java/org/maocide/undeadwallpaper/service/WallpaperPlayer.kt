@@ -2,6 +2,7 @@ package org.maocide.undeadwallpaper.service
 
 import android.content.Context
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.Looper
 import android.view.Surface
 import androidx.annotation.OptIn
@@ -19,8 +20,11 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder
 import androidx.media3.exoplayer.upstream.DefaultAllocator
 import androidx.media3.exoplayer.video.VideoFrameMetadataListener
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.android.asCoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.maocide.undeadwallpaper.model.PlaybackMode
@@ -44,99 +48,85 @@ class WallpaperPlayer(
 
     private var player: ExoPlayer? = null
     private var playerListener: Player.Listener? = null
+    private val playbackThread = HandlerThread("ExoPlaybackThread").apply { start() }
+    val playbackDispatcher: CoroutineDispatcher = Handler(playbackThread.looper).asCoroutineDispatcher("ExoPlaybackDispatcher")
+    private val playbackScope = CoroutineScope(SupervisorJob() + playbackDispatcher)
 
     private var recoveryAttempts = 0
 
     // Expose just enough surface area for UndeadWallpaperService to use
 
-    val duration: Long
-        get() = player?.duration ?: C.TIME_UNSET
+    suspend fun getDurationSuspend(): Long = kotlinx.coroutines.withContext(playbackDispatcher) {
+        player?.duration ?: C.TIME_UNSET
+    }
 
-    val currentPosition: Long
-        get() = player?.currentPosition ?: 0L
+    suspend fun getCurrentPositionSuspend(): Long = kotlinx.coroutines.withContext(playbackDispatcher) {
+        player?.currentPosition ?: 0L
+    }
 
-    val currentMediaItemIndex: Int
-        get() = player?.currentMediaItemIndex ?: 0
+    suspend fun getPlayWhenReadySuspend(): Boolean = kotlinx.coroutines.withContext(playbackDispatcher) {
+        player?.playWhenReady ?: false
+    }
 
-    var playWhenReady: Boolean
-        get() = player?.playWhenReady ?: false
-        set(value) {
-            player?.playWhenReady = value
-        }
+    fun setPlayWhenReadyAsync(playWhenReady: Boolean) = playbackScope.launch {
+        player?.playWhenReady = playWhenReady
+    }
 
-    var videoScalingMode: Int
-        @OptIn(UnstableApi::class)
-        get() = player?.videoScalingMode ?: C.VIDEO_SCALING_MODE_DEFAULT
-        @OptIn(UnstableApi::class)
-        set(value) {
-            player?.videoScalingMode = value
-        }
+
+
+    @OptIn(UnstableApi::class)
+    fun setVideoScalingModeAsync(mode: Int) = playbackScope.launch {
+        player?.videoScalingMode = mode
+    }
 
     val isPlaybackThreadAlive: Boolean
         @OptIn(UnstableApi::class)
         get() = player?.playbackLooper?.thread?.isAlive ?: false
 
-    @OptIn(UnstableApi::class)
-    fun setMediaSources(mediaSources: List<MediaSource>) {
+    @OptIn(androidx.media3.common.util.UnstableApi::class)
+    fun setMediaSourcesAsync(mediaSources: List<androidx.media3.exoplayer.source.MediaSource>) = playbackScope.launch {
         player?.setMediaSources(mediaSources)
     }
 
-    @OptIn(UnstableApi::class)
-    fun setMediaSource(mediaSource: MediaSource) {
-        player?.setMediaSource(mediaSource)
-    }
-
-    fun seekTo(positionMs: Long) {
+    fun seekToAsync(positionMs: Long) = playbackScope.launch {
         player?.seekTo(positionMs)
     }
 
-    fun seekTo(mediaItemIndex: Int, positionMs: Long) {
+    fun seekToAsync(mediaItemIndex: Int, positionMs: Long) = playbackScope.launch {
         player?.seekTo(mediaItemIndex, positionMs)
     }
 
-    fun seekToDefaultPosition() {
+    fun seekToDefaultPositionAsync() = playbackScope.launch {
         player?.seekToDefaultPosition()
     }
 
-    fun setVideoSurface(surface: Surface) {
+    fun setVideoSurfaceAsync(surface: android.view.Surface) = playbackScope.launch {
         player?.setVideoSurface(surface)
     }
 
-    fun prepare() {
+    fun prepareAsync() = playbackScope.launch {
         player?.prepare()
     }
 
-    fun play() {
+    fun playAsync() = playbackScope.launch {
         player?.play()
     }
 
-    fun pause() {
+    fun pauseAsync() = playbackScope.launch {
         player?.pause()
     }
 
-    fun setRepeatMode(mode: Int) {
+    fun setRepeatModeAsync(mode: Int) = playbackScope.launch {
         player?.repeatMode = mode
     }
 
-    fun getPlayerInstance(): Player? {
-        return player
+    fun applyNonVisualSettingsAsync(volume: Float, speed: Float) = playbackScope.launch {
+        player?.volume = volume
+        player?.setPlaybackSpeed(speed)
     }
 
-    /**
-     * Atomic replace + prepare for skipping chunks.
-     * Loads newMediaSources, attaches them as the sole media list,
-     * seeks to media index 0 position 0, prepares, and returns.
-     * Preserves volume, speed, repeat/shuffle mode, and decoder instances.
-     */
-    @OptIn(UnstableApi::class)
-    fun loadAndPlayNewChunk(newMediaSources: List<MediaSource>) {
-        val p = player ?: return
-
-        p.setMediaSources(newMediaSources)
-        p.seekTo(0, 0L)
-        p.prepare()
-
-        // We do NOT set playWhenReady here. The Engine handles that based on visibility.
+    fun getPlayerInstance(): androidx.media3.common.Player? {
+        return player
     }
 
     /**
@@ -179,7 +169,7 @@ class WallpaperPlayer(
         }
 
         player = ExoPlayer.Builder(context, renderersFactory)
-            .setLooper(Looper.getMainLooper())
+            .setLooper(playbackThread.looper)
             .setLoadControl(loadControl)
             .setSeekParameters(SeekParameters.NEXT_SYNC)
             .build()
@@ -282,8 +272,8 @@ class WallpaperPlayer(
                 addListener(playerListener!!)
 
                 if (surface != null) {
-                    setVideoSurface(surface)
-                    prepare()
+                    this.setVideoSurface(surface)
+                    this.prepare()
                 }
             }
     }
@@ -302,5 +292,18 @@ class WallpaperPlayer(
             p.release()
         }
         player = null
+    }
+
+    fun initializeAsync(
+        surface: Surface?,
+        initialVolume: Float,
+        speed: Float,
+        playbackMode: PlaybackMode
+    ) = playbackScope.launch {
+        initialize(surface, initialVolume, speed, playbackMode)
+    }
+
+    fun releaseAsync() = playbackScope.launch {
+        release()
     }
 }

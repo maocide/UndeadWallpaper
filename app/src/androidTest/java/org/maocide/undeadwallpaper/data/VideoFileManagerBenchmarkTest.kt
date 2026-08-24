@@ -16,9 +16,9 @@ class VideoFileManagerBenchmarkTest {
     private val TAG = "VideoFileManagerBenchmark"
 
     @Test
-    fun benchmarkLoadRecentFiles() {
+    fun benchmarkLoadRecentFiles() = kotlinx.coroutines.runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val videoFileManager = VideoFileManager(context)
+        val videoFileManager = org.maocide.undeadwallpaper.data.VideoFileManager(context)
 
         // 1. Setup: Clean up existing videos
         val videosDir = File(context.getExternalFilesDir(android.os.Environment.DIRECTORY_MOVIES), "videos")
@@ -30,21 +30,25 @@ class VideoFileManagerBenchmarkTest {
 
         // 2. Setup: Create multiple video files (20 copies)
         val copyCount = 20
+        val prefs = org.maocide.undeadwallpaper.data.PreferencesManager(context)
+        val settingsList = mutableListOf<org.maocide.undeadwallpaper.model.VideoSettings>()
+        
         for (i in 0 until copyCount) {
-            val fileName = "benchmark_video_$i.mp4"
-            videoFileManager.createDefaultFileFromResource(org.maocide.undeadwallpaper.R.raw.zombillie_default, fileName)
+            val file = videoFileManager.createDefaultFileFromResource(org.maocide.undeadwallpaper.R.raw.zombillie_default)
+            if (file != null) {
+                settingsList.add(org.maocide.undeadwallpaper.model.VideoSettings(fileName = file.name, expectedFileSize = file.length()))
+            }
         }
+        prefs.savePlaylistSettings(settingsList)
 
         // 3. Measure
         val startTime = System.nanoTime()
-        val recentFiles = kotlinx.coroutines.runBlocking {
-             videoFileManager.loadRecentFiles()
-        }
+        val recentFiles = videoFileManager.loadRecentFiles()
         val endTime = System.nanoTime()
 
         // 4. Report
         val durationMs = (endTime - startTime) / 1_000_000
-        Log.i(TAG, "Benchmark: loadRecentFiles took $durationMs ms for $copyCount files")
+        android.util.Log.i(TAG, "Benchmark: loadRecentFiles took $durationMs ms for $copyCount files")
         println("Benchmark: loadRecentFiles took $durationMs ms for $copyCount files")
 
         // 5. Verify

@@ -26,3 +26,6 @@ local.properties
 
 # Local configuration
 local.properties
+
+# R8 / Proguard Mapping Files
+**/mapping.txt
