@@ -14,7 +14,7 @@
     <string name="trim_video">ビデオをトリミング</string>
     <string name="setting_audio_enabled">オーディオを有効にする</string>
     <string name="playback_mode_setting">再生モード</string>
-    <string name="recent_files">プレイリスト / 最近のファイル</string>
+    <string name="recent_files">プレイリスト</string>
     <string name="playlist_instructions">長押しで順序変更、左右にスワイプで外す</string>
     <string name="apply_trim">適用</string>
     <string name="wallpaper_description">ビデオを再生するライブ壁紙です。</string>
@@ -81,7 +81,8 @@
 
     <!-- UI Headers & Sections -->
     <string name="custom_settings_header">カスタム設定</string>
-    <string name="importing_video">動画をインポート中</string>
+    <string name="importing_video">新しいファイルに侵食中</string>
+    <string name="preparing_assets">アンデッドを覚醒中</string>
     <string name="positioning_header">配置</string>
     <string name="general_header">一般</string>
     <string name="volume_label">音量</string>
@@ -131,10 +132,16 @@
     <string name="log_cleared_toast">ログファイルがクリアされました</string>
 
     <!-- Parallax -->
-    <string name="parallax_icon_description">実験的機能</string>
-    <string name="parallax_card_title">視差効果（実験的）</string>
+    <string name="parallax_icon_description">視差効果</string>
+    <string name="parallax_card_title">視差効果</string>
     <string name="parallax_toggle_label">ホーム画面の視差効果</string>
     <string name="parallax_description">ページをスワイプすると動画が連動して動きます。動画を少しズームインして黒い縁を隠してください。注意：一部のカスタムランチャーではサポートされていません。</string>
     <string name="parallax_strength_label">視差効果の強さ</string>
 
+
+    <string name="mirror_video">動画を反転</string>
+    <string name="flip_horizontal">水平</string>
+    <string name="flip_vertical">垂直</string>
+    <string name="error_file_too_large">選択した動画が500 MBの制限を超えています。</string>
+    <string name="warning_status_bar_oem">一部のランチャーではサポートされていない場合があります。</string>
 </resources>

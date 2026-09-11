@@ -13,6 +13,9 @@ import org.maocide.undeadwallpaper.model.StartTime
 import org.maocide.undeadwallpaper.model.StatusBarColor
 import org.maocide.undeadwallpaper.service.UndeadWallpaperService
 import org.maocide.undeadwallpaper.utils.FileLogger
+import org.maocide.undeadwallpaper.utils.preventDoubleInput
+import org.maocide.undeadwallpaper.utils.setSafeOnClickListener
+import java.io.File
 
 import android.Manifest
 import android.app.Activity
@@ -22,7 +25,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
-import android.media.MediaMetadataRetriever
+import org.maocide.undeadwallpaper.utils.MediaAnalyzer
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -70,15 +73,22 @@ class SettingsFragment : Fragment() {
     private var _binding: FragmentSettingsBinding? = null
     private val binding get() = _binding!!
     private val tag: String = javaClass.simpleName
+    private var brainsTapCount = 0
+    private var targetTapCount = 0
+    private var lastBrainsTapTime = 0L
     private lateinit var preferencesManager: PreferencesManager
     private lateinit var videoFileManager: VideoFileManager
     private lateinit var recentFilesAdapter: RecentFilesAdapter
     private val recentFiles = mutableListOf<RecentFile>()
-    private var currentVideoDurationMs: Long = 0L
     private var previewPlayer: ExoPlayer? = null
     private var randomStartTimeWarned = false
     private var isUpdatingUi = false
     private var hasWarnedAboutGestures = false
+    private var statusBarColorWarned = false
+    private var currentPage = 0
+    private var engineSyncJob: kotlinx.coroutines.Job? = null
+    private var undeadActivationJob: kotlinx.coroutines.Job? = null
+    private var lastUpdateVideoSourceTime = 0L
 
     // Initialize the shared ViewModel
     private val sharedViewModel: SettingsViewModel by activityViewModels()
@@ -93,57 +103,23 @@ class SettingsFragment : Fragment() {
         }
     }
 
-    companion object { // key for bundle in restoring instance state
-        private const val KEY_ADVANCED_EXPANDED = "key_advanced_expanded"
+    companion object {
+        private const val DEBOUNCE_PAGINATION_MS = 500L
+        private const val DEBOUNCE_MANUAL_TAP_MS = 300L
     }
 
 
     /**
      * Launcher for picking media from the file system.
      */
-    private val pickMediaLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            result.data?.data?.let { uri ->
-                handleSelectedMedia(uri)
+    private val pickMediaLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                result.data?.data?.let { uri ->
+                    handleSelectedMedia(uri)
+                }
             }
         }
-    }
-
-    /**
-     * Retrieves the duration of a video from its URI.
-     * @param uri The URI of the video.
-     * @return The duration in milliseconds, or 0L if it cannot be determined.
-     */
-    private suspend fun getVideoDuration(uri: Uri): Long = withContext(Dispatchers.IO) {
-        return@withContext try {
-            val retriever = MediaMetadataRetriever()
-            retriever.setDataSource(context, uri)
-            val durationString = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
-            retriever.release()
-            durationString?.toLong() ?: 0L
-        } catch (e: Exception) {
-            if (BuildConfig.DEBUG) {
-                FileLogger.e(tag, "Failed to get video duration for URI: $uri", e)
-            } else {
-                FileLogger.e(tag, "Failed to get video duration", e)
-            }
-            0L
-        }
-    }
-
-    /**
-     * Launcher for requesting permissions.
-     */
-    private val requestPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        if (isGranted) {
-            FileLogger.d(tag, "Permission granted by user.")
-            openFilePicker()
-        } else {
-            FileLogger.d(tag, "Permission denied by user.")
-        }
-    }
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -182,7 +158,15 @@ class SettingsFragment : Fragment() {
      * @param uri The URI of the new video file.
      * @param forceChange Weather to send a broadcast to the service to cause a video reload.
      */
-    private suspend fun updateVideoSource(uri: Uri, forceChange: Boolean) {
+    private suspend fun updateVideoSource(uri: Uri, forceChange: Boolean, isManualTap: Boolean = false) {
+        val currentTime = System.currentTimeMillis()
+        val debounceThreshold = if (isManualTap) DEBOUNCE_MANUAL_TAP_MS else DEBOUNCE_PAGINATION_MS
+        if (currentTime - lastUpdateVideoSourceTime < debounceThreshold) {
+            // FileLogger.w(tag, "updateVideoSource debounced! Ignoring rapid clicks.")
+            return
+        }
+        lastUpdateVideoSourceTime = currentTime
+
         // Clear any previous trimming data
         preferencesManager.removeClippingTimes()
 
@@ -194,13 +178,6 @@ class SettingsFragment : Fragment() {
             recentFilesAdapter.currentVideoUriString = uri.toString()
             recentFilesAdapter.notifyDataSetChanged()
         }
-
-        // Get duration and update UI
-        currentVideoDurationMs = getVideoDuration(uri)
-        if (currentVideoDurationMs == 0L) {
-            Toast.makeText(context, R.string.error_could_not_read_video_duration, Toast.LENGTH_LONG).show()
-        }
-
         // Only spawn a new player if the user actively clicked
         // If the app is booting up, onResume will handle it
         if (isResumed) {
@@ -208,7 +185,7 @@ class SettingsFragment : Fragment() {
         }
 
         // Save the preference and notify the service to reload the video from that value
-        if(forceChange) {
+        if (forceChange) {
             preferencesManager.saveActiveVideoUri(uri.toString())
             val intent = Intent(UndeadWallpaperService.ACTION_VIDEO_URI_CHANGED).apply {
                 setPackage(context?.packageName)
@@ -230,11 +207,13 @@ class SettingsFragment : Fragment() {
             onItemClick = { recentFile ->
                 val fileUri = Uri.fromFile(recentFile.file)
                 viewLifecycleOwner.lifecycleScope.launch {
-                    updateVideoSource(fileUri, true)
+                    engineSyncJob?.cancel() // Prevent debounced page load from overriding manual selection
+                    updateVideoSource(fileUri, true, isManualTap = true)
                 }
             },
             onSettingsClick = { recentFile ->
-                val bottomSheet = VideoSettingsSheet.newInstance(recentFile.file.name, recentFile.getFormattedMetadata())
+                val bottomSheet =
+                    VideoSettingsSheet.newInstance(recentFile.file.name, recentFile.getFormattedMetadata())
                 bottomSheet.show(childFragmentManager, "VideoSettingsBottomSheet")
             }
         )
@@ -261,9 +240,12 @@ class SettingsFragment : Fragment() {
                 val item = recentFilesAdapter.getItems()[position]
 
                 if (recentFilesAdapter.itemCount <= 1) {
-                    Toast.makeText(context, getString(R.string.error_cannot_remove_last_video), Toast.LENGTH_SHORT).show()
-                    recentFilesAdapter.notifyItemChanged(position)
-                    return
+                    if (currentPage == 0) {
+                        Toast.makeText(context, getString(R.string.error_cannot_remove_last_video), Toast.LENGTH_SHORT)
+                            .show()
+                        recentFilesAdapter.notifyItemChanged(position)
+                        return
+                    }
                 }
 
                 val settings = preferencesManager.getVideoSettings(item.file.name)
@@ -272,7 +254,8 @@ class SettingsFragment : Fragment() {
                     .setMessage(getString(R.string.remove_file_message, settings.getEffectiveDisplayName()))
                     .setPositiveButton(getString(R.string.remove_action)) { _, _ ->
                         val deletedUriString = Uri.fromFile(item.file).toString()
-                        val uiSelectedUriString = sharedViewModel.selectedVideoUri?.toString() ?: preferencesManager.getActiveVideoUri()
+                        val uiSelectedUriString =
+                            sharedViewModel.selectedVideoUri?.toString() ?: preferencesManager.getActiveVideoUri()
                         val backgroundActiveUriString = preferencesManager.getActiveVideoUri()
 
                         // Remove from adapter safely using the object reference
@@ -281,9 +264,12 @@ class SettingsFragment : Fragment() {
                         // Delete physical file and thumbnail
                         if (item.file.exists()) {
                             item.file.delete()
-                            
+
                             // Clean up cached thumbnail
-                            val thumbnailsDir = java.io.File(requireContext().getExternalFilesDir(android.os.Environment.DIRECTORY_MOVIES), "thumbnails")
+                            val thumbnailsDir = java.io.File(
+                                requireContext().getExternalFilesDir(android.os.Environment.DIRECTORY_MOVIES),
+                                "thumbnails"
+                            )
                             val thumbnailFile = java.io.File(thumbnailsDir, "${item.file.nameWithoutExtension}.jpg")
                             if (thumbnailFile.exists()) {
                                 thumbnailFile.delete()
@@ -293,31 +279,56 @@ class SettingsFragment : Fragment() {
                         // Save new list order
                         saveCurrentPlaylistOrder()
 
-                        // Edge case: User deleted the currently UI-highlighted video, OR the video actively playing in the background
-                        if (deletedUriString == uiSelectedUriString || deletedUriString == backgroundActiveUriString) {
-                            val nextItem = recentFilesAdapter.getItems().firstOrNull()
-                            if (nextItem != null) {
-                                val newUri = Uri.fromFile(nextItem.file)
-                                viewLifecycleOwner.lifecycleScope.launch {
-                                    updateVideoSource(newUri, true)
-                                }
-                            } else {
-                                // Fallback if list is entirely empty (shouldn't happen due to 1 video at least enforced)
-                                viewLifecycleOwner.lifecycleScope.launch {
-                                    ensureDefaultVideoExists()
-                                    val defaultUri = preferencesManager.getActiveVideoUri()
-                                    if (defaultUri != null) {
-                                        updateVideoSource(defaultUri.toUri(), true)
+                        val wasActive =
+                            (deletedUriString == uiSelectedUriString || deletedUriString == backgroundActiveUriString)
+
+                        if (recentFilesAdapter.itemCount == 0) {
+                            // Current page is now empty -> reload to let collapseEmptyPages bring higher pages down
+                            viewLifecycleOwner.lifecycleScope.launch {
+                                engineSyncJob?.cancel()
+                                loadRecentFiles()
+                                val reloadedNextItem = recentFilesAdapter.getItems().firstOrNull()
+
+                                if (reloadedNextItem != null) {
+                                    // Higher page collapsed down to currentPage!
+                                    if (wasActive) {
+                                        updateVideoSource(Uri.fromFile(reloadedNextItem.file), true, isManualTap = true)
+                                    } else {
+                                        val intent = Intent(UndeadWallpaperService.ACTION_PLAYLIST_REORDERED).apply {
+                                            setPackage(requireContext().packageName)
+                                        }
+                                        requireContext().applicationContext.sendBroadcast(intent)
+                                    }
+                                } else {
+                                    // Truly empty page, navigate to previous page
+                                    if (currentPage > 0) {
+                                        changePage(currentPage - 1, slideRight = false)
+                                    } else {
+                                        // Fallback if list is entirely empty (shouldn't happen due to 1 video at least enforced)
+                                        preferencesManager.saveActiveVideoUri("")
+                                        ensureDefaultVideoExists()
+                                        val defaultUri = preferencesManager.getActiveVideoUri()
+                                        if (defaultUri != null) {
+                                            updateVideoSource(defaultUri.toUri(), true, isManualTap = true)
+                                            loadRecentFiles()
+                                        }
                                     }
                                 }
+                                updatePaginationUI()
                             }
                         } else {
-                            // If we deleted an inactive video, we MUST still notify the service that the playlist changed.
-                            // Otherwise, the background service's chunk loader might try to buffer the physically deleted file!
-                            val intent = Intent(UndeadWallpaperService.ACTION_PLAYLIST_REORDERED).apply {
-                                setPackage(requireContext().packageName)
+                            if (wasActive) {
+                                val nextItem = recentFilesAdapter.getItems().first()
+                                viewLifecycleOwner.lifecycleScope.launch {
+                                    updateVideoSource(Uri.fromFile(nextItem.file), true, isManualTap = true)
+                                }
+                            } else {
+                                val intent = Intent(UndeadWallpaperService.ACTION_PLAYLIST_REORDERED).apply {
+                                    setPackage(requireContext().packageName)
+                                }
+                                requireContext().applicationContext.sendBroadcast(intent)
                             }
-                            requireContext().applicationContext.sendBroadcast(intent)
+                            updatePaginationUI()
                         }
                     }
                     .setNegativeButton(getString(R.string.cancel)) { dialog, _ ->
@@ -359,49 +370,68 @@ class SettingsFragment : Fragment() {
         val currentFileNames = recentFilesAdapter.getItems().map { it.file.name }
         val currentSettings = preferencesManager.getPlaylistSettings()
 
+        // Settings for other pages
+        val otherPagesSettings = currentSettings.filter { it.page != currentPage }
+
         // Build an indexed map: O(N) complexity
         val settingsMap = currentSettings.associateBy { it.fileName }
 
         // Lookups are now O(1), making the whole block O(N) instead of O(N^2)
-        val newSettingsList = currentFileNames.mapNotNull { settingsMap[it] }
+        val currentPageSettings = currentFileNames.mapNotNull { settingsMap[it] }
 
-        preferencesManager.savePlaylistSettings(newSettingsList)
+        val newSettingsList = otherPagesSettings + currentPageSettings
+
+        preferencesManager.savePlaylistSettings(newSettingsList.sortedBy { it.page })
     }
 
     /**
      * Loads the list of recent files and updates the RecyclerView.
      */
     private suspend fun loadRecentFiles() {
-        viewLifecycleOwner.lifecycleScope.launch {
-            val files = withContext(Dispatchers.IO) {
-                videoFileManager.loadRecentFiles()
-            }
-            recentFiles.clear()
-            recentFiles.addAll(files)
-            recentFilesAdapter.notifyDataSetChanged()
+        val files = withContext(Dispatchers.IO) {
+            videoFileManager.loadRecentFiles()
         }
+
+        val settings = preferencesManager.getPlaylistSettings()
+        val filesOnPage = settings.filter { it.page == currentPage }.map { it.fileName }.toSet()
+        val filteredFiles = files.filter { it.file.name in filesOnPage }
+
+        recentFiles.clear()
+        recentFiles.addAll(filteredFiles)
+
+        val currentUri = sharedViewModel.selectedVideoUri?.toString() ?: preferencesManager.getActiveVideoUri()
+        recentFilesAdapter.currentVideoUriString = currentUri
+
+        if (recentFiles.isEmpty()) {
+            binding.recyclerViewRecentFiles.visibility = android.view.View.GONE
+            binding.layoutEmptyPlaylist.visibility = android.view.View.VISIBLE
+        } else {
+            binding.recyclerViewRecentFiles.visibility = android.view.View.VISIBLE
+            binding.layoutEmptyPlaylist.visibility = android.view.View.GONE
+        }
+
+        recentFilesAdapter.notifyDataSetChanged()
+        binding.recyclerViewRecentFiles.scheduleLayoutAnimation()
+        updatePaginationUI()
     }
 
-    /**
-     * Checks if we need to copy the default video.
-     * specific to Dispatchers.IO to keep UI smooth.
-     */
-    private suspend fun ensureDefaultVideoExists() = withContext(Dispatchers.IO) {
-        if (preferencesManager.getActiveVideoUri() == null) {
-            val defaultFile = videoFileManager.createDefaultFileFromResource(R.raw.zombillie_default)
+    private suspend fun ensureDefaultVideoExists() {
+        if (preferencesManager.getActiveVideoUri().isNullOrEmpty()) {
+            withLoadingOverlay(getString(R.string.preparing_assets), cancellable = false) {
+                withContext(Dispatchers.IO) {
+                    val defaultFile = videoFileManager.createDefaultFileFromResource(R.raw.zombillie_default)
 
-            if (defaultFile != null) {
-                val defaultFileName = getString(R.string.default_video_filename)
-                preferencesManager.updateVideoSettings(defaultFile.name) {
-                    it.copy(displayName = defaultFileName, expectedFileSize = defaultFile.length())
-                }
-                val defaultUri = Uri.fromFile(defaultFile)
-                // Switch back to Main thread to update Prefs safely
-                withContext(Dispatchers.Main) {
-                    preferencesManager.saveActiveVideoUri(defaultUri.toString())
-                    // Force the UI to load this new video
-                    // No forceChange, since the live wallpaper service hasn't actually been started yet
-                    updateVideoSource(defaultUri, forceChange = false)
+                    if (defaultFile != null) {
+                        val defaultFileName = getString(R.string.default_video_filename)
+                        preferencesManager.updateVideoSettings(defaultFile.name) {
+                            it.copy(displayName = defaultFileName, expectedFileSize = defaultFile.length())
+                        }
+                        val defaultUri = Uri.fromFile(defaultFile)
+                        withContext(Dispatchers.Main) {
+                            preferencesManager.saveActiveVideoUri(defaultUri.toString())
+                            updateVideoSource(defaultUri, forceChange = false)
+                        }
+                    }
                 }
             }
         }
@@ -412,11 +442,11 @@ class SettingsFragment : Fragment() {
      * Calling this BEFORE listeners prevents accidental triggers.
      */
     private suspend fun syncUiState() {
-
         // SET to avoid overriding
         isUpdatingUi = true
 
         try {
+            currentPage = preferencesManager.getActivePage()
 
             // Playback Mode
             when (preferencesManager.getPlaybackMode()) {
@@ -438,6 +468,14 @@ class SettingsFragment : Fragment() {
                 StatusBarColor.AUTO -> binding.statusBarColorGroup.check(binding.statusBarAuto.id)
                 StatusBarColor.DARK -> binding.statusBarColorGroup.check(binding.statusBarDark.id)
                 StatusBarColor.LIGHT -> binding.statusBarColorGroup.check(binding.statusBarLight.id)
+            }
+
+            // Expand global settings accordion if user has customized them
+            if (preferencesManager.getStartTime() != StartTime.RESUME ||
+                preferencesManager.getStatusBarColor() != StatusBarColor.AUTO
+            ) {
+                binding.contentGlobalSettings.visibility = View.VISIBLE
+                binding.iconGlobalSettingsChevron.rotation = 180f
             }
 
             // Load Video Preview and set the video as selected
@@ -473,7 +511,7 @@ class SettingsFragment : Fragment() {
             binding.switchParallax.isChecked = isParallaxEnabled
             binding.sliderParallaxStrength.value = preferencesManager.getParallaxStrength()
             binding.layoutParallaxStrength.visibility = if (isParallaxEnabled) View.VISIBLE else View.GONE
-            
+
             if (isParallaxEnabled) {
                 binding.contentParallax.visibility = View.VISIBLE
                 binding.iconParallaxChevron.rotation = 180f
@@ -526,7 +564,8 @@ class SettingsFragment : Fragment() {
                 startActivity(intent)
             } catch (e: Exception) {
                 FileLogger.e(tag, "Failed to open app info settings", e)
-                Toast.makeText(requireContext(), getString(R.string.error_open_settings_failed), Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), getString(R.string.error_open_settings_failed), Toast.LENGTH_SHORT)
+                    .show()
             }
         }
     }
@@ -541,6 +580,10 @@ class SettingsFragment : Fragment() {
         }
 
         // Playback Mode
+        binding.playbackModeLoop.preventDoubleInput()
+        binding.playbackModeOneshot.preventDoubleInput()
+        binding.playbackModeLoopAll.preventDoubleInput()
+        binding.playbackModeShuffle.preventDoubleInput()
         binding.playbackModeGroup.setOnCheckedStateChangeListener { _, checkedIds ->
             // If nothing is selected, skip
             if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
@@ -564,7 +607,8 @@ class SettingsFragment : Fragment() {
                 sharedViewModel.selectedVideoUri = Uri.parse(highlightedUri)
                 preferencesManager.saveActiveVideoUri(highlightedUri)
             } else {
-                val currentSelectedUri = sharedViewModel.selectedVideoUri?.toString() ?: preferencesManager.getActiveVideoUri()
+                val currentSelectedUri =
+                    sharedViewModel.selectedVideoUri?.toString() ?: preferencesManager.getActiveVideoUri()
                 preferencesManager.saveActiveVideoUri(currentSelectedUri.toString())
             }
 
@@ -572,6 +616,9 @@ class SettingsFragment : Fragment() {
         }
 
         // StartTime preference
+        binding.startTimeRestart.preventDoubleInput()
+        binding.startTimeRandom.preventDoubleInput()
+        binding.startTimeResume.preventDoubleInput()
         binding.startTimeGroup.setOnCheckedStateChangeListener { group, checkedIds ->
             if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
 
@@ -597,6 +644,9 @@ class SettingsFragment : Fragment() {
         }
 
         // StatusBar Color
+        binding.statusBarDark.preventDoubleInput()
+        binding.statusBarLight.preventDoubleInput()
+        binding.statusBarAuto.preventDoubleInput()
         binding.statusBarColorGroup.setOnCheckedStateChangeListener { group, checkedIds ->
             if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
 
@@ -608,6 +658,11 @@ class SettingsFragment : Fragment() {
                 else -> StatusBarColor.AUTO
             }
             preferencesManager.saveStatusBarColor(newMode)
+
+            if (newMode != StatusBarColor.AUTO && !statusBarColorWarned) {
+                Toast.makeText(requireContext(), R.string.warning_status_bar_oem, Toast.LENGTH_SHORT).show()
+                statusBarColorWarned = true
+            }
 
             // Specific intent sent to not reload video
             val intent = Intent(UndeadWallpaperService.ACTION_STATUS_BAR_COLOR_CHANGED).apply {
@@ -629,6 +684,9 @@ class SettingsFragment : Fragment() {
         }
 
         // Double Tap Gesture
+        binding.doubleTapNone.preventDoubleInput()
+        binding.doubleTapPause.preventDoubleInput()
+        binding.doubleTapSkip.preventDoubleInput()
         binding.doubleTapGroup.setOnCheckedStateChangeListener { _, checkedIds ->
             if (isUpdatingUi || checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
 
@@ -651,6 +709,9 @@ class SettingsFragment : Fragment() {
         }
 
         // Triple Tap Gesture
+        binding.tripleTapNone.preventDoubleInput()
+        binding.tripleTapPause.preventDoubleInput()
+        binding.tripleTapSkip.preventDoubleInput()
         binding.tripleTapGroup.setOnCheckedStateChangeListener { _, checkedIds ->
             if (isUpdatingUi || checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
 
@@ -673,6 +734,7 @@ class SettingsFragment : Fragment() {
         }
 
         // Parallax Toggle
+        binding.switchParallax.preventDoubleInput()
         binding.switchParallax.setOnCheckedChangeListener { _, isChecked ->
             if (isUpdatingUi) return@setOnCheckedChangeListener
 
@@ -693,23 +755,35 @@ class SettingsFragment : Fragment() {
         }
 
         // Parallax Strength Slider
-        binding.sliderParallaxStrength.addOnChangeListener { _, value, fromUser ->
-            if (fromUser) {
-                preferencesManager.setParallaxStrength(value)
+        binding.sliderParallaxStrength.addOnSliderTouchListener(object :
+            com.google.android.material.slider.Slider.OnSliderTouchListener {
+            override fun onStartTrackingTouch(slider: com.google.android.material.slider.Slider) {
+                // Do nothing
+            }
+
+            override fun onStopTrackingTouch(slider: com.google.android.material.slider.Slider) {
+                preferencesManager.setParallaxStrength(slider.value)
                 // No need to broadcast here. The Engine reads the preference live
                 // inside onOffsetsChanged(), so the strength updates instantly on next swipe
             }
-        }
+        })
 
         // Accordion Toggles
-        binding.headerTouchControls.setOnClickListener {
+        binding.headerGlobalSettingsChevron.setSafeOnClickListener(debounceMs = 200L) {
+            val isVisible = binding.contentGlobalSettings.visibility == View.VISIBLE
+            android.transition.TransitionManager.beginDelayedTransition(binding.root as android.view.ViewGroup)
+            binding.contentGlobalSettings.visibility = if (isVisible) View.GONE else View.VISIBLE
+            binding.iconGlobalSettingsChevron.animate().rotation(if (isVisible) 0f else 180f).setDuration(200).start()
+        }
+
+        binding.headerTouchControls.setSafeOnClickListener(debounceMs = 200L) {
             val isVisible = binding.contentTouchControls.visibility == View.VISIBLE
             android.transition.TransitionManager.beginDelayedTransition(binding.root as android.view.ViewGroup)
             binding.contentTouchControls.visibility = if (isVisible) View.GONE else View.VISIBLE
             binding.iconTouchChevron.animate().rotation(if (isVisible) 0f else 180f).setDuration(200).start()
         }
 
-        binding.headerParallax.setOnClickListener {
+        binding.headerParallax.setSafeOnClickListener(debounceMs = 200L) {
             val isVisible = binding.contentParallax.visibility == View.VISIBLE
             android.transition.TransitionManager.beginDelayedTransition(binding.root as android.view.ViewGroup)
             binding.contentParallax.visibility = if (isVisible) View.GONE else View.VISIBLE
@@ -717,58 +791,163 @@ class SettingsFragment : Fragment() {
         }
 
         // Video Picker
-        binding.buttonPickVideo.setOnClickListener {
-            checkPermissionAndOpenFilePicker()
+        binding.buttonPickVideo.setSafeOnClickListener {
+            openFilePicker()
         }
-        binding.cardVideoPreview.setOnClickListener {
-            checkPermissionAndOpenFilePicker()
+        binding.cardVideoPreview.setSafeOnClickListener {
+            openFilePicker()
         }
 
+        binding.btnPrevPage.setSafeOnClickListener(debounceMs = 250L) {
+            changePage(
+                currentPage - 1,
+                slideRight = false
+            )
+        }
+        binding.btnNextPage.setSafeOnClickListener(debounceMs = 250L) { changePage(currentPage + 1, slideRight = true) }
+        binding.btnAddToPlaylist.setSafeOnClickListener { openFilePicker() }
+        binding.layoutEmptyPlaylist.setSafeOnClickListener { openFilePicker() }
+        binding.tvPageNumber.setSafeOnClickListener(debounceMs = 150L) { showPaginationDropdown() }
+
+        binding.tvBrains.setSafeOnClickListener(debounceMs = 0L) { view ->
+            val now = System.currentTimeMillis()
+            if (now - lastBrainsTapTime > 1100L) {
+                brainsTapCount = 0
+                undeadActivationJob?.cancel()
+                setUndeadState(false)
+            }
+            lastBrainsTapTime = now
+
+            view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+
+            undeadActivationJob?.cancel()
+
+            if (brainsTapCount == 0) {
+                targetTapCount = (6..9).random()
+
+                val loreMessage = when (targetTapCount) {
+                    6 -> "Specimen six exhibiting autonomous motor reflexes. 🧬"
+                    7 -> "Quarantine breach logged in sector seven. ☣︎"
+                    8 -> "Administering eight milligrams of formaldehyde. 💉"
+                    9 -> "Sub-level nine isolation protocol active. 🕸"
+                    else -> "Cellular decay anomaly detected. 🦠"
+                }
+
+                Toast.makeText(requireContext(), loreMessage, Toast.LENGTH_SHORT).show()
+            }
+
+            brainsTapCount++
+
+            if (brainsTapCount == targetTapCount) {
+                undeadActivationJob = viewLifecycleOwner.lifecycleScope.launch {
+                    kotlinx.coroutines.delay(1000)
+                    Toast.makeText(requireContext(), "you walk with the undead.", Toast.LENGTH_SHORT).show()
+                    setUndeadState(true)
+                    brainsTapCount = 0
+                }
+            } else if (brainsTapCount > targetTapCount) {
+                if (brainsTapCount == targetTapCount + 1) {
+                    Toast.makeText(requireContext(), "Containment restored.", Toast.LENGTH_SHORT).show()
+                    setUndeadState(false)
+                }
+            }
+        }
+    }
+
+    private fun setUndeadState(isActive: Boolean) {
+        preferencesManager.setUndead(isActive)
+        if (!isActive) {
+            preferencesManager.saveLoggingEnabled(false)
+            FileLogger.setLoggingEnabled(false)
+        }
+        updateActionBarTitle()
+    }
+
+    private fun updatePaginationUI() {
+        if (_binding == null) return
+        binding.tvPageNumber.text = String.format("%02d", currentPage + 1)
+
+        binding.btnPrevPage.isEnabled = currentPage > 0
+        binding.btnPrevPage.alpha = if (currentPage > 0) 1.0f else 0.3f
+
+        val settings = preferencesManager.getPlaylistSettings()
+        val hasItemsOnCurrentPage = settings.any { it.page == currentPage }
+
+        binding.btnNextPage.isEnabled = hasItemsOnCurrentPage
+        binding.btnNextPage.alpha = if (hasItemsOnCurrentPage) 1.0f else 0.3f
+    }
+
+    private fun showPaginationDropdown() {
+        val settings = preferencesManager.getPlaylistSettings()
+        val maxPage = settings.maxOfOrNull { it.page } ?: 0
+        val targetMaxPage = if (settings.any { it.page == maxPage }) maxPage + 1 else maxPage
+
+        val popup = android.widget.PopupMenu(requireContext(), binding.tvPageNumber)
+        for (i in 0..targetMaxPage) {
+            val title = if (i == targetMaxPage && i > 0 && settings.none { it.page == i }) {
+                "Slot ${String.format("%02d", i + 1)} (New)"
+            } else {
+                "Slot ${String.format("%02d", i + 1)}"
+            }
+            popup.menu.add(0, i, 0, title)
+        }
+
+        popup.setOnMenuItemClickListener { item ->
+            val targetPage = item.itemId
+            val slideRight = targetPage > currentPage
+            changePage(targetPage, slideRight)
+            true
+        }
+        popup.show()
     }
 
     /**
-     * Checks for storage permissions and opens the file picker.
-     * This function is carefully designed to handle the different permission models
-     * across various Android versions.
+     * Checks whether the currently selected active video actually exists on disk
+     * and is registered in the playlist settings. Runs safely on Dispatchers.IO.
      */
-    private fun checkPermissionAndOpenFilePicker() {
-        // We define the permission we need based on the Android version.
-        // Build.VERSION.SDK_INT is the API level of the device's OS.
-        val permission =
-            // For Android 13 (TIRAMISU, API 33) and higher, we need READ_MEDIA_VIDEO.
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                Manifest.permission.READ_MEDIA_VIDEO
-            }
-            // For all older versions (Android 12L and below), we use the classic storage permission.
-            else {
-                Manifest.permission.READ_EXTERNAL_STORAGE
-            }
+    private suspend fun isCurrentVideoValid(): Boolean = withContext(Dispatchers.IO) {
+        val currentUriString = sharedViewModel.selectedVideoUri?.toString()
+            ?: preferencesManager.getActiveVideoUri()
+        if (currentUriString.isNullOrEmpty() || currentUriString == "null") return@withContext false
 
-        // Now, we check if we already have the permission.
-        when {
-            // If the permission is already granted, we can proceed directly.
-            ContextCompat.checkSelfPermission(requireContext(), permission) == PackageManager.PERMISSION_GRANTED -> {
-                if (BuildConfig.DEBUG) {
-                    FileLogger.d(tag, "Permission '$permission' already granted. Opening picker.")
-                } else {
-                    FileLogger.d(tag, "Permission already granted. Opening picker.")
+        val path = currentUriString.toUri().path ?: return@withContext false
+        val file = File(path)
+        if (!file.exists() || !file.isFile) return@withContext false
+
+        val settings = preferencesManager.getPlaylistSettings()
+        settings.any { it.fileName == file.name }
+    }
+
+    private fun changePage(newPage: Int, slideRight: Boolean) {
+        if (newPage == currentPage) return
+        currentPage = newPage
+        preferencesManager.saveActivePage(currentPage)
+        updatePaginationUI()
+
+        val animRes = if (slideRight) R.anim.layout_anim_slide_right else R.anim.layout_anim_slide_left
+        val controller = android.view.animation.AnimationUtils.loadLayoutAnimation(requireContext(), animRes)
+        binding.recyclerViewRecentFiles.layoutAnimation = controller
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            loadRecentFiles()
+        }
+
+        // Engine sync: ONLY auto-select if the current active video is missing, deleted, or invalid
+        engineSyncJob?.cancel()
+        engineSyncJob = viewLifecycleOwner.lifecycleScope.launch {
+            if (!isCurrentVideoValid()) {
+                val settings = preferencesManager.getPlaylistSettings()
+                if (settings.any { it.page == currentPage }) {
+                    val firstFileOnPage = withContext(Dispatchers.IO) {
+                        val files = videoFileManager.loadRecentFiles()
+                        val filesOnPage = settings.filter { it.page == currentPage }.map { it.fileName }.toSet()
+                        files.firstOrNull { it.file.name in filesOnPage }
+                    }
+                    if (firstFileOnPage != null) {
+                        // Automatically sync the first video on the page and broadcast URI change
+                        updateVideoSource(android.net.Uri.fromFile(firstFileOnPage.file), true, isManualTap = true)
+                    }
                 }
-                openFilePicker()
-            }
-            // If we want to show a popup explaining why we need the permission.
-            // For now, we'll just request it directly.
-            shouldShowRequestPermissionRationale(permission) -> {
-                FileLogger.d(tag, "Showing rationale for permission request.")
-                requestPermissionLauncher.launch(permission)
-            }
-            // If we don't have the permission, we launch the request.
-            else -> {
-                if (BuildConfig.DEBUG) {
-                    FileLogger.d(tag, "Requesting permission: $permission")
-                } else {
-                    FileLogger.d(tag, "Requesting permission")
-                }
-                requestPermissionLauncher.launch(permission)
             }
         }
     }
@@ -778,6 +957,12 @@ class SettingsFragment : Fragment() {
      * Opens the file picker for selecting a video.
      */
     private fun openFilePicker() {
+        val act = activity ?: return
+        if (!act.hasWindowFocus()) {
+            FileLogger.d(tag, "openFilePicker deferred: window focus transition")
+            return
+        }
+
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
             type = "video/*"
@@ -815,106 +1000,82 @@ class SettingsFragment : Fragment() {
             FileLogger.w(tag, "Failed to take persistable URI permission. Proceeding with copy anyway.", e)
         }
 
-        // Metadata check in coroutine
+        // Ingestion in coroutine
         viewLifecycleOwner.lifecycleScope.launch {
-            // Check if the video is valid to be played
-            val isValid = withContext(Dispatchers.IO) {
-
-                val retriever = MediaMetadataRetriever()
-                try {
-                    retriever.setDataSource(context, uri)
-
-                    // Extract dimensions
-                    val widthStr =
-                        retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
-                    val heightStr =
-                        retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
-
-                    val width = widthStr?.toIntOrNull() ?: 0
-                    val height = heightStr?.toIntOrNull() ?: 0
-
-                    // Calculate total pixels
-                    val pixelCount = width * height
-
-                    // Hard cap at 12 Million to allow DCI 4K but block 5K/8K.
-                    val maxPixels = 12_000_000
-
-                    FileLogger.i(
-                        tag,
-                        "Video Analysis: ${width}x${height} ($pixelCount pixels). Max allowed: $maxPixels"
-                    )
-
-                    pixelCount < maxPixels // If valid
-                } catch (e: Exception) {
-                    if (BuildConfig.DEBUG) {
-                        FileLogger.e(tag, "Failed to analyze video dimensions for $uri", e)
-                    } else {
-                        FileLogger.e(tag, "Failed to analyze video dimensions", e)
-                    }
-                    true // We let the check pass anyway on error.
-                } finally {
-                    retriever.release()
-                }
-            }
-
-            if (!isValid) {
-                Toast.makeText(
-                    context,
-                    getString(R.string.error_video_too_large),
-                    Toast.LENGTH_LONG
-                ).show()
-
-                // Stop!
-                return@launch
-            }
-
             // Wrap the entire copy operation in our new Loading Overlay
             withLoadingOverlay(getString(R.string.importing_video)) {
-                val copiedFilePair = try {
+                val copyResult = try {
                     withContext(Dispatchers.IO) {
                         videoFileManager.createFileFromContentUri(uri)
                     }
-                } catch (e: kotlinx.coroutines.CancellationException) {
-                    null // Return null to skip the success block
+                } catch (_: kotlinx.coroutines.CancellationException) {
+                    null // Return null to skip the block
                 }
-                
-                if (copiedFilePair != null) {
-                    val copiedFile = copiedFilePair.first
-                    val originalName = copiedFilePair.second
-                    
-                    // Immediately save the VideoSettings with the displayName
-                    withContext(Dispatchers.IO) {
-                        preferencesManager.updateVideoSettings(copiedFile.name) {
-                            it.copy(displayName = originalName, expectedFileSize = copiedFile.length())
+
+                when (copyResult) {
+                    is VideoFileManager.CopyResult.Success -> {
+                        val copiedFile = copyResult.file
+                        val originalName = copyResult.originalName
+
+                        // Immediately save the VideoSettings with the displayName and current page
+                        withContext(Dispatchers.IO) {
+                            preferencesManager.updateVideoSettings(copiedFile.name) {
+                                it.copy(
+                                    displayName = originalName,
+                                    expectedFileSize = copiedFile.length(),
+                                    page = currentPage
+                                )
+                            }
                         }
+
+                        val savedFileUri = Uri.fromFile(copiedFile)
+                        if (BuildConfig.DEBUG) {
+                            FileLogger.d(tag, "File copied to: $savedFileUri")
+                        } else {
+                            FileLogger.d(tag, "File copied to local storage")
+                        }
+
+                        // Load the new file into the RecyclerView
+                        loadRecentFiles()
+
+                        // Update the current video (now that the file is in the adapter)
+                        updateVideoSource(
+                            savedFileUri,
+                            true,
+                            isManualTap = true
+                        ) // Automatically set as active wallpaper
+
+                        // Notifies the service of a change in the playlist
+                        val intent = Intent(UndeadWallpaperService.ACTION_PLAYLIST_REORDERED).apply {
+                            setPackage(requireContext().packageName)
+                        }
+                        requireContext().applicationContext.sendBroadcast(intent)
                     }
-                    
-                    val savedFileUri = Uri.fromFile(copiedFile)
-                    if (BuildConfig.DEBUG) {
-                        FileLogger.d(tag, "File copied to: $savedFileUri")
-                    } else {
-                        FileLogger.d(tag, "File copied to local storage")
+
+                    is VideoFileManager.CopyResult.SizeLimitExceeded -> {
+                        Toast.makeText(context, getString(R.string.error_file_too_large), Toast.LENGTH_LONG).show()
                     }
-    
-                    // Load the new file into the RecyclerView
-                    loadRecentFiles()
-    
-                    // Update the current video (now that the file is in the adapter)
-                    updateVideoSource(savedFileUri, true) // Automatically set as active wallpaper
-    
-                    // Notifies the service of a change in the playlist
-                    val intent = Intent(UndeadWallpaperService.ACTION_PLAYLIST_REORDERED).apply {
-                        setPackage(requireContext().packageName)
+
+                    is VideoFileManager.CopyResult.DimensionsExceeded -> {
+                        Toast.makeText(context, getString(R.string.error_video_too_large), Toast.LENGTH_LONG).show()
                     }
-                    requireContext().applicationContext.sendBroadcast(intent)
-                } else if (kotlinx.coroutines.currentCoroutineContext().isActive) {
-                    // Only show error if the coroutine wasn't cancelled
-                    if (BuildConfig.DEBUG) {
-                        FileLogger.e(tag, "Failed to copy file from URI: $uri")
-                    } else {
-                        FileLogger.e(tag, "Failed to copy file from URI")
+
+                    is VideoFileManager.CopyResult.CorruptFile -> {
+                        Toast.makeText(context, getString(R.string.error_cannot_play_video), Toast.LENGTH_LONG).show()
                     }
-                    Toast.makeText(context, getString(R.string.error_copy_failed), Toast.LENGTH_LONG).show()
+
+                    is VideoFileManager.CopyResult.Error -> {
+                        if (BuildConfig.DEBUG) {
+                            FileLogger.e(tag, "Failed to copy file from URI: $uri")
+                        } else {
+                            FileLogger.e(tag, "Failed to copy file from URI")
+                        }
+                        Toast.makeText(context, getString(R.string.error_copy_failed), Toast.LENGTH_LONG).show()
+                    }
+
+                    null -> {
+                        // Operation was cancelled
+                    }
                 }
             }
 
@@ -989,7 +1150,8 @@ class SettingsFragment : Fragment() {
                         }
 
                         if (context != null) {
-                            Toast.makeText(context, getString(R.string.error_cannot_play_video), Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, getString(R.string.error_cannot_play_video), Toast.LENGTH_SHORT)
+                                .show()
                         }
                     }
                 })
@@ -999,6 +1161,32 @@ class SettingsFragment : Fragment() {
             }
 
         binding.videoPreview.player = previewPlayer
+
+        // Fetch and apply the blurred thumbnail background
+        uri.path?.let { path ->
+            viewLifecycleOwner.lifecycleScope.launch {
+                try {
+                    val file = java.io.File(path)
+                    if (file.exists()) {
+                        val bitmap = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            videoFileManager.getOrGenerateThumbnail(file)
+                        }
+                        if (bitmap != null) {
+                            binding.ivVideoBlurBg.setImageBitmap(bitmap)
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                                binding.ivVideoBlurBg.setRenderEffect(
+                                    android.graphics.RenderEffect.createBlurEffect(
+                                        50f, 50f, android.graphics.Shader.TileMode.CLAMP
+                                    )
+                                )
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    FileLogger.e(tag, "Error loading thumbnail for blurred background", e)
+                }
+            }
+        }
     }
 
     private fun releasePreviewPlayer() {
@@ -1023,7 +1211,24 @@ class SettingsFragment : Fragment() {
             IntentFilter(UndeadWallpaperService.ACTION_VIDEO_SETTINGS_CHANGED),
             ContextCompat.RECEIVER_NOT_EXPORTED
         )
-        // Resume playback if we have a selected video uri
+        // Snapshot Sync: Pull the latest active video from the background service when the UI opens.
+        val activeUriString = preferencesManager.getActiveVideoUri()
+        if (!activeUriString.isNullOrEmpty()) {
+            val activeUri = activeUriString.toUri()
+
+            // If the UI is out of sync with the background service (e.g. from a gesture)
+            if (sharedViewModel.selectedVideoUri != activeUri) {
+                sharedViewModel.selectedVideoUri = activeUri
+
+                // Update the adapter highlight
+                if (::recentFilesAdapter.isInitialized) {
+                    recentFilesAdapter.currentVideoUriString = activeUriString
+                    recentFilesAdapter.notifyDataSetChanged()
+                }
+            }
+        }
+
+        // Resume playback or initialize the player if it doesn't exist
         sharedViewModel.selectedVideoUri?.let { uri ->
             if (previewPlayer == null) {
                 setupVideoPreview(uri)
@@ -1031,13 +1236,44 @@ class SettingsFragment : Fragment() {
                 previewPlayer?.playWhenReady = true
             }
         } ?: run {
-            preferencesManager.getActiveVideoUri()?.let { uriString ->
+            preferencesManager.getActiveVideoUri()?.takeIf { it.isNotEmpty() && it != "null" }?.let { uriString ->
                 if (previewPlayer == null) {
                     setupVideoPreview(uriString.toUri())
                 } else {
                     previewPlayer?.playWhenReady = true
                 }
             }
+        }
+
+        updateActionBarTitle()
+    }
+
+    private fun updateActionBarTitle() {
+        // Highlight "Undead" in the action bar title if we are undead
+        if (preferencesManager.isUndead()) {
+            val title = getString(R.string.first_fragment_label)
+            val spannable = android.text.SpannableString(title)
+
+            var index = title.indexOf("Undead", ignoreCase = true)
+            var length = 6
+            if (index == -1) {
+                index = title.indexOf("亡灵", ignoreCase = true)
+                length = 2
+            }
+
+            if (index != -1) {
+                val greenColor = androidx.core.content.ContextCompat.getColor(requireContext(), R.color.light_green)
+                spannable.setSpan(
+                    android.text.style.ForegroundColorSpan(greenColor),
+                    index,
+                    index + length,
+                    android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+                (activity as? androidx.appcompat.app.AppCompatActivity)?.supportActionBar?.title = spannable
+            }
+        } else {
+            (activity as? androidx.appcompat.app.AppCompatActivity)?.supportActionBar?.title =
+                getString(R.string.first_fragment_label)
         }
     }
 

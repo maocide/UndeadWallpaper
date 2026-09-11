@@ -14,7 +14,7 @@
     <string name="trim_video">Cortar Vídeo</string>
     <string name="setting_audio_enabled">Habilitar Áudio</string>
     <string name="playback_mode_setting">Modo de Reprodução</string>
-    <string name="recent_files">Playlist / Arquivos Recentes</string>
+    <string name="recent_files">Playlist</string>
     <string name="playlist_instructions">Toque longo para reordenar. Deslize para a esquerda ou direita para remover.</string>
     <string name="error_cannot_remove_last_video">Não é possível remover o último vídeo da playlist.</string>
     <string name="apply_trim">Aplicar</string>
@@ -90,7 +90,8 @@
 
     <!-- UI Headers & Sections -->
     <string name="custom_settings_header">Configurações Personalizadas</string>
-    <string name="importing_video">Importando vídeo</string>
+    <string name="importing_video">Infestando novos arquivos</string>
+    <string name="preparing_assets">Despertando os mortos-vivos</string>
     <string name="positioning_header">Posicionamento</string>
     <string name="general_header">Geral</string>
     <string name="volume_label">Volume</string>
@@ -141,10 +142,16 @@
     <string name="log_cleared_toast">Arquivo de registro limpo</string>
 
     <!-- Parallax -->
-    <string name="parallax_icon_description">Experimental</string>
-    <string name="parallax_card_title">Experimento: Parallax</string>
+    <string name="parallax_icon_description">Parallax</string>
+    <string name="parallax_card_title">Parallax</string>
     <string name="parallax_toggle_label">Parallax na Tela Inicial</string>
     <string name="parallax_description">Faz o vídeo se mover ao deslizar as páginas. Aproxime ligeiramente o vídeo para esconder as bordas pretas. Nota: Pode não ser compatível com todos os launchers personalizados.</string>
     <string name="parallax_strength_label">Intensidade do Parallax</string>
 
+
+    <string name="mirror_video">Espelhar Vídeo</string>
+    <string name="flip_horizontal">Horizontal</string>
+    <string name="flip_vertical">Vertical</string>
+    <string name="error_file_too_large">O vídeo selecionado excede o limite de 500 MB.</string>
+    <string name="warning_status_bar_oem">Pode não ser suportado por todos os launchers.</string>
 </resources>

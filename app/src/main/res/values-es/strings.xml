@@ -15,7 +15,7 @@
     <string name="trim_video">Recortar Video</string>
     <string name="setting_audio_enabled">Habilitar Audio</string>
     <string name="playback_mode_setting">Modo de Reproducción</string>
-    <string name="recent_files">Lista de Reproducción / Archivos Recientes</string>
+    <string name="recent_files">Lista de reproducción</string>
     <string name="playlist_instructions">Mantén presionado para reordenar. Desliza a la izquierda o derecha para remover.</string>
     <string name="error_cannot_remove_last_video">No se puede remover el último video en la lista de reproducción.</string>
     <string name="apply_trim">Aplicar</string>
@@ -82,7 +82,8 @@
 
     <!-- UI Headers & Sections -->
     <string name="custom_settings_header">Configuración Personalizada</string>
-    <string name="importing_video">Importando vídeo</string>
+    <string name="importing_video">Infestando nuevos archivos</string>
+    <string name="preparing_assets">Despertando a los no muertos</string>
     <string name="positioning_header">Posicionamiento</string>
     <string name="general_header">General</string>
     <string name="volume_label">Volumen</string>
@@ -133,10 +134,16 @@
     <string name="log_cleared_toast">Archivo de registro borrado</string>
 
     <!-- Parallax -->
-    <string name="parallax_icon_description">Experimental</string>
-    <string name="parallax_card_title">Experimento: Paralaje</string>
+    <string name="parallax_icon_description">Paralaje</string>
+    <string name="parallax_card_title">Paralaje</string>
     <string name="parallax_toggle_label">Paralaje de Pantalla de Inicio</string>
     <string name="parallax_description">Hace que el video se desplace al deslizar las páginas. Acerca ligeramente el video para ocultar los bordes negros. Nota: No es compatible con todos los launchers personalizados.</string>
     <string name="parallax_strength_label">Intensidad del Paralaje</string>
 
+
+    <string name="mirror_video">Reflejar Video</string>
+    <string name="flip_horizontal">Horizontal</string>
+    <string name="flip_vertical">Vertical</string>
+    <string name="error_file_too_large">El video seleccionado supera el límite de 500 MB.</string>
+    <string name="warning_status_bar_oem">Es posible que no todos los launchers lo soporten.</string>
 </resources>

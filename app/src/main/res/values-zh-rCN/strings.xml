@@ -13,7 +13,7 @@
     <string name="trim_video">裁剪视频</string>
     <string name="setting_audio_enabled">启用音频</string>
     <string name="playback_mode_setting">播放模式</string>
-    <string name="recent_files">播放列表 / 最近文件</string>
+    <string name="recent_files">播放列表</string>
     <string name="playlist_instructions">长按以重新排序。向左或向右滑动以移除。</string>
     <string name="error_cannot_remove_last_video">无法移除播放列表中的最后一个视频。</string>
     <string name="apply_trim">应用</string>
@@ -76,7 +76,8 @@
     <string name="status_bar_black_icons">黑色</string>
 
     <string name="custom_settings_header">自定义设置</string>
-    <string name="importing_video">正在导入视频</string>
+    <string name="importing_video">正在侵蚀新文件</string>
+    <string name="preparing_assets">正在唤醒亡灵</string>
     <string name="positioning_header">定位</string>
     <string name="general_header">常规</string>
     <string name="volume_label">音量</string>
@@ -123,10 +124,16 @@
     <string name="log_empty_toast">未找到日志文件或文件为空</string>
     <string name="log_cleared_toast">日志文件已清除</string>
 
-    <string name="parallax_icon_description">实验性功能</string>
-    <string name="parallax_card_title">视差实验</string>
+    <string name="parallax_icon_description">视差</string>
+    <string name="parallax_card_title">视差</string>
     <string name="parallax_toggle_label">主屏幕视差</string>
     <string name="parallax_description">使视频随您滑动页面而移动。稍微放大视频以隐藏黑边。注意：并非所有自定义系统桌面应用都支持。</string>
     <string name="parallax_strength_label">视差强度</string>
 
+
+    <string name="mirror_video">镜像视频</string>
+    <string name="flip_horizontal">水平</string>
+    <string name="flip_vertical">垂直</string>
+    <string name="error_file_too_large">所选视频超过了 500 MB 的限制。</string>
+    <string name="warning_status_bar_oem">可能不受所有启动器的支持。</string>
 </resources>

@@ -17,10 +17,18 @@ class UndeadWallpaperApplication : Application() {
 
         // Read preferences and initialize the FileLogger
         val prefs = PreferencesManager(this)
+
+        // Cold-boot Killswitch: If the user is not Undead, forcefully disable logging.
+        // This prevents the logger from remaining enabled if they updated from a previous build
+        if (!prefs.isUndead()) {
+            prefs.saveLoggingEnabled(false)
+        }
+
         FileLogger.setLoggingEnabled(prefs.isLoggingEnabled())
         FileLogger.init(this)
 
         // Setup the Global Crash Handler
+        /*
         val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
 
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
@@ -41,5 +49,6 @@ class UndeadWallpaperApplication : Application() {
                 defaultHandler?.uncaughtException(thread, throwable)
             }
         }
+        */
     }
 }

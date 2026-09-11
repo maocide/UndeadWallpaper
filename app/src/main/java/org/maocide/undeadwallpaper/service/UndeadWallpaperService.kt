@@ -9,6 +9,7 @@ import org.maocide.undeadwallpaper.model.ScalingMode
 import org.maocide.undeadwallpaper.model.StartTime
 import org.maocide.undeadwallpaper.model.StatusBarColor
 import org.maocide.undeadwallpaper.utils.FileLogger
+import org.maocide.undeadwallpaper.utils.HapticHelper
 
 import android.app.WallpaperColors
 import android.content.BroadcastReceiver
@@ -137,9 +138,13 @@ class UndeadWallpaperService : WallpaperService() {
         private val parallaX: Float = 0.5f - (Random.nextFloat() * 0.30f - 0.15f)
 
         // Initialize gesture manager
-        private val gestureManager = WallpaperGestureManager(prefs) { action ->
-            executeGestureAction(action)
-        }
+        private val gestureManager = WallpaperGestureManager(
+            context = baseContext,
+            prefs = prefs,
+            onActionTriggered = { action ->
+                executeGestureAction(action)
+            }
+        )
 
         /**
          * Resets the internal playback timeline variables.
@@ -204,10 +209,24 @@ class UndeadWallpaperService : WallpaperService() {
             }
         }
 
-        private fun executeGestureAction(action: WallpaperAction) {
-            when (action) {
-                WallpaperAction.NONE -> return
+        private var lastActionExecutionTimeMs = 0L
+        private val ACTION_DEBOUNCE_MS = 700L
 
+        private fun executeGestureAction(action: WallpaperAction) {
+            if (action == WallpaperAction.NONE) return
+
+            val now = android.os.SystemClock.uptimeMillis()
+            if (now - lastActionExecutionTimeMs < ACTION_DEBOUNCE_MS) {
+                FileLogger.d(TAG, "Action debounce active. Ignoring gesture.")
+                return
+            }
+            lastActionExecutionTimeMs = now
+
+            // Provide Haptic Feedback for successful gesture
+            HapticHelper.performGestureFeedback(this@UndeadWallpaperService)
+
+            when (action) {
+                WallpaperAction.NONE -> return // Already handled above, but needed for exhaustiveness
                 WallpaperAction.SKIP_NEXT -> {
                     // UX Rule: If they skip, they want to see the new video. Unpause it.
                     val currentState = fsm.state as? EngineState.Ready
@@ -263,10 +282,17 @@ class UndeadWallpaperService : WallpaperService() {
             // If the chunk we built contains every video in the playlist, they all share settings!
             // We can safely enable ExoPlayer's internal REPEAT_MODE_ALL. This gives perfect gapless looping
             // without ever hitting STATE_ENDED and incurring the manual flush pause.
-            // NOTE: SHUFFLE mode is excluded because it MUST hit STATE_ENDED to trigger a newly randomized sequence loop.
-            if (currentPlaybackMode == PlaybackMode.LOOP_ALL
+            val canLoopAll = currentPlaybackMode == PlaybackMode.LOOP_ALL
                 && playlistUris.isNotEmpty() && chunkUris.size == playlistUris.size
-            ) {
+
+            // Single-Item Shuffle Optimization:
+            // With only 1 video in the playlist, shuffling has no sequence to regenerate.
+            // We can safely loop it seamlessly instead of hitting STATE_ENDED and re-initializing the decoder.
+            // NOTE: Multi-video SHUFFLE (> 1) MUST hit STATE_ENDED with REPEAT_MODE_OFF to regenerate a newly randomized sequence loop.
+            val canLoopSingleVideoShuffle = currentPlaybackMode == PlaybackMode.SHUFFLE
+                && playlistUris.size == 1 && chunkUris.isNotEmpty()
+
+            if (canLoopAll || canLoopSingleVideoShuffle) {
                 wallpaperPlayer.setRepeatModeAsync(Player.REPEAT_MODE_ALL)
             } else if (currentPlaybackMode == PlaybackMode.LOOP_ALL || currentPlaybackMode == PlaybackMode.SHUFFLE) {
                 wallpaperPlayer.setRepeatModeAsync(Player.REPEAT_MODE_OFF)
@@ -280,6 +306,11 @@ class UndeadWallpaperService : WallpaperService() {
                 playheadTime
             }
             wallpaperPlayer.seekToAsync(0, pos)
+
+            // If the player died from a background buffer error on the deleted file,
+            // setMediaSources won't automatically restart it. We MUST call prepare!
+            // (If it's already playing, prepare() is a safe no-op).
+            wallpaperPlayer.prepareAsync()
         }
 
 
@@ -350,8 +381,14 @@ class UndeadWallpaperService : WallpaperService() {
                     }
 
                     Intent.ACTION_USER_UNLOCKED -> {
-                        FileLogger.i(TAG, "Broadcast received: User Unlocked. Initializing player safely.")
+                        FileLogger.i(
+                            TAG,
+                            "Broadcast received: User Unlocked. Initializing player safely and restoring colors."
+                        )
                         processEvent(EngineEvent.InitializeRequested)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            notifyColorsChanged()
+                        }
                     }
                 }
 
@@ -441,7 +478,9 @@ class UndeadWallpaperService : WallpaperService() {
                 x = activeSettings.positionX,
                 y = activeSettings.positionY,
                 zoom = activeSettings.zoom,
-                rotation = activeSettings.rotation
+                rotation = activeSettings.rotation,
+                flipHorizontal = activeSettings.flipHorizontal,
+                flipVertical = activeSettings.flipVertical
             )
 
             val lumaOffset = -100.0f * (1.0f - activeLumaScale)
@@ -566,10 +605,18 @@ class UndeadWallpaperService : WallpaperService() {
 
             if (!prefs.isParallaxEnabled()) return
 
-            val shiftX = (parallaX - xOffset) * prefs.getParallaxStrength()
-            renderer?.setParallaxOffset(shiftX)
+            val distanceFromCenter = kotlin.math.abs(xOffset - 0.5f)
 
-            //FileLogger.i(TAG, "PARALLAX offset event SHIFT: $shiftX")
+            // Multiplier 1.0 at center, 0.0 at edges
+            val safeMultiplier = 1.0f - (distanceFromCenter * 2.0f)
+
+            val rOffset = parallaX - 0.5f
+
+            // Fade offset near boundaries
+            val safeCenter = 0.5f + (rOffset * safeMultiplier)
+
+            val shiftX = (safeCenter - xOffset) * prefs.getParallaxStrength()
+            renderer?.setParallaxOffset(shiftX)
         }
 
         @OptIn(UnstableApi::class)
@@ -796,7 +843,11 @@ class UndeadWallpaperService : WallpaperService() {
             }
 
             if (!useFallbackSurface) {
-                renderer = GLVideoRenderer(applicationContext)
+                renderer = GLVideoRenderer(applicationContext) {
+                    FileLogger.e(TAG, "GLVideoRenderer reported Context/Surface Lost! Forcing Engine Restart.")
+                    processEvent(EngineEvent.HardwareFailure("GL Context Lost"))
+                    processEvent(EngineEvent.InitializeRequested)
+                }
                 renderer?.onSurfaceCreated(holder)
             } else {
                 FileLogger.i(TAG, "Using fallback surface, skipping GL Renderer creation")
@@ -835,7 +886,7 @@ class UndeadWallpaperService : WallpaperService() {
             gestureManager.destroy()
             try {
                 unregisterReceiver(videoChangeReceiver)
-            } catch (e: IllegalArgumentException) {
+            } catch (_: IllegalArgumentException) {
                 FileLogger.w(TAG, "Receiver was not registered, skipping unregister.")
             }
         }
@@ -957,6 +1008,9 @@ class UndeadWallpaperService : WallpaperService() {
         override fun onCreate(surfaceHolder: SurfaceHolder) {
             super.onCreate(surfaceHolder)
             FileLogger.i(TAG, "Engine onCreate")
+            if (prefs.isUndead()) {
+                FileLogger.i(TAG, "Brains and parts detected...")
+            }
 
             // Turn on filter to start listening
             val intentFilter = IntentFilter().apply {

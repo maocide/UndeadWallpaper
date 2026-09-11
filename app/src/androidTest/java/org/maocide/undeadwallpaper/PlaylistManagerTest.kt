@@ -26,25 +26,27 @@ class PlaylistManagerTest {
 
     @Before
     fun setup() {
-        prefsManager = PreferencesManager(context)
+        prefsManager = PreferencesManager(context, "TEST_PREFS")
+        
         // Clear prefs before each test
         prefsManager.savePlaylistSettings(emptyList())
+        prefsManager.saveActivePage(0)
 
         // Create dummy video files
-        videosDir = File(context.getExternalFilesDir(Environment.DIRECTORY_MOVIES), "videos")
+        videosDir = File(context.getExternalFilesDir(Environment.DIRECTORY_MOVIES), "test_videos")
         if (!videosDir.exists()) {
             videosDir.mkdirs()
         }
         
         // Ensure directory is clean
         videosDir.listFiles()?.forEach { it.delete() }
-        
-        playlistManager = PlaylistManager(context, prefsManager)
+        playlistManager = PlaylistManager(context, prefsManager, "test_videos")
     }
 
     @After
     fun teardown() {
         prefsManager.savePlaylistSettings(emptyList())
+        prefsManager.saveActivePage(0)
         videosDir.listFiles()?.forEach { it.delete() }
     }
 
@@ -147,5 +149,57 @@ class PlaylistManagerTest {
         val nextNextShuffle = nextV1Shuffle?.let { playlistManager.getNextUri(it, PlaybackMode.SHUFFLE) }
         
         assertEquals(true, nextV1Shuffle != null && nextNextShuffle != null)
+    }
+    @Test
+    fun testCollapseEmptyPages_noEmptyPages() {
+        val settings = mutableListOf(
+            VideoSettings("video1.mp4", page = 0),
+            VideoSettings("video2.mp4", page = 1),
+            VideoSettings("video3.mp4", page = 2)
+        )
+
+        val collapsed = playlistManager.collapseEmptyPages(settings)
+        org.junit.Assert.assertFalse(collapsed)
+        assertEquals(0, settings[0].page)
+        assertEquals(1, settings[1].page)
+        assertEquals(2, settings[2].page)
+    }
+
+    @Test
+    fun testCollapseEmptyPages_withEmptyPages() {
+        // Page 1 is empty
+        val settings = mutableListOf(
+            VideoSettings("video1.mp4", page = 0),
+            VideoSettings("video2.mp4", page = 2),
+            VideoSettings("video3.mp4", page = 3)
+        )
+
+        val collapsed = playlistManager.collapseEmptyPages(settings)
+        org.junit.Assert.assertTrue(collapsed)
+        
+        // Items should be shifted down
+        assertEquals(0, settings[0].page)
+        assertEquals(1, settings[1].page)
+        assertEquals(2, settings[2].page)
+    }
+
+    @Test
+    fun testCollapseEmptyPages_updatesActivePage() {
+        val settings = mutableListOf(
+            VideoSettings("video1.mp4", page = 0),
+            VideoSettings("video2.mp4", page = 2)
+        )
+        
+        // User was on page 2 (which will become page 1 after collapse)
+        prefsManager.saveActivePage(2)
+
+        val collapsed = playlistManager.collapseEmptyPages(settings)
+        org.junit.Assert.assertTrue(collapsed)
+        
+        assertEquals(0, settings[0].page)
+        assertEquals(1, settings[1].page)
+        
+        // Active page should be clamped to the new max page (1)
+        assertEquals(1, prefsManager.getActivePage())
     }
 }

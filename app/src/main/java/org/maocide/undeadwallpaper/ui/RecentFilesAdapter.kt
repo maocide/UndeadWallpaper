@@ -6,6 +6,7 @@ import org.maocide.undeadwallpaper.model.RecentFile
 import org.maocide.undeadwallpaper.model.VideoSettings
 import org.maocide.undeadwallpaper.model.ScalingMode
 import org.maocide.undeadwallpaper.data.PreferencesManager
+import org.maocide.undeadwallpaper.utils.setSafeOnClickListener
 
 import android.graphics.Bitmap
 import android.graphics.Color
@@ -88,14 +89,14 @@ class RecentFilesAdapter(
         private val breadcrumbText: TextView = itemView.findViewById(R.id.breadcrumb_text)
 
         init {
-            itemView.setOnClickListener {
+            itemView.setSafeOnClickListener(debounceMs = 300L) {
                 val position = bindingAdapterPosition
                 if (position != RecyclerView.NO_POSITION) {
                     onItemClick(recentFiles[position])
                 }
             }
 
-            settingsButton.setOnClickListener {
+            settingsButton.setSafeOnClickListener(debounceMs = 300L) {
                 val position = bindingAdapterPosition
                 if (position != RecyclerView.NO_POSITION) {
                     onSettingsClick(recentFiles[position])

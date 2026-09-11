@@ -12,7 +12,7 @@
     <string name="trim_video">Przytnij Wideo</string>
     <string name="setting_audio_enabled">Włącz Audio</string>
     <string name="playback_mode_setting">Tryb Odtwarzania</string>
-    <string name="recent_files">Playlist / Ostatnie pliki</string>
+    <string name="recent_files">Playlista</string>
     <string name="playlist_instructions">Przytrzymaj żeby zmienić kolejność. Przesuń w lewo lub w prawo żeby usunąć.</string>
     <string name="error_cannot_remove_last_video">Nie można usunąć ostatniego pliku z playlisty.</string>
     <string name="apply_trim">Ustaw</string>
@@ -34,12 +34,12 @@
     <string name="license_text"><a href="https://www.gnu.org/licenses/gpl-3.0.en.html">Na licencji GNU GPL v3.0</a></string>
     <string name="license_url" translatable="false">https://www.gnu.org/licenses/gpl-3.0.en.html</string>
 
-    <string name="about_header_story">Historia za Nazwą</string>
-    <string name="about_story_content">To nie tylko sprytna gra słów nawiązująca do <b>live</b> wallpaper. Nazwa <b>UndeadWallpaper</b> ma charakter osobisty. Po długiej, wymuszonej przerwie od kodowania, ten projekt był pierwszym znakiem życia — momentem, w którym pasja, która została pogrzebana, wygrzebała się z powrotem na powierzchnię. Ta aplikacja nie jest po prostu <b>live</b>; to symbol twórcy powracającego z martwych. Jest <b>undead</b>, bo niektóre rzeczy są zbyt uparte, by po prostu umrzeć.</string>
-    <string name="about_header_features">Co potrafi</string>
-    <string name="about_feature_loops">• Bardzo płynne pętle: Zmień dowolny film ze swojego telefonu w płynną, pozbawioną zacięć animowaną tapetę.</string>
+    <string name="about_header_story">Historia kryjąca się za nazwą</string>
+    <string name="about_story_content">To nie jest tylko sprytna gra słów o <b>live</b> wallpaper (żywej tapecie). Nazwa <b>UndeadWallpaper</b> ma znaczenie osobiste. Po długiej, przymusowej przerwie od programowania, ten projekt był pierwszym znakiem życia — momentem, w którym pogrzebana pasja powróciła na powierzchnię. Ta aplikacja nie jest tylko <b>live</b>; jest symbolem twórcy powracającego z martwych. Jest <b>undead</b> (nieumarła), ponieważ niektóre rzeczy są po prostu zbyt uparte, by umrzeć.</string>
+    <string name="about_header_features">Funkcje aplikacji</string>
+    <string name="about_feature_loops">• Płynne pętle: Zamienia dowolne wideo na telefonie w idealną animowaną tapetę bez zacięć.</string>
     <string name="about_feature_freedom">• Pełna wolność: <b>Zero</b> reklam, <b>zero</b> mikropłatności, <b>zero</b> kompromisów. <b>Nigdy</b>.</string>
-    <string name="about_feature_control">• Ty masz moc: Obsługuje przełączniki dźwięku i zapamiętuje ostatnio używane media, pozwalając na ich szybką zmianę.</string>
+    <string name="about_feature_control">• Pełna kontrola: Obsługuje przełączanie dźwięku i zapamiętuje ostatnio używane filmy, by móc je szybko zmieniać.</string>
     <string name="playback_mode_loop">Powtarzaj jeden</string>
     <string name="playback_mode_oneshot">Jednorazowo</string>
     <string name="playback_mode_loop_all">Powtarzaj wszystko</string>
@@ -85,7 +85,8 @@
 
     <!-- UI Headers & Sections -->
     <string name="custom_settings_header">Ustawienia Niestandardowe</string>
-    <string name="importing_video">Importowanie wideo</string>
+    <string name="importing_video">Infestowanie nowych plików</string>
+    <string name="preparing_assets">Przebudzenie nieumarłych</string>
     <string name="positioning_header">Pozycja</string>
     <string name="general_header">Główne</string>
     <string name="volume_label">Głośność</string>
@@ -134,10 +135,16 @@
     <string name="log_cleared_toast">Logi usunięte</string>
 
     <!-- Parallax -->
-    <string name="parallax_icon_description">Eksperymentalne</string>
-    <string name="parallax_card_title">Eksperyment: Paralaksa</string>
+    <string name="parallax_icon_description">Paralaksa</string>
+    <string name="parallax_card_title">Paralaksa</string>
     <string name="parallax_toggle_label">Paralaksa ekranu głównego</string>
     <string name="parallax_description">Przesuwa wideo podczas przewijania stron. Zbliż nieco wideo, aby ukryć czarne krawędzie. Uwaga: funkcja może nie być obsługiwana przez niektóre niestandardowe launchery.</string>
     <string name="parallax_strength_label">Siła paralaksy</string>
 
+
+    <string name="mirror_video">Odbicie lustrzane</string>
+    <string name="flip_horizontal">Poziomo</string>
+    <string name="flip_vertical">Pionowo</string>
+    <string name="error_file_too_large">Wybrany film przekracza limit 500 MB.</string>
+    <string name="warning_status_bar_oem">Może nie być obsługiwane przez wszystkie programy uruchamiające.</string>
 </resources>

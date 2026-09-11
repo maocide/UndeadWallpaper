@@ -29,3 +29,7 @@ local.properties
 
 # R8 / Proguard Mapping Files
 **/mapping.txt
+
+# Keystores
+*.jks
+*.keystore

@@ -4,7 +4,7 @@ import org.maocide.undeadwallpaper.model.PlaybackMode
 
 import android.content.Context
 import android.net.Uri
-import android.util.Log
+import org.maocide.undeadwallpaper.utils.FileLogger
 
 import java.io.File
 import kotlin.random.Random
@@ -16,12 +16,14 @@ import androidx.core.net.toUri
  */
 class PlaylistManager(
     private val context: Context,
-    private val prefs: PreferencesManager
+    private val prefs: PreferencesManager,
+    private val videosDirectoryName: String = "videos"
 ) {
     private val TAG = javaClass.simpleName
 
     // In-memory state for maintaining a true non-repeating shuffle sequence
     private var shuffledIndices: List<Int>? = null
+    private var lastActivePage: Int = 0
 
     /**
      * Returns a list of valid URIs for all items in the playlist.
@@ -30,28 +32,36 @@ class PlaylistManager(
     suspend fun getPlaylistUris(): List<String> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         val playlistSettings = prefs.getPlaylistSettings()
 
-        // If playlist size changes, invalidate the shuffle cache
-        if (shuffledIndices?.size != playlistSettings.size) {
+        // Decouple Engine playback page from UI scroll state
+        // Find which page the currently active video belongs to, and play that page
+        val activeVideoFileName = prefs.getActiveVideoUri()?.toUri()?.lastPathSegment
+        val activePage = playlistSettings.find { it.fileName == activeVideoFileName }?.page ?: 0
+
+        val pagedSettings = playlistSettings.filter { it.page == activePage }
+
+        // If playlist size changes or page changes, invalidate the shuffle cache
+        if (shuffledIndices?.size != pagedSettings.size || lastActivePage != activePage) {
             shuffledIndices = null
+            lastActivePage = activePage
         }
 
-        if (playlistSettings.isEmpty()) {
+        if (pagedSettings.isEmpty()) {
             return@withContext emptyList()
         }
 
-        val videosDir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_MOVIES)?.let { File(it, "videos") }
+        val videosDir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_MOVIES)?.let { File(it, videosDirectoryName) }
         if (videosDir == null) return@withContext emptyList()
 
         // Fetch directory contents once and use a Set for fast O(1) lookups
         val physicalFilesSet = videosDir.list()?.toSet() ?: emptySet()
 
         val validUris = mutableListOf<String>()
-        for (setting in playlistSettings) {
+        for (setting in pagedSettings) {
             if (physicalFilesSet.contains(setting.fileName)) {
                 val file = File(videosDir, setting.fileName)
                 validUris.add(Uri.fromFile(file).toString())
             } else {
-                Log.w(TAG, "File in playlist not found on disk: ${setting.fileName}")
+                FileLogger.w(TAG, "File in playlist not found on disk: ${setting.fileName}")
             }
         }
         validUris
@@ -190,5 +200,40 @@ class PlaylistManager(
         }
 
         return playlistUris[sequenceOrder[nextPositionInSequence]]
+    }
+
+    /**
+     * Collapses empty pages in a playlist and adjusts the active page if necessary.
+     * @param settings The mutable list of settings to modify in-place.
+     * @return True if a collapse occurred.
+     */
+    fun collapseEmptyPages(settings: MutableList<org.maocide.undeadwallpaper.model.VideoSettings>): Boolean {
+        var collapseOccurred = false
+        val maxPage = settings.maxOfOrNull { it.page } ?: -1
+        if (maxPage > 0) {
+            var p = 1
+            while (p <= (settings.maxOfOrNull { it.page } ?: -1)) {
+                if (settings.none { it.page == p }) {
+                    // Page p is empty, shift all higher pages down
+                    for (i in settings.indices) {
+                        if (settings[i].page > p) {
+                            settings[i] = settings[i].copy(page = settings[i].page - 1)
+                        }
+                    }
+                    collapseOccurred = true
+                    // Do not increment p, check the new contents of page p
+                } else {
+                    p++
+                }
+            }
+            if (collapseOccurred) {
+                val currentActivePage = prefs.getActivePage()
+                val newMax = settings.maxOfOrNull { it.page } ?: 0
+                if (currentActivePage > newMax) {
+                    prefs.saveActivePage(newMax)
+                }
+            }
+        }
+        return collapseOccurred
     }
 }

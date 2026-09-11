@@ -16,6 +16,7 @@ import org.maocide.undeadwallpaper.R
  */
 suspend fun Fragment.withLoadingOverlay(
     message: String,
+    cancellable: Boolean = true,
     block: suspend () -> Unit
 ) = coroutineScope {
     val rootView = requireActivity().findViewById<ViewGroup>(android.R.id.content) ?: return@coroutineScope block()
@@ -28,9 +29,14 @@ suspend fun Fragment.withLoadingOverlay(
     // Launch the child job
     val taskJob = launch { block() }
     
-    // Bind cancel button to the child job
-    overlayView.findViewById<Button>(R.id.btn_cancel_loading)?.setOnClickListener {
-        taskJob.cancel()
+    // Bind cancel button to the child job if cancellable
+    val cancelButton = overlayView.findViewById<Button>(R.id.btn_cancel_loading)
+    if (cancellable) {
+        cancelButton?.setOnClickListener {
+            taskJob.cancel()
+        }
+    } else {
+        cancelButton?.visibility = View.GONE
     }
     
     // Add to window

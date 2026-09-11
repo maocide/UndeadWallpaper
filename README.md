@@ -1,63 +1,86 @@
-# UndeadWallpaper 🧟‍♀️📱
+# UndeadWallpaper
 
-![UndeadWallpaper Banner](banner.png)
+![UndeadWallpaper Banner](assets/banner.png)
 
-**Your phone screen is boring. Let's make it undead.**
+### An OpenGL-transformed, ExoPlayer-driven, video live wallpaper engine.
+###### No telemetry. No ads. It runs the media you feed it, when you feed it.
 
-Tired of static backgrounds? UndeadWallpaper is a free, balls-to-the-wall Android app that brings your screen to life... or, well, *un-death* by letting you slap any of your favorite videos on it as a seamless, stutter-free live wallpaper.
 
-## The Story Behind the Name
+<div align="center">
+  <video src="assets/app_demo_vertical.mp4" width="300" controls autoplay loop muted></video>
+</div>
+<br>
 
-This isn't just a clever pun on "live" wallpaper. The name **UndeadWallpaper** is personal. After a long, forced hiatus from coding, this project was the first sign of life... the moment a passion that was buried came clawing its way back to the surface. This app isn't just "live"; it's a symbol of a creator coming back from the dead. It's **undead**, because some things are just too stubborn to die.
-
-## Features ✨
-
-* **Per-Video God-Mode Controls:** Why apply one setting to everything? Tap the gear icon next to any video to open the new Video Settings Sheet. Individually tweak the zoom, offset, rotation, playback speed, and volume for *every single file*. The UI even shows you dynamic breadcrumbs so you know exactly which videos have custom tweaks.
-* **The New Engine (Gapless & Smooth):** Ripped out the old guts and built a custom OpenGL + ExoPlayer pipeline. The new batching engine groups videos with identical settings, allowing for seamless, gapless transitions between your favorite clips with zero buffering or black screens.
-* **Dynamic UI Colors (Material You):** Your phone, your vibe. As you set a video, the app extracts the dominant colors from your wallpaper and seamlessly themes your Android system to match. 
-* **Sleek Material 3 UI:** Wrapped in a custom "Zombie Glass" dark theme, everything from the tonal chips to the smooth bottom sheets is designed to look native, premium, and easy to use with one hand.
-* **Interactive Playlist:** Your recent files are a fully drag-and-drop playground. Swipe to delete, reorder on the fly, and hit `Loop All` or `Shuffle` modes for endless visual chaos.
-* **Video Parallax:** Give your home screen real depth. The custom OpenGL engine intercepts your launcher's events, smoothly shifting your video's perspective as you scroll through your pages, all without tanking your frame rate or eating your battery.
-* **Smart Start Times:** Customize what your wallpaper does when you unlock your phone. Resume where you left off, restart for that dramatic intro, or jump to a random frame.
-* **One-Shot Mode:** Want a "Live Photo" vibe? Set your video to play once and freeze on the final frame. Perfect for cinematic intros.
-* **Zombillie is Here:** Fresh install? We got you covered with a default Zombillie animation so your screen isn't naked while you look for your own clips.
-* **100% Free & Open Source:** No ads, no bullshit, no microtransactions. Ever. This is a passion project, and the code is open for all you brilliant weirdos to see.
-
-## Getting Started (It's scary simple)
-
-1. **Pick Your Poison:** Tap the "Pick Video" button and choose your masterpiece.
-2. **Smash the Button:** Like what you see? Hit that floating button and bring your screen to glorious un-life, you are done!
-3. **Tweak It:** Tap the gear icon next to your video. Use the advanced settings to fit, fill, or stretch it. Zoom in, move it around, make it perfect. You can even peek at your home screen to see what you changed on the fly.
-
-### Keep It Alive (Disable Battery Optimizations) 🧟‍♂️
-
-Some Android ROMs are absolutely ruthless. They will try to double-tap this app in the background to save a drop of battery, killing the decoders or the background service right when you need them. 
-
-A built-in **"Allow Background Performance"** card directly in the app will warn you. Just tap "Fix" to dive straight into your phone's app settings and **disable battery optimizations** for UndeadWallpaper. Tell the OS to back off and leave the dead alone!
-
-> **Having weird OS issues? Screen freezing? Icons the wrong color? [Check out The Horde's Survival Guide (FAQ)](FAQ.md) for workarounds to annoying OEM limitations.**
-
-## Join the Horde! (Contribute & Connect)
-
-This project clawed its way back from the dead, but it was the **people** that truly gave it a soul. 
-
-Want to see what the horde is saying? **[Dive into the main feedback thread right here!](https://www.reddit.com/r/androidapps/comments/1nl2zwj/i_made_a_free_noads_opensource_app_that_lets_you/)**
-
-Got your own ideas? Found a bug? Wanna make this thing even more badass? Contributions are celebrated, but we play by a strict set of rules to keep the app fast and bloat-free.
-
-* **[Read the CONTRIBUTING.md Guide BEFORE opening an issue or PR!](CONTRIBUTING.md)** This covers our strict UI rules, battery performance requirements, and bug reporting steps.
-* Spotted a glitch? Got the logs to prove it? **[Open an issue](https://github.com/maocide/UndeadWallpaper/issues/new/choose)**.
-* Ready to code? **Fork the repo** and hit me with a pull request!
-
-## License
-
-This whole shebang is licensed under the **GNU General Public License v3.0**. Freedom for all!
-
-## Download Now (Do it!)
-
-* **Google Play Store:** [From the Play Store](https://play.google.com/store/apps/details?id=org.maocide.undeadwallpaper)
-* **GitHub Releases:** [Grab the bleeding-edge APKs here!](https://github.com/maocide/UndeadWallpaper/releases/)
 
 ---
 
-Thanks for checking out the project. Now go make something awesome. (,,•ω•,,)♡
+| Standard Distribution | Direct / Bootleg Pipeline |
+| :--- | :--- |
+| **[GET IT ON GOOGLE PLAY](https://play.google.com/store/apps/details?id=org.maocide.undeadwallpaper)**<br>Signed release build, managed updates. | **[VISIT MERCH STORE](#merch-store)**<br>Cheap FOSS merch, handcrafted DLCs, raw APKs. |
+
+---
+
+## Origin
+
+This project did not start as a roadmap. After a forced, extended hiatus from coding where the developer almost flatlined, this was the first pulse... a prototype built in a single morning that refused to stay buried. It is not just a live wallpaper. It is a symbol of coming back from the dead. Some things are just too stubborn to die.
+
+## Specifications
+
+**The Interface**
+* **Material Zombie Theme:** Material 3 architecture. Custom dark theme, accordion menus, and tonal layouts.
+* **Dynamic UI Extraction:** The engine extracts dominant color palettes from active media to theme the Android OS environment.
+* **Tactile Response:** Haptic feedback integration. Custom double/triple tap gestures execute skip or pause commands directly from the home screen.
+
+**The Guts**
+* **Custom Graphics Pipeline:** Dedicated OpenGL + ExoPlayer backend. Hardware-accelerated transforms, positioning, and gapless loop transitions.
+* **Agnostic Ingestion:** The engine is content-agnostic, not limited to sketchy anime loops. It renders the media you provide—from recorded drone footage to family pet videos to fully licensed anime loops. All file types are treated equally by the renderer.
+* **Isolated Local Storage:** File I/O executes asynchronously via scoped isolated storage.
+* **Video Parallax:** The engine intercepts launcher events, shifting perspective proportionally to the aspect ratio during scroll.
+
+**Ultimate Control**
+* **Per-Video Overrides:** Access the Video Settings Sheet to manipulate zoom, offset, rotation, playback speed, mirroring, brightness and volume for individual files.
+* **Playlists Slots:** Paginated dashboard for playlist management. Loop All or Shuffle execution.
+* **Smart Start States:** Define engine behavior on visibility acquired. Resume playback, jump to a random frame, or execute a one-shot cinematic intro that freezes on the final frame.
+* **Licensing:** Zero ads. Zero microtransactions. Public source code.
+
+## Deployment
+
+1. **Load:** Select local media via the official file picker.
+2. **Execute:** Trigger the primary action button to deploy the render pipeline to the system home screen.
+3. **Calibrate: (Optional)** Access advanced settings to scale, offset, and rotate. Live updates allow real-time home screen adjustments. 
+
+### OS Interference (Battery Optimizations)
+
+Certain Android ROMs aggressively terminate background decoders. The built-in Allow Background Performance card flags this behavior. Tap "Fix" to enter system settings and disable battery optimizations for the app. Tell the OS to back off.
+
+> **Troubleshooting:** OEM limitations causing UI freezes or color mismatch? [Read the FAQ](FAQ.md).
+
+
+## Merch Store
+#### *"you can't kill what's already dead."*
+
+| Preview |  Content | Specification & Origin | Status | Price |
+| :--- | :--- | :--- | :--- | :--- |
+| <img src="assets/merch_apk_thumb.png" width="200"> | **[UWU v1.4.0 (｡• ω •｡) UNDEAD WALLPAPER UNRESTRICTED](https://github.com/maocide/UndeadWallpaper/releases)** | Native engine APK. Fits on 5 High-Density 3.5" floppy disks (spanning archive, 1.44 MB each). **DLC NOT included**. | `[AVAILABLE]` | 0.00 FOS$ |
+| <img src="assets/undead_unrestrict_shirt_thumb.png" width="200"> | **[UNDEAD // UNRESTRICT OFFICIAL T-SHIRT](DIY_MERCH.md)** | High-DPI PNG FOSS Apparel. 0.0 BLOAT. GPLv3 Silk-Screening deployment guide available. | `[DIY ONLY // PHYSICAL SEIZED]` | 0.00 FOS$ |
+| <img src="assets/sybil_dlc_thumb.png" width="200"> | **SYBIL WAIFU // DLC LIVE WALLPAPER** | Artisanal generative loop. Executed via handcrafted ComfyUI node pipeline and encoded natively via PixelChopper.<br>**Format Specs:** 1080p MP4.<br>**Lore:** Interactive oracle imported from **[BACKLOG REAPER](https://github.com/maocide/BacklogReaper)**.<br>**Notice:** Pending centralized platform age-verification clearance. | `[RESTRICTED // PENDING AGE CLASSIFICATION]` | 0.00 FOS$ |
+| <img src="assets/abby_dlc_thumb.gif" width="200"> | **QA TESTER ABBY // DLC LIVE WALLPAPER** | Artisanal generative loop. Executed via handcrafted ComfyUI node pipeline and encoded natively via PixelChopper.<br>**Format Specs:** 1080p MP4. Engine pre-optimized. | `[TBA // INTERNAL TEST TRACK ONLY]` | 0.00 FOS$ |
+| <img src="assets/profile.png" width="200"> | **[DIY DEVELOPER PERSONA](assets/profile.png)** | Hand-drawn (Paint Tool SAI) avatar deployment kit. Dated pre-Stable Diffusion era. | `[DEPLOYED]` | 0.00 FOS$ |
+
+<br>
+
+> **Physical Copyleft & Disclaimer (GNU GPLv3)**
+>
+> UndeadWallpaper and its associated visual assets are licensed under the GNU General Public License v3.0. We believe software copyleft naturally extends to physical manifestations. 
+> 
+> If you pull the repository, compile the engine, or screen-print this apparel, the same rules apply: you are legally obligated to provide the source code, the master PNGs, and the manufacturing instructions to anyone who asks. Closed-door corporate gatekeeping of these assets—digital or physical—is strictly prohibited.
+>
+> The software is provided strictly **"AS IS"**, without warranty of any kind. The engine is an offline, hardware-accelerated vessel—zero telemetry, zero cloud crutches. Lifecycles and decoder performance are governed entirely by your hardware and your OEM's background limits.
+
+<br>
+
+> **⚠️ DISCLOSURE**
+> 
+> LLMs may have been utilized to assist in the production or conceptualization of certain software or visual assets. However, all final architectural and artistic decisions were strictly enforced by demi-human intervention. No LLMs were harmed during production.
+>
+> Furthermore, all fictional entities, digital waifus, and anthropomorphic representations depicted herein are categorically 18 years of age or older at the time of drawing, editing or generating, regardless of spatial-temporal paradoxes, suspension of disbelief, or stylistic proportions.

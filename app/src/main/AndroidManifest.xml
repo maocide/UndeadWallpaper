@@ -7,22 +7,19 @@
         android:required="true" >
     </uses-feature>
 
-    <!-- For Android 13 (API 33) and above -->
-    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <!-- Removed storage permissions (READ_MEDIA_VIDEO, READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE) as SAF handles this natively -->
 
-    <!-- For Android 10 (API 29) to 12L (API 32) -->
-    <!-- maxSdkVersion to tell the system this is for older versions -->
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <!-- Haptic Feedback for Gestures -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 
-    <!-- Legacy permission for Android 9 (API 28) and below -->
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
-
+    <!-- Prevent non-system overlay windows from being drawn over the app (API 31+) -->
+    <uses-permission android:name="android.permission.HIDE_OVERLAY_WINDOWS" />
 
     <application
         android:name=".UndeadWallpaperApplication"
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
-        android:fullBackupContent="@xml/backup_rules"
+        android:fullBackupContent="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:largeHeap="true"

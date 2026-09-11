@@ -7,17 +7,14 @@ import org.maocide.undeadwallpaper.model.RecentFile
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.media.MediaExtractor
-import android.app.WallpaperColors
-import android.media.MediaFormat
-import android.media.MediaMetadataRetriever
+import org.maocide.undeadwallpaper.utils.MediaAnalyzer
 import android.media.ThumbnailUtils
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.provider.OpenableColumns
-import android.util.Log
+import org.maocide.undeadwallpaper.utils.FileLogger
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -36,10 +33,23 @@ import java.io.InputStream
  *
  * @param context The application context.
  */
-class VideoFileManager(private val context: Context) {
+class VideoFileManager(
+    private val context: Context,
+    private val prefsName: String = "DEFAULT",
+    private val videosDirectoryName: String = "videos"
+) {
+
+    sealed class CopyResult {
+        data class Success(val file: File, val originalName: String) : CopyResult()
+        object SizeLimitExceeded : CopyResult()
+        object DimensionsExceeded : CopyResult()
+        object CorruptFile : CopyResult()
+        object Error : CopyResult()
+    }
+
+    class SizeLimitExceededException : Exception("File exceeds maximum supported size")
 
     private val tag: String = javaClass.simpleName
-
 
     /**
      * Copies a raw resource to the app's video storage if it doesn't exist.
@@ -50,19 +60,29 @@ class VideoFileManager(private val context: Context) {
      * @return The File object of the created or existing video.
      */
     suspend fun createDefaultFileFromResource(resourceId: Int): File? {
-        val outputDir = getAppSpecificAlbumStorageDir(context, "videos")
+        val outputDir = getAppSpecificAlbumStorageDir(context, videosDirectoryName)
         val outputFile = File(outputDir, "video_${java.util.UUID.randomUUID()}.mp4")
 
         return try {
             context.resources.openRawResource(resourceId).use { inputStream ->
-                copyStreamToFile(inputStream, outputFile)
+                // We enforce a strict 2MB limit here to prevent a tampered APK from 
+                // unpacking a massive dummy payload (zip-bomb) to internal storage.
+                copyStreamToFile(inputStream, outputFile, maxBytes = 2_000_000L)
             }
+
+            // Strict compile-time exact size validation against the bundled asset
+            if (BuildConfig.DEFAULT_ASSET_SIZE > 0 && outputFile.length() != BuildConfig.DEFAULT_ASSET_SIZE) {
+                FileLogger.e(tag, "Default asset corrupt.")
+                outputFile.delete()
+                return null
+            }
+
             outputFile
         } catch (e: Exception) {
             if (BuildConfig.DEBUG) {
-                Log.e(tag, "Failed to copy default resource", e)
+                FileLogger.e(tag, "Failed to copy default resource", e)
             } else {
-                Log.e(tag, "Failed to copy default resource", e)
+                FileLogger.e(tag, "Failed to copy default resource", e)
             }
             null
         }
@@ -74,9 +94,9 @@ class VideoFileManager(private val context: Context) {
      * It uses a random UUID for the physical filename, and returns the original display name.
      *
      * @param fileUri The URI of the file to be copied.
-     * @return A Pair containing the new File and its original display name, or null if it fails.
+     * @return A CopyResult indicating Success, Error, or SizeLimitExceeded.
      */
-    suspend fun createFileFromContentUri(fileUri: Uri): Pair<File, String>? {
+    suspend fun createFileFromContentUri(fileUri: Uri): CopyResult {
         var originalFileName = ""
 
         // Try to query the display name
@@ -87,11 +107,32 @@ class VideoFileManager(private val context: Context) {
                     if (nameIndex >= 0) {
                         originalFileName = cursor.getString(nameIndex)
                     }
+
+                    // Early validation: Check size upfront to avoid streaming massive files to disk
+                    val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+                    if (sizeIndex >= 0) {
+                        val sizeBytes = cursor.getLong(sizeIndex)
+                        // 524_288_000L = 500 MB
+                        if (sizeBytes > 524_288_000L) {
+                            FileLogger.w(
+                                tag,
+                                "Upfront file size check failed. File is ${sizeBytes / 1_048_576}MB (Max: 500MB)."
+                            )
+                            return CopyResult.SizeLimitExceeded
+                        }
+                    }
+
+                    // Early validation: Check dimensions before streaming file
+                    val isValid = MediaAnalyzer.validateVideoDimensions(context, fileUri)
+                    if (!isValid) {
+                        FileLogger.w(tag, "Upfront dimension check failed.")
+                        return CopyResult.DimensionsExceeded
+                    }
                 }
             }
             originalFileName = java.io.File(originalFileName).name
         } catch (e: Exception) {
-            Log.w(tag, "Could not query file name, generating fallback.", e)
+            FileLogger.w(tag, "Could not query file name, generating fallback.", e)
         }
 
         // Use UUID for the fallback display name
@@ -99,59 +140,46 @@ class VideoFileManager(private val context: Context) {
             originalFileName = "imported_video_${java.util.UUID.randomUUID()}.mp4"
         }
 
-        val outputDir = getAppSpecificAlbumStorageDir(context, "videos")
+        val outputDir = getAppSpecificAlbumStorageDir(context, videosDirectoryName)
         val outputFile = File(outputDir, "video_${java.util.UUID.randomUUID()}.mp4")
 
         try {
             context.contentResolver.openInputStream(fileUri)?.use { iStream ->
                 copyStreamToFile(iStream, outputFile)
             }
+        } catch (_: SizeLimitExceededException) {
+            FileLogger.w(tag, "File copy aborted: exceeds maximum size limit.")
+            if (outputFile.exists()) {
+                outputFile.delete()
+            }
+            return CopyResult.SizeLimitExceeded
         } catch (e: kotlinx.coroutines.CancellationException) {
-            Log.i(tag, "File copy cancelled. Deleting partial file.")
+            FileLogger.i(tag, "File copy cancelled. Deleting partial file.")
             if (outputFile.exists()) {
                 outputFile.delete()
             }
             throw e
         } catch (e: Exception) {
-            if (BuildConfig.DEBUG) {
-                Log.e(tag, "Error copying file from URI: $fileUri", e)
-            } else {
-                Log.e(tag, "Error copying file from URI", e)
-            }
+            FileLogger.e(tag, "Error copying file from URI", e)
             if (outputFile.exists()) {
                 outputFile.delete()
             }
-            return null
+            return CopyResult.Error
         }
 
-        return Pair(outputFile, originalFileName)
+        // Pre-Flight Validation Gate
+        val thumbnail = getOrGenerateThumbnail(outputFile)
+        if (thumbnail == null) {
+            FileLogger.w(tag, "Corrupt or truncated media file rejected.")
+            if (outputFile.exists()) {
+                outputFile.delete()
+            }
+            return CopyResult.CorruptFile
+        }
+
+        return CopyResult.Success(outputFile, originalFileName)
     }
 
-
-    /**
-     * Copies a file to the app's specific storage.
-     * It uses the original file name to avoid duplicates.
-     *
-     * @param file The file to be copied.
-     * @return The newly created File object.
-     */
-    suspend fun copyRecentFile(file: File): Pair<File, String> {
-        val outputDir = getAppSpecificAlbumStorageDir(context, "videos")
-        val newFile = File(outputDir, "video_${java.util.UUID.randomUUID()}.mp4")
-        copyStreamToFile(file.inputStream(), newFile)
-        return Pair(newFile, file.name)
-    }
-
-    /**
-     * Creates a temporary video file in the app's specific storage.
-     * The file will have a unique name.
-     *
-     * @return The newly created File object.
-     */
-    fun createTempVideoFile(): File {
-        val outputDir = getAppSpecificAlbumStorageDir(context, "videos")
-        return File.createTempFile("clip_", ".mp4", outputDir)
-    }
 
     /**
      * Loads the list of recent video files from the app's storage,
@@ -160,28 +188,76 @@ class VideoFileManager(private val context: Context) {
      * @return A list of [RecentFile] objects in the correct order.
      */
     suspend fun loadRecentFiles(): List<RecentFile> = withContext(Dispatchers.IO) {
-        val videosDir = getAppSpecificAlbumStorageDir(context, "videos")
+        val videosDir = getAppSpecificAlbumStorageDir(context, videosDirectoryName)
         var physicalFiles = videosDir.listFiles() ?: return@withContext emptyList()
-        val preferencesManager = PreferencesManager(context)
+        val preferencesManager = PreferencesManager(context, prefsName)
 
         // Get the persisted list of settings
-        var persistedSettings = preferencesManager.getPlaylistSettings().toMutableList()
-        var settingsChanged = false
+        val rawSettings = preferencesManager.getPlaylistSettings()
 
-        // CHECK & MIGRATION
+        // Data Migration
+        val (migratedSettings, wasMigrated) = performDataMigration(
+            videosDir,
+            physicalFiles,
+            rawSettings,
+            preferencesManager
+        )
+        if (wasMigrated) {
+            physicalFiles = videosDir.listFiles() ?: emptyArray() // Refresh physical files
+        }
+
+        // Garbage Collection
+        val (cleanFiles, cleanSettings) = performGarbageCollection(physicalFiles, migratedSettings)
+
+        // Pagination Clean-up
+        val playlistManager = PlaylistManager(context, preferencesManager)
+        val collapseOccurred = playlistManager.collapseEmptyPages(cleanSettings)
+
+        // Save & Broadcast if needed
+        if (wasMigrated || cleanSettings.size != rawSettings.size || collapseOccurred) {
+            preferencesManager.savePlaylistSettings(cleanSettings)
+
+            val intent =
+                android.content.Intent(org.maocide.undeadwallpaper.service.UndeadWallpaperService.ACTION_PLAYLIST_REORDERED)
+                    .apply {
+                        setPackage(context.packageName)
+                    }
+            context.applicationContext.sendBroadcast(intent)
+        }
+
+        // Generate Thumbnails & Return
+        return@withContext generateThumbnailsAsync(cleanFiles, cleanSettings, preferencesManager)
+    }
+
+    /**
+     * Migrates legacy video files to the new UUID-based naming convention and cleans up corrupted files.
+     *
+     * @param videosDir The directory where video files are physically stored.
+     * @param physicalFiles The array of currently existing physical video files.
+     * @param persistedSettings The list of VideoSettings loaded from PreferencesManager.
+     * @param preferencesManager The manager instance to sync the active video URI if a rename occurs.
+     * @return A Pair containing the updated list of settings and a boolean indicating if changes (like renames/deletes) occurred.
+     */
+    private fun performDataMigration(
+        videosDir: java.io.File,
+        physicalFiles: Array<java.io.File>,
+        persistedSettings: List<org.maocide.undeadwallpaper.model.VideoSettings>,
+        preferencesManager: PreferencesManager
+    ): Pair<MutableList<org.maocide.undeadwallpaper.model.VideoSettings>, Boolean> {
+        var settingsChanged = false
         val updatedSettings = mutableListOf<org.maocide.undeadwallpaper.model.VideoSettings>()
+
         for (setting in persistedSettings) {
             val file = physicalFiles.find { it.name == setting.fileName }
             if (file != null) {
                 if (setting.expectedFileSize == null) {
                     settingsChanged = true
-                    
+
                     // Verify if it is the legacy default file, check size
                     val defaultFileName = context.getString(org.maocide.undeadwallpaper.R.string.default_video_filename)
                     if (setting.fileName == defaultFileName) {
-                        val EXPECTED_DEFAULT_SIZE = 1808797L
-                        if (file.length() != EXPECTED_DEFAULT_SIZE) {
-                            android.util.Log.e(tag, "File is corrupted, deleting video ${file.name}")
+                        if (BuildConfig.DEFAULT_ASSET_SIZE > 0 && file.length() != BuildConfig.DEFAULT_ASSET_SIZE) {
+                            FileLogger.e(tag, "File is corrupted, deleting video ${file.name}")
                             file.delete()
                             continue
                         }
@@ -192,8 +268,14 @@ class VideoFileManager(private val context: Context) {
                     val newFileName = "video_${java.util.UUID.randomUUID()}.mp4"
                     val newFile = java.io.File(videosDir, newFileName)
                     if (file.renameTo(newFile)) {
-                        updatedSettings.add(setting.copy(fileName = newFileName, expectedFileSize = newFile.length(), displayName = originalName))
-                        
+                        updatedSettings.add(
+                            setting.copy(
+                                fileName = newFileName,
+                                expectedFileSize = newFile.length(),
+                                displayName = originalName
+                            )
+                        )
+
                         // Keep the active video in sync
                         val activeUri = preferencesManager.getActiveVideoUri()
                         if (activeUri != null && android.net.Uri.parse(activeUri).lastPathSegment == originalName) {
@@ -204,7 +286,7 @@ class VideoFileManager(private val context: Context) {
                     }
                 } else if (setting.expectedFileSize != file.length()) {
                     // Inconsistency found
-                    android.util.Log.e(tag, "File is corrupted, deleting video ${file.name}")
+                    FileLogger.e(tag, "File is corrupted, deleting video ${file.name}")
                     file.delete()
                     settingsChanged = true
                     // Do not add to updatedSettings so it gets removed from the playlist
@@ -215,12 +297,21 @@ class VideoFileManager(private val context: Context) {
                 updatedSettings.add(setting) // File missing physically, will be filtered out below
             }
         }
+        return Pair(updatedSettings, settingsChanged)
+    }
 
-        if (settingsChanged) {
-            persistedSettings = updatedSettings
-            physicalFiles = videosDir.listFiles() ?: emptyArray() // Refresh physical files
-        }
-
+    /**
+     * Reconciles physical files with persisted settings, securely deleting unindexed "orphaned" 
+     * physical files and purging settings that point to missing physical files.
+     *
+     * @param physicalFiles The array of currently existing physical video files.
+     * @param persistedSettings The mutable list of VideoSettings after migration.
+     * @return A Pair containing the cleaned array of physical files and the cleaned list of VideoSettings.
+     */
+    private fun performGarbageCollection(
+        physicalFiles: Array<java.io.File>,
+        persistedSettings: MutableList<org.maocide.undeadwallpaper.model.VideoSettings>
+    ): Pair<Array<java.io.File>, MutableList<org.maocide.undeadwallpaper.model.VideoSettings>> {
         val persistedFileNames = persistedSettings.map { it.fileName }.toMutableList()
 
         // Identify physical files that are NOT in the persisted list (e.g., injected or orphaned files)
@@ -228,63 +319,65 @@ class VideoFileManager(private val context: Context) {
         val orphanedFiles = physicalFiles.filter { it.name !in persistedFileNames }
 
         // Security / Garbage Collection: Delete unindexed physical files
+        var cleanPhysicalFiles = physicalFiles
         if (orphanedFiles.isNotEmpty()) {
             for (file in orphanedFiles) {
-                android.util.Log.w(tag, "Deleting unindexed/injected physical file: ${file.name}")
+                FileLogger.w(tag, "Deleting unindexed/injected physical file: ${file.name}")
                 file.delete()
             }
-            // Update the physicalFiles array so we don't try to generate thumbnails for them
-            physicalFiles = physicalFiles.filter { it.name in persistedFileNames }.toTypedArray()
+            cleanPhysicalFiles = physicalFiles.filter { it.name in persistedFileNames }.toTypedArray()
         }
 
         // Identify files in the persisted list that no longer exist physically
         persistedFileNames.retainAll(physicalFileNames)
         persistedSettings.retainAll { it.fileName in physicalFileNames }
 
-        // Save the synchronized list back to SharedPreferences if it was changed
-        if (settingsChanged || persistedSettings.size != physicalFiles.size) {
-            preferencesManager.savePlaylistSettings(persistedSettings)
-            
-            // Broadcast intent to notify the background live wallpaper service 
-            // that the playlist or physical files (like a UUID migration) have changed, 
-            // so it can reload the active stream without freezing.
-            val intent = android.content.Intent(org.maocide.undeadwallpaper.service.UndeadWallpaperService.ACTION_PLAYLIST_REORDERED).apply {
-                setPackage(context.packageName)
-            }
-            context.applicationContext.sendBroadcast(intent)
-        }
+        return Pair(cleanPhysicalFiles, persistedSettings)
+    }
 
-        // Create a lookup map for physical files to maintain O(1) access
+    /**
+     * Asynchronously generates thumbnails and extracts metadata/colors for the cleaned video files.
+     * Limits concurrent processing to avoid OOM errors.
+     *
+     * @param physicalFiles The cleaned array of physical video files.
+     * @param persistedSettings The cleaned list of VideoSettings.
+     * @param preferencesManager The manager instance to persist newly extracted metadata/colors.
+     * @return A fully populated list of RecentFile objects ready for the UI layer.
+     */
+    private suspend fun generateThumbnailsAsync(
+        physicalFiles: Array<java.io.File>,
+        persistedSettings: List<org.maocide.undeadwallpaper.model.VideoSettings>,
+        preferencesManager: PreferencesManager
+    ): List<RecentFile> = kotlinx.coroutines.coroutineScope {
         val physicalFileMap = physicalFiles.associateBy { it.name }
+        val semaphore = kotlinx.coroutines.sync.Semaphore(4) // Limit to 4 concurrent thumbnail generations
 
-        // Generate thumbnails based on the synchronized order
-        val semaphore = Semaphore(4) // Limit to 4 concurrent thumbnail generations
-
-        persistedFileNames.mapNotNull { fileName ->
+        persistedSettings.mapNotNull { setting ->
+            val fileName = setting.fileName
             val file = physicalFileMap[fileName]
             if (file != null) {
                 async {
                     semaphore.withPermit {
                         try {
-                            kotlinx.coroutines.currentCoroutineContext().ensureActive() // Allow cancellation before heavy processing
+                            kotlinx.coroutines.currentCoroutineContext()
+                                .ensureActive() // Allow cancellation before heavy processing
 
                             val currentSettings = preferencesManager.getVideoSettings(fileName)
                             val thumbnail = getOrGenerateThumbnail(file)
 
                             // Extract WallpaperColors if needed
-                            if (thumbnail != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                            if (thumbnail != null) {
                                 if (currentSettings.primaryColor == null) {
-                                    // Downscale for performance
-                                    val scaledThumb = Bitmap.createScaledBitmap(thumbnail, 112, 112, true)
-                                    val colors = WallpaperColors.fromBitmap(scaledThumb)
-
-                                    preferencesManager.updateVideoSettings(fileName) { settings ->
-                                        settings.copy(
-                                            primaryColor = colors.primaryColor.toArgb(),
-                                            secondaryColor = colors.secondaryColor?.toArgb(),
-                                            tertiaryColor = colors.tertiaryColor?.toArgb(),
-                                            colorHints = colors.colorHints
-                                        )
+                                    val colors = MediaAnalyzer.extractWallpaperColors(thumbnail)
+                                    if (colors != null) {
+                                        preferencesManager.updateVideoSettings(fileName) { settings ->
+                                            settings.copy(
+                                                primaryColor = colors.primaryColor,
+                                                secondaryColor = colors.secondaryColor,
+                                                tertiaryColor = colors.tertiaryColor,
+                                                colorHints = colors.colorHints
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -297,34 +390,15 @@ class VideoFileManager(private val context: Context) {
                             // If metadata is missing, extract and save it
                             if (durationMs == null || width == null || height == null || fps == null) {
                                 try {
-                                    kotlinx.coroutines.currentCoroutineContext().ensureActive() // Check before extracting metadata
-                                    val retriever = MediaMetadataRetriever()
-                                    try {
-                                        retriever.setDataSource(file.path)
-                                        durationMs = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
-                                        width = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
-                                        height = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 0
-                                    } finally {
-                                        retriever.release()
-                                    }
+                                    kotlinx.coroutines.currentCoroutineContext()
+                                        .ensureActive() // Check before extracting metadata
 
-                                    val extractor = MediaExtractor()
-                                    try {
-                                        extractor.setDataSource(file.path)
-                                        for (i in 0 until extractor.trackCount) {
-                                            val format = extractor.getTrackFormat(i)
-                                            val mime = format.getString(MediaFormat.KEY_MIME)
+                                    val metadata = MediaAnalyzer.extractVideoMetadata(file.path)
 
-                                            if (mime?.startsWith("video/") == true) {
-                                                if (format.containsKey(MediaFormat.KEY_FRAME_RATE)) {
-                                                    fps = format.getInteger(MediaFormat.KEY_FRAME_RATE)
-                                                }
-                                                break // Found the video track, stop looking
-                                            }
-                                        }
-                                    } finally {
-                                        extractor.release()
-                                    }
+                                    durationMs = metadata.durationMs
+                                    width = metadata.width
+                                    height = metadata.height
+                                    fps = metadata.fps
 
                                     synchronized(preferencesManager) {
                                         preferencesManager.updateVideoSettings(fileName) { settings ->
@@ -337,7 +411,7 @@ class VideoFileManager(private val context: Context) {
                                         }
                                     }
                                 } catch (e: Exception) {
-                                    Log.e(tag, "Error extracting metadata for ${file.name}", e)
+                                    FileLogger.e(tag, "Error extracting metadata", e)
                                 }
                             }
 
@@ -351,7 +425,7 @@ class VideoFileManager(private val context: Context) {
                                 fps = fps ?: 0
                             )
                         } catch (e: Exception) {
-                            Log.e(tag, "Error loading thumbnail for ${file.name}", e)
+                            FileLogger.e(tag, "Error loading thumbnail", e)
                             RecentFile(file, null, sizeBytes = file.length())
                         }
                     }
@@ -368,11 +442,21 @@ class VideoFileManager(private val context: Context) {
      * @param filePath The path of the video file.
      * @return A [Bitmap] thumbnail, or null if creation fails.
      */
-    fun createVideoThumbnail(filePath: String): Bitmap? {
-        return ThumbnailUtils.createVideoThumbnail(
-            filePath,
-            MediaStore.Images.Thumbnails.MINI_KIND
-        )
+    private fun createVideoThumbnail(filePath: String): Bitmap? {
+        val retriever = android.media.MediaMetadataRetriever()
+        return try {
+            retriever.setDataSource(filePath)
+            retriever.getFrameAtTime()
+        } catch (_: Exception) {
+            FileLogger.w(tag, "Thumbnail failure. Media corrupted.")
+            null
+        } finally {
+            try {
+                retriever.release()
+            } catch (_: Exception) {
+                // Ignore release exceptions
+            }
+        }
     }
 
     /**
@@ -381,11 +465,11 @@ class VideoFileManager(private val context: Context) {
     fun getOrGenerateThumbnail(videoFile: File): Bitmap? {
         val thumbnailsDir = getAppSpecificAlbumStorageDir(context, "thumbnails")
         val thumbnailFile = File(thumbnailsDir, "${videoFile.nameWithoutExtension}.jpg")
-        
+
         if (thumbnailFile.exists()) {
             return android.graphics.BitmapFactory.decodeFile(thumbnailFile.absolutePath)
         }
-        
+
         val bitmap = createVideoThumbnail(videoFile.absolutePath)
         if (bitmap != null) {
             try {
@@ -393,7 +477,7 @@ class VideoFileManager(private val context: Context) {
                     bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, out)
                 }
             } catch (e: Exception) {
-                Log.e(tag, "Failed to cache thumbnail for ${videoFile.name}", e)
+                FileLogger.e(tag, "Failed to cache thumbnail", e)
             }
         }
         return bitmap
@@ -408,8 +492,8 @@ class VideoFileManager(private val context: Context) {
      */
     private fun getAppSpecificAlbumStorageDir(context: Context, albumName: String): File {
         val file = File(context.getExternalFilesDir(Environment.DIRECTORY_MOVIES), albumName)
-        if (!file.mkdirs()) {
-            Log.e(tag, "Directory not created or already exists")
+        if (!file.exists() && !file.mkdirs()) {
+            FileLogger.e(tag, "Failed to create directory: $albumName")
         }
         return file
     }
@@ -420,13 +504,21 @@ class VideoFileManager(private val context: Context) {
      * @param inputStream The input stream to copy from.
      * @param outputFile The file to copy to.
      */
-    private suspend fun copyStreamToFile(inputStream: InputStream, outputFile: File) {
+    private suspend fun copyStreamToFile(inputStream: InputStream, outputFile: File, maxBytes: Long = 524_288_000L) {
         inputStream.use { input ->
             FileOutputStream(outputFile).use { output ->
                 val buffer = ByteArray(64 * 1024)
                 var byteCount: Int
+                var totalBytesCopied = 0L
                 while (input.read(buffer).also { byteCount = it } != -1) {
-                    kotlinx.coroutines.currentCoroutineContext().ensureActive() // Checks for coroutine cancellation without yielding thread
+                    kotlinx.coroutines.currentCoroutineContext()
+                        .ensureActive() // Checks for coroutine cancellation without yielding thread
+
+                    totalBytesCopied += byteCount
+                    if (totalBytesCopied > maxBytes) {
+                        throw SizeLimitExceededException()
+                    }
+
                     output.write(buffer, 0, byteCount)
                 }
             }

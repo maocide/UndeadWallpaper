@@ -1,13 +1,10 @@
-<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<org.maocide.undeadwallpaper.ui.GestureSafeScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/settings_scroll_view"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context="ui.SettingsFragment"
-    android:paddingBottom="88dp"
-    android:clipToPadding="false"
-    >
+    tools:context="ui.SettingsFragment">
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
@@ -37,10 +34,24 @@
                 <FrameLayout
                     android:id="@+id/video_preview_container"
                     android:layout_width="0dp"
-                    android:layout_height="240dp"
+                    android:layout_height="0dp"
+                    app:layout_constraintDimensionRatio="16:9"
+                    android:descendantFocusability="blocksDescendants"
                     app:layout_constraintTop_toTopOf="parent"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintEnd_toEndOf="parent">
+
+                    <ImageView
+                        android:id="@+id/iv_video_blur_bg"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:scaleType="centerCrop"
+                        android:importantForAccessibility="no" />
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:background="#66000000" />
 
                     <androidx.media3.ui.PlayerView
                         android:id="@+id/video_preview"
@@ -57,12 +68,13 @@
                     style="@style/Widget.Material3.Button.ElevatedButton"
                     app:strokeWidth="1dp"
                     app:strokeColor="?attr/colorPrimary"
+                    android:alpha="0.85"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="16dp"
                     android:text="@string/pick_video"
                     app:cornerRadius="24dp"
-                    app:icon="@android:drawable/ic_menu_gallery"
+                    app:icon="@drawable/ic_load_in"
                     app:layout_constraintBottom_toBottomOf="@id/video_preview_container"
                     app:layout_constraintEnd_toEndOf="@id/video_preview_container"
                     app:layout_constraintStart_toStartOf="@id/video_preview_container" />
@@ -199,70 +211,92 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
+                android:orientation="vertical">
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/global_settings_header"
-                    android:textAppearance="?attr/textAppearanceTitleMedium" android:textStyle="bold"
-                    android:textColor="?attr/colorPrimary"
-                    android:layout_marginBottom="8dp"/>
-
-                <!-- Playback Mode -->
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    android:text="@string/playback_mode_setting"
-                    android:visibility="visible" />
-
-                <com.google.android.material.chip.ChipGroup
-                    android:id="@+id/playback_mode_group"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    app:singleSelection="true"
-                    app:selectionRequired="true"
-                    app:chipSpacingHorizontal="8dp">
+                    android:orientation="vertical"
+                    android:paddingTop="16dp"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:paddingBottom="0dp">
 
-                    <com.google.android.material.chip.Chip
-                        android:id="@+id/playback_mode_loop"
-                        style="@style/Widget.MaterialComponents.Chip.Choice"
+                    <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:checked="true"
-                        android:text="@string/playback_mode_loop"/>
+                        android:text="@string/global_settings_header"
+                        android:textAppearance="?attr/textAppearanceTitleMedium" android:textStyle="bold"
+                        android:textColor="?attr/colorPrimary"
+                        app:drawableStartCompat="@drawable/ic_public"
+                        android:drawablePadding="8dp"
+                        app:drawableTint="?attr/colorPrimary"
+                        android:layout_marginBottom="8dp"/>
 
-                    <com.google.android.material.chip.Chip
-                        android:id="@+id/playback_mode_oneshot"
-                        style="@style/Widget.MaterialComponents.Chip.Choice"
+                    <!-- Playback Mode -->
+                    <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/playback_mode_oneshot"/>
+                        android:layout_marginTop="8dp"
+                        android:text="@string/playback_mode_setting"
+                        android:visibility="visible" />
 
-                    <com.google.android.material.chip.Chip
-                        android:id="@+id/playback_mode_loop_all"
-                        style="@style/Widget.MaterialComponents.Chip.Choice"
-                        android:layout_width="wrap_content"
+                    <com.google.android.material.chip.ChipGroup
+                        android:id="@+id/playback_mode_group"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="@string/playback_mode_loop_all"/>
+                        android:layout_marginTop="4dp"
+                        app:singleSelection="true"
+                        app:selectionRequired="true"
+                        app:chipSpacingHorizontal="8dp">
 
-                    <com.google.android.material.chip.Chip
-                        android:id="@+id/playback_mode_shuffle"
-                        style="@style/Widget.MaterialComponents.Chip.Choice"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/playback_mode_shuffle"/>
+                        <com.google.android.material.chip.Chip
+                            android:id="@+id/playback_mode_loop"
+                            style="@style/Widget.MaterialComponents.Chip.Choice"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="true"
+                            android:text="@string/playback_mode_loop"/>
 
-                </com.google.android.material.chip.ChipGroup>
+                        <com.google.android.material.chip.Chip
+                            android:id="@+id/playback_mode_oneshot"
+                            style="@style/Widget.MaterialComponents.Chip.Choice"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/playback_mode_oneshot"/>
 
-                <!-- Start Time  -->
-                <TextView
-                    android:layout_width="wrap_content"
+                        <com.google.android.material.chip.Chip
+                            android:id="@+id/playback_mode_loop_all"
+                            style="@style/Widget.MaterialComponents.Chip.Choice"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/playback_mode_loop_all"/>
+
+                        <com.google.android.material.chip.Chip
+                            android:id="@+id/playback_mode_shuffle"
+                            style="@style/Widget.MaterialComponents.Chip.Choice"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/playback_mode_shuffle"/>
+
+                    </com.google.android.material.chip.ChipGroup>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/content_global_settings"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
+                    android:orientation="vertical"
+                    android:visibility="gone"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:paddingBottom="0dp">
+
+                    <!-- Start Time  -->
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
 
                     android:text="@string/start_time_label" />
 
@@ -400,6 +434,26 @@
                     android:indeterminate="true"
                     android:visibility="gone"
                     tools:visibility="visible" />
+                </LinearLayout>
+
+                <FrameLayout
+                    android:id="@+id/header_global_settings_chevron"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="8dp"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <ImageView
+                        android:id="@+id/icon_global_settings_chevron"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_expand_more"
+                        app:tint="?attr/colorPrimary"
+                        android:importantForAccessibility="no" />
+                </FrameLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -587,7 +641,7 @@
                     <ImageView
                         android:layout_width="24dp"
                         android:layout_height="24dp"
-                        android:src="@drawable/ic_science"
+                        android:src="@drawable/ic_panorama"
                         app:tint="?attr/colorPrimary"
                         android:layout_marginEnd="8dp"
                         android:contentDescription="@string/parallax_icon_description" />
@@ -653,7 +707,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:valueFrom="0.1"
-                        android:valueTo="3.0"
+                        android:valueTo="1.5"
                         android:value="0.5"
                         android:stepSize="0.1" />
                 </LinearLayout>
@@ -681,15 +735,83 @@
                 android:orientation="vertical"
                 android:padding="16dp">
 
-                <!-- Recent Files -->
-                <TextView
-                    android:layout_width="wrap_content"
+                <!-- Recent Files / Playlist Header -->
+                <androidx.constraintlayout.widget.ConstraintLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="@string/recent_files"
-                    android:textAppearance="?attr/textAppearanceTitleMedium"
-                    android:textStyle="bold"
-                    android:textColor="?attr/colorPrimary"
-                    android:layout_marginBottom="8dp" />
+                    android:layout_marginTop="-12dp"
+                    android:layout_marginBottom="8dp">
+
+                    <TextView
+                        android:id="@+id/tv_playlist_title"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/recent_files"
+                        android:textAppearance="?attr/textAppearanceTitleMedium"
+                        android:textStyle="bold"
+                        android:textColor="?attr/colorPrimary"
+                        app:drawableStartCompat="@drawable/ic_playlist_filled"
+                        android:drawablePadding="8dp"
+                        app:drawableTint="?attr/colorPrimary"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent"
+                        app:layout_constraintBottom_toBottomOf="parent" />
+
+                    <ImageButton
+                        android:id="@+id/btn_prev_page"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:src="@drawable/ic_expand_more"
+                        android:rotation="90"
+                        android:contentDescription="Previous Page"
+                        app:tint="?attr/colorPrimary"
+                        app:layout_constraintTop_toTopOf="parent"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintEnd_toStartOf="@id/tv_page_number" />
+
+                    <TextView
+                        android:id="@+id/tv_page_number"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:minWidth="24dp"
+                        android:gravity="center"
+                        android:text="0"
+                        android:padding="16dp"
+                        android:textAppearance="?attr/textAppearanceTitleMedium"
+                        android:textStyle="bold"
+                        android:textColor="?attr/colorPrimary"
+                        app:layout_constraintTop_toTopOf="parent"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintEnd_toStartOf="@id/btn_next_page" />
+
+                    <ImageButton
+                        android:id="@+id/btn_next_page"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:src="@drawable/ic_expand_more"
+                        android:rotation="-90"
+                        android:contentDescription="Next Page"
+                        app:tint="?attr/colorPrimary"
+                        app:layout_constraintTop_toTopOf="parent"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintEnd_toStartOf="@id/btn_add_to_playlist"
+                        android:layout_marginEnd="16dp" />
+                    
+                    <ImageButton
+                        android:id="@+id/btn_add_to_playlist"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:src="@drawable/ic_load_in"
+                        android:contentDescription="Add to Playlist"
+                        app:tint="?attr/colorPrimary"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintTop_toTopOf="parent"
+                        app:layout_constraintBottom_toBottomOf="parent" />
+
+                </androidx.constraintlayout.widget.ConstraintLayout>
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -699,17 +821,58 @@
                     android:textAppearance="?attr/textAppearanceCaption"
                     android:textColor="?android:attr/textColorSecondary" />
 
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/recycler_view_recent_files"
+                <FrameLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp" />
+                    android:layout_marginTop="8dp"
+                    android:minHeight="200dp">
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/recycler_view_recent_files"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent" />
+
+                    <LinearLayout
+                        android:id="@+id/layout_empty_playlist"
+                        android:layout_width="match_parent"
+                        android:layout_height="200dp"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:visibility="gone"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true">
+
+                        <ImageView
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:src="@drawable/ic_tombstone"    
+                            android:scaleType="fitCenter"
+                            android:alpha="0.5" />
+                    </LinearLayout>
+                </FrameLayout>
 
             </LinearLayout>
 
 
         </com.google.android.material.card.MaterialCardView>
 
-    </androidx.constraintlayout.widget.ConstraintLayout>
+        <TextView
+            android:id="@+id/tv_brains"
+            android:layout_width="wrap_content"
+            android:layout_height="88dp"
+            android:gravity="center"
+            android:text="made with 🧠s and parts"
+            android:textAppearance="?attr/textAppearanceLabelMedium"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:alpha="0.7"
+            android:clickable="true"
+            android:focusable="true"
+            android:hapticFeedbackEnabled="true"
+            app:layout_constraintTop_toBottomOf="@id/card_playlist"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent" />
 
-</androidx.core.widget.NestedScrollView>
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</org.maocide.undeadwallpaper.ui.GestureSafeScrollView>

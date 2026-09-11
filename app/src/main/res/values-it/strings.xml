@@ -14,7 +14,7 @@
     <string name="trim_video">Taglia Video</string>
     <string name="setting_audio_enabled">Abilita Audio</string>
     <string name="playback_mode_setting">Modalita Playback</string>
-    <string name="recent_files">Playlist / File Recenti</string>
+    <string name="recent_files">Playlist</string>
     <string name="playlist_instructions">Tieni premuto per riordinare. Scorri a sinistra o a destra per rimuovere.</string>
     <string name="error_cannot_remove_last_video">Impossibile rimuovere l\'ultimo video nella playlist.</string>
     <string name="apply_trim">Applica</string>
@@ -81,7 +81,8 @@
 
     <!-- UI Headers & Sections -->
     <string name="custom_settings_header">Impostazioni personalizzate</string>
-    <string name="importing_video">Importazione video</string>
+    <string name="importing_video">Infestando nuovi file</string>
+    <string name="preparing_assets">Risvegliando i non morti</string>
     <string name="positioning_header">Posizionamento</string>
     <string name="general_header">Generali</string>
     <string name="volume_label">Volume</string>
@@ -132,10 +133,16 @@
     <string name="log_cleared_toast">File di log cancellato</string>
 
     <!-- Parallax -->
-    <string name="parallax_icon_description">Sperimentale</string>
-    <string name="parallax_card_title">Esperimento Parallasse</string>
+    <string name="parallax_icon_description">Parallasse</string>
+    <string name="parallax_card_title">Parallasse</string>
     <string name="parallax_toggle_label">Parallasse Home Screen</string>
     <string name="parallax_description">Sposta il video mentre scorri le pagine. Zoomma leggermente il video per nascondere i bordi neri. Nota: potrebbe non funzionare con alcuni launcher personalizzati.</string>
     <string name="parallax_strength_label">Intensità Parallasse</string>
 
+
+    <string name="mirror_video">Specchia Video</string>
+    <string name="flip_horizontal">Orizzontale</string>
+    <string name="flip_vertical">Verticale</string>
+    <string name="error_file_too_large">Il video selezionato supera il limite di 500 MB.</string>
+    <string name="warning_status_bar_oem">Potrebbe non essere supportato da tutti i launcher.</string>
 </resources>

@@ -1,0 +1,19 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- The Smartphone Frame (Classic 9:16 slightly blockier ratio with wide screen) -->
+    <path
+        android:fillColor="#000000"
+        android:fillType="evenOdd"
+        android:pathData="M 7.7,1.75 H 16.3 A 2.2,2.2 0 0,1 18.5,3.95 V 20.05 A 2.2,2.2 0 0,1 16.3,22.25 H 7.7 A 2.2,2.2 0 0,1 5.5,20.05 V 3.95 A 2.2,2.2 0 0,1 7.7,1.75 Z M 6.8,4.2 H 17.2 V 19.8 H 6.8 Z M 10.2,2.5 H 13.8 V 3.3 H 10.2 Z" />
+
+    <!-- The Undead Tombstone with Stepped Plinth & Cutout Cross -->
+    <path
+        android:fillColor="#000000"
+        android:fillType="evenOdd"
+        android:pathData="M 8.2,18.5 H 15.8 V 16.9 H 14.7 V 12.2 A 2.7,2.7 0 0,0 9.3,12.2 V 16.9 H 8.2 Z M 11.4,11.2 h 1.2 v 1.1 h 1.0 v 1.1 h -1.0 v 2.0 h -1.2 v -2.0 h -1.0 v -1.1 h 1.0 Z" />
+
+</vector>

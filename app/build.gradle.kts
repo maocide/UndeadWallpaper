@@ -12,10 +12,15 @@ android {
         applicationId = "org.maocide.undeadwallpaper"
         minSdk = 28
         targetSdk = 36
-        versionCode = 47
-        versionName = "1.3.8"
+        versionCode = 64
+        versionName = "1.4.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Dynamically compute the size of the default asset to prevent manual mismatch errors
+        val defaultAssetFile = file("src/main/res/raw/zombillie_default.mp4")
+        val assetSize = if (defaultAssetFile.exists()) defaultAssetFile.length() else 0L
+        buildConfigField("Long", "DEFAULT_ASSET_SIZE", "${assetSize}L")
     }
 
     buildTypes {
@@ -26,7 +31,6 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug")
         }
     }
     compileOptions {

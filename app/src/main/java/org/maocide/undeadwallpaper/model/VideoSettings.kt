@@ -26,7 +26,10 @@ data class VideoSettings(
     val durationMs: Long? = null,
     val width: Int? = null,
     val height: Int? = null,
-    val fps: Int? = null
+    val fps: Int? = null,
+    val flipHorizontal: Boolean = false,
+    val flipVertical: Boolean = false,
+    val page: Int = 0
 ) {
     fun getEffectiveDisplayName(): String {
         return displayName ?: fileName
@@ -62,6 +65,9 @@ data class VideoSettings(
         if (volume != defaultSettings.volume) {
             changedLabels.add(context.getString(R.string.breadcrumb_volume))
         }
+        if (flipHorizontal != defaultSettings.flipHorizontal || flipVertical != defaultSettings.flipVertical) {
+            changedLabels.add("Flipped")
+        }
 
         if (changedLabels.isEmpty()) {
             return null
@@ -88,7 +94,9 @@ data class VideoSettings(
                 this.positionY == other.positionY &&
                 this.zoom == other.zoom &&
                 this.rotation == other.rotation &&
-                this.brightness == other.brightness
+                this.brightness == other.brightness &&
+                this.flipHorizontal == other.flipHorizontal &&
+                this.flipVertical == other.flipVertical
     }
 
     /**

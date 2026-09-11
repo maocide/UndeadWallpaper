@@ -22,6 +22,9 @@ object FileLogger {
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
     private var isInitialized = false
     private var isLoggingEnabled = false
+    private val logExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
+    private val URI_REGEX = Regex("content://[\\w\\.\\-\\/]+")
+    private val STORAGE_REGEX = Regex("/storage/[\\w\\-]+/[\\w\\.\\-\\/]+")
 
     /**
      * Sets whether file logging should actively write to the file.
@@ -56,20 +59,25 @@ object FileLogger {
      */
     private fun sanitize(msg: String?): String {
         if (msg == null) return ""
+        val truncatedMsg = if (msg.length > 2000) msg.substring(0, 2000) + "... [TRUNCATED]" else msg
+        
         if (BuildConfig.DEBUG) {
-            return msg
+            return truncatedMsg
         }
 
-        var sanitized = msg
+        var sanitized = truncatedMsg
 
         // Example 1: Redact standard content URIs (e.g., content://media/external/video/media/123)
         // Replaces the specific ID/path with [URI_REDACTED]
-        sanitized = sanitized.replace(Regex("content://[\\w\\.\\-\\/]+"), "[URI_REDACTED]")
+        sanitized = sanitized.replace(URI_REGEX, "[URI_REDACTED]")
 
         // Example 2: Redact absolute file paths (e.g., /storage/emulated/0/Movies/my_video.mp4)
         // Keeps the file extension if it exists, so you still know the format failing
-        sanitized = sanitized.replace(Regex("/storage/[\\w\\-]+/[\\w\\.\\-\\/]+(\\.\\w+)?")) { matchResult ->
-            val extension = matchResult.groups[1]?.value ?: ""
+        sanitized = sanitized.replace(STORAGE_REGEX) { matchResult ->
+            val fullPath = matchResult.value
+            val lastDot = fullPath.lastIndexOf('.')
+            val lastSlash = fullPath.lastIndexOf('/')
+            val extension = if (lastDot > lastSlash && lastDot != -1) fullPath.substring(lastDot) else ""
             "[STORAGE_PATH_REDACTED]$extension"
         }
 
@@ -79,7 +87,6 @@ object FileLogger {
     /**
      * Helper method to write a formatted string to the log file.
      */
-    @Synchronized
     private fun writeToFile(level: String, tag: String, cleanMsg: String, cleanTr: String? = null) {
         if (!isInitialized || logFile == null || !isLoggingEnabled) return
 
@@ -110,52 +117,64 @@ object FileLogger {
      * Debug log
      */
     fun d(tag: String, msg: String, tr: Throwable? = null) {
-        val cleanMsg = sanitize(msg)
-        val cleanTr = tr?.let { sanitize(Log.getStackTraceString(it)) }
+        if (!BuildConfig.DEBUG && !isLoggingEnabled) return
+        logExecutor.execute {
+            val cleanMsg = sanitize(msg)
+            val cleanTr = tr?.let { sanitize(Log.getStackTraceString(it)) }
 
-        if (BuildConfig.DEBUG) {
-            if (cleanTr != null) Log.d(tag, "$cleanMsg\n$cleanTr") else Log.d(tag, cleanMsg)
+            if (BuildConfig.DEBUG) {
+                if (cleanTr != null) Log.d(tag, "$cleanMsg\n$cleanTr") else Log.d(tag, cleanMsg)
+            }
+            writeToFile("D", tag, cleanMsg, cleanTr)
         }
-        writeToFile("D", tag, cleanMsg, cleanTr)
     }
 
     /**
      * Info log
      */
     fun i(tag: String, msg: String, tr: Throwable? = null) {
-        val cleanMsg = sanitize(msg)
-        val cleanTr = tr?.let { sanitize(Log.getStackTraceString(it)) }
+        if (!BuildConfig.DEBUG && !isLoggingEnabled) return
+        logExecutor.execute {
+            val cleanMsg = sanitize(msg)
+            val cleanTr = tr?.let { sanitize(Log.getStackTraceString(it)) }
 
-        if (BuildConfig.DEBUG) {
-            if (cleanTr != null) Log.i(tag, "$cleanMsg\n$cleanTr") else Log.i(tag, cleanMsg)
+            if (BuildConfig.DEBUG) {
+                if (cleanTr != null) Log.i(tag, "$cleanMsg\n$cleanTr") else Log.i(tag, cleanMsg)
+            }
+            writeToFile("I", tag, cleanMsg, cleanTr)
         }
-        writeToFile("I", tag, cleanMsg, cleanTr)
     }
 
     /**
      * Warning log
      */
     fun w(tag: String, msg: String, tr: Throwable? = null) {
-        val cleanMsg = sanitize(msg)
-        val cleanTr = tr?.let { sanitize(Log.getStackTraceString(it)) }
+        if (!BuildConfig.DEBUG && !isLoggingEnabled) return
+        logExecutor.execute {
+            val cleanMsg = sanitize(msg)
+            val cleanTr = tr?.let { sanitize(Log.getStackTraceString(it)) }
 
-        if (BuildConfig.DEBUG) {
-            if (cleanTr != null) Log.w(tag, "$cleanMsg\n$cleanTr") else Log.w(tag, cleanMsg)
+            if (BuildConfig.DEBUG) {
+                if (cleanTr != null) Log.w(tag, "$cleanMsg\n$cleanTr") else Log.w(tag, cleanMsg)
+            }
+            writeToFile("W", tag, cleanMsg, cleanTr)
         }
-        writeToFile("W", tag, cleanMsg, cleanTr)
     }
 
     /**
      * Error log
      */
     fun e(tag: String, msg: String, tr: Throwable? = null) {
-        val cleanMsg = sanitize(msg)
-        val cleanTr = tr?.let { sanitize(Log.getStackTraceString(it)) }
+        if (!BuildConfig.DEBUG && !isLoggingEnabled) return
+        logExecutor.execute {
+            val cleanMsg = sanitize(msg)
+            val cleanTr = tr?.let { sanitize(Log.getStackTraceString(it)) }
 
-        if (BuildConfig.DEBUG) {
-            if (cleanTr != null) Log.e(tag, "$cleanMsg\n$cleanTr") else Log.e(tag, cleanMsg)
+            if (BuildConfig.DEBUG) {
+                if (cleanTr != null) Log.e(tag, "$cleanMsg\n$cleanTr") else Log.e(tag, cleanMsg)
+            }
+            writeToFile("E", tag, cleanMsg, cleanTr)
         }
-        writeToFile("E", tag, cleanMsg, cleanTr)
     }
 
     /**
@@ -169,10 +188,12 @@ object FileLogger {
      * Clears the current log file.
      */
     fun clearLog() {
-        if (logFile?.exists() == true) {
-            logFile?.delete()
-            logFile?.createNewFile()
-            i("FileLogger", "Log file cleared.")
+        logExecutor.execute {
+            if (logFile?.exists() == true) {
+                logFile?.delete()
+                logFile?.createNewFile()
+                i("FileLogger", "Log file cleared.")
+            }
         }
     }
 }

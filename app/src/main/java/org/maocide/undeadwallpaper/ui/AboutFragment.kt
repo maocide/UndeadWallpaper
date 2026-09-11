@@ -45,6 +45,8 @@ class AboutFragment : Fragment() {
         binding.textviewLicense.movementMethod = LinkMovementMethod.getInstance()
 
         setupDebugOptions()
+
+        binding.cardDebugOptions.visibility = if (preferencesManager.isUndead()) View.VISIBLE else View.GONE
     }
 
     private fun setupDebugOptions() {
@@ -108,7 +110,12 @@ class AboutFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        updateLogButtonsState()
+        binding.cardDebugOptions.visibility = if (preferencesManager.isUndead()) View.VISIBLE else View.GONE
+        
+        if (preferencesManager.isUndead()) {
+            updateLogButtonsState()
+            binding.switchEnableLogging.isChecked = preferencesManager.isLoggingEnabled()
+        }
     }
 
     private fun updateLogButtonsState() {

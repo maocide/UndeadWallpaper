@@ -5,7 +5,14 @@
         <item name="colorPrimary">@color/light_green</item>
         <item name="colorSecondary">@color/zombie_green</item>
         <item name="bottomSheetDialogTheme">@style/ThemeOverlay.UndeadWallpaper.BottomSheetDialog</item>
+        <item name="popupMenuStyle">@style/Widget.UndeadWallpaper.PopupMenu</item>
+        <item name="android:popupMenuStyle">@style/Widget.UndeadWallpaper.PopupMenu</item>
+        <item name="actionOverflowMenuStyle">@style/Widget.UndeadWallpaper.PopupMenu</item>
+    </style>
 
+    <style name="Widget.UndeadWallpaper.PopupMenu" parent="Widget.Material3.PopupMenu">
+        <item name="android:popupBackground">@drawable/bg_popup_rim</item>
+        <item name="android:overlapAnchor">true</item>
     </style>
 
     <style name="Theme.UndeadWallpaper" parent="Base.Theme.UndeadWallpaper" />

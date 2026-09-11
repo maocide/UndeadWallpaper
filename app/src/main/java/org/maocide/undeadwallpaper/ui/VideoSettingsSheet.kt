@@ -101,17 +101,22 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
             binding.videoMetadata.text = metadata
         }
 
-        // Load thumbnail
+        // Load thumbnail using cached disk representation (self-heals if missing)
         lifecycleScope.launch(Dispatchers.IO) {
             val videoFileManager = VideoFileManager(requireContext())
-            val videosDir = context?.getExternalFilesDir(android.os.Environment.DIRECTORY_MOVIES)?.let { File(it, "videos") }
+            val videosDir =
+                context?.getExternalFilesDir(android.os.Environment.DIRECTORY_MOVIES)?.let { File(it, "videos") }
             if (videosDir != null) {
                 val file = File(videosDir, fileName)
                 if (file.exists()) {
-                    val thumbnail = videoFileManager.createVideoThumbnail(file.path)
+                    val thumbnail = videoFileManager.getOrGenerateThumbnail(file)
                     withContext(Dispatchers.Main) {
-                        if (thumbnail != null) {
+                        if (thumbnail != null && _binding != null) {
                             binding.thumbnailPreview.setImageBitmap(thumbnail)
+                            binding.thumbnailPreview.animate()
+                                .alpha(1f)
+                                .setDuration(150L)
+                                .start()
                         }
                     }
                 }
@@ -127,6 +132,16 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
         try {
             val settings = preferencesManager.getVideoSettings(fileName)
             val defaults = VideoSettings(fileName)
+
+            binding.chipFlipHorizontal.isChecked = settings.flipHorizontal
+            binding.chipFlipVertical.isChecked = settings.flipVertical
+
+            // Mark mirror section as modified if any flip is enabled (default is false)
+            binding.mirrorLabel.markIfModified(
+                binding.mirrorIcon,
+                settings.flipHorizontal || settings.flipVertical,
+                false
+            )
 
             when (settings.scalingMode) {
                 ScalingMode.FIT -> binding.scalingModeGroup.check(binding.scalingModeFit.id)
@@ -176,7 +191,13 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
     private fun setupListeners() {
         val defaults = VideoSettings(fileName)
 
-        fun setupSafeSlider(slider: Slider, label: TextView, icon: ImageView, defaultVal: Float, saveAction: (Float) -> Unit) {
+        fun setupSafeSlider(
+            slider: Slider,
+            label: TextView,
+            icon: ImageView,
+            defaultVal: Float,
+            saveAction: (Float) -> Unit
+        ) {
             slider.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
                 override fun onStartTrackingTouch(slider: Slider) {}
 
@@ -187,7 +208,7 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
                 }
             })
 
-            
+
         }
 
 
@@ -202,16 +223,79 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
             binding.scalingModeLabel.markIfModified(binding.scalingModeIcon, newMode, defaults.scalingMode)
         }
 
-        setupSafeSlider(binding.positionXSlider, binding.positionXLabel, binding.positionXIcon, defaults.positionX) { value -> updateSettings { it.copy(positionX = value) } }
-        setupSafeSlider(binding.positionYSlider, binding.positionYLabel, binding.positionYIcon, defaults.positionY) { value -> updateSettings { it.copy(positionY = value) } }
-        setupSafeSlider(binding.zoomSlider, binding.zoomLabel, binding.zoomIcon, defaults.zoom) { value -> updateSettings { it.copy(zoom = value) } }
-        setupSafeSlider(binding.rotationSlider, binding.rotationLabel, binding.rotationIcon, defaults.rotation) { value -> updateSettings { it.copy(rotation = value) } }
-        setupSafeSlider(binding.brightnessSlider, binding.brightnessLabel, binding.brightnessIcon, defaults.brightness) { value -> updateSettings { it.copy(brightness = value) } }
-        setupSafeSlider(binding.speedSlider, binding.speedLabel, binding.speedIcon, defaults.speed) { value -> updateSettings { it.copy(speed = value) } }
-        setupSafeSlider(binding.volumeSlider, binding.volumeLabel, binding.volumeIcon, defaults.volume) { value -> updateSettings { it.copy(volume = value) } }
+        binding.chipFlipHorizontal.setOnCheckedChangeListener { _, isChecked ->
+            if (isUpdatingUi) return@setOnCheckedChangeListener
+            updateSettings { it.copy(flipHorizontal = isChecked) }
+            binding.mirrorLabel.markIfModified(
+                binding.mirrorIcon,
+                isChecked || binding.chipFlipVertical.isChecked,
+                false
+            )
+        }
+
+        binding.chipFlipVertical.setOnCheckedChangeListener { _, isChecked ->
+            if (isUpdatingUi) return@setOnCheckedChangeListener
+            updateSettings { it.copy(flipVertical = isChecked) }
+            binding.mirrorLabel.markIfModified(
+                binding.mirrorIcon,
+                binding.chipFlipHorizontal.isChecked || isChecked,
+                false
+            )
+        }
+
+        setupSafeSlider(
+            binding.positionXSlider,
+            binding.positionXLabel,
+            binding.positionXIcon,
+            defaults.positionX
+        ) { value -> updateSettings { it.copy(positionX = value) } }
+        setupSafeSlider(
+            binding.positionYSlider,
+            binding.positionYLabel,
+            binding.positionYIcon,
+            defaults.positionY
+        ) { value -> updateSettings { it.copy(positionY = value) } }
+        setupSafeSlider(
+            binding.zoomSlider,
+            binding.zoomLabel,
+            binding.zoomIcon,
+            defaults.zoom
+        ) { value -> updateSettings { it.copy(zoom = value) } }
+        setupSafeSlider(
+            binding.rotationSlider,
+            binding.rotationLabel,
+            binding.rotationIcon,
+            defaults.rotation
+        ) { value -> updateSettings { it.copy(rotation = value) } }
+        setupSafeSlider(
+            binding.brightnessSlider,
+            binding.brightnessLabel,
+            binding.brightnessIcon,
+            defaults.brightness
+        ) { value -> updateSettings { it.copy(brightness = value) } }
+        setupSafeSlider(
+            binding.speedSlider,
+            binding.speedLabel,
+            binding.speedIcon,
+            defaults.speed
+        ) { value -> updateSettings { it.copy(speed = value) } }
+        setupSafeSlider(
+            binding.volumeSlider,
+            binding.volumeLabel,
+            binding.volumeIcon,
+            defaults.volume
+        ) { value -> updateSettings { it.copy(volume = value) } }
 
         binding.buttonResetAdvanced.setOnClickListener {
-            updateSettings { VideoSettings(fileName) }
+            updateSettings { currentSettings ->
+                VideoSettings(
+                    fileName = fileName,
+                    page = currentSettings.page,
+                    durationMs = currentSettings.durationMs,
+                    expectedFileSize = currentSettings.expectedFileSize,
+                    displayName = currentSettings.displayName
+                )
+            }
             syncUiState()
         }
     }
@@ -247,6 +331,28 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
     }
 
     private fun TextView.markIfModified(icon: ImageView, current: Float, default: Float) {
+        if (current != default) {
+            val typedValue = TypedValue()
+            context.theme.resolveAttribute(androidx.appcompat.R.attr.colorPrimary, typedValue, true)
+            val primaryColor = ContextCompat.getColor(context, typedValue.resourceId)
+            this.setTextColor(primaryColor)
+            this.setTypeface(null, android.graphics.Typeface.BOLD)
+
+            icon.setColorFilter(primaryColor)
+            icon.alpha = 1.0f
+        } else {
+            val typedValue = TypedValue()
+            context.theme.resolveAttribute(android.R.attr.textColorSecondary, typedValue, true)
+            val secondaryColor = ContextCompat.getColor(context, typedValue.resourceId)
+            this.setTextColor(secondaryColor)
+            this.setTypeface(null, android.graphics.Typeface.NORMAL)
+
+            icon.setColorFilter(secondaryColor)
+            icon.alpha = 0.5f
+        }
+    }
+
+    private fun TextView.markIfModified(icon: ImageView, current: Boolean, default: Boolean) {
         if (current != default) {
             val typedValue = TypedValue()
             context.theme.resolveAttribute(androidx.appcompat.R.attr.colorPrimary, typedValue, true)

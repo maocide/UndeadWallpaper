@@ -12,5 +12,8 @@
         <item name="colorOnSecondaryContainer">@color/light_green</item>
 
         <item name="bottomSheetDialogTheme">@style/ThemeOverlay.UndeadWallpaper.BottomSheetDialog</item>
+        <item name="popupMenuStyle">@style/Widget.UndeadWallpaper.PopupMenu</item>
+        <item name="android:popupMenuStyle">@style/Widget.UndeadWallpaper.PopupMenu</item>
+        <item name="actionOverflowMenuStyle">@style/Widget.UndeadWallpaper.PopupMenu</item>
     </style>
 </resources>

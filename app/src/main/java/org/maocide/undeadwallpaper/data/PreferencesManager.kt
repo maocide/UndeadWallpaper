@@ -22,10 +22,10 @@ import org.maocide.undeadwallpaper.model.WallpaperAction
  *
  * @param context The application context.
  */
-class PreferencesManager(context: Context) {
+class PreferencesManager(context: Context, prefsName: String = PREFS_NAME) {
 
     private val sharedPrefs: SharedPreferences =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        context.getSharedPreferences(prefsName, Context.MODE_PRIVATE)
 
     private val jsonParser = Json { ignoreUnknownKeys = true }
 
@@ -54,6 +54,7 @@ class PreferencesManager(context: Context) {
 
         private const val KEY_RECENT_FILES_LIST = "recent_files_list"
         private const val KEY_PLAYLIST_SETTINGS = "playlist_settings"
+        private const val KEY_ACTIVE_PAGE = "active_page"
 
         private const val KEY_ACTION_DOUBLE_TAP = "action_double_tap"
 
@@ -61,12 +62,29 @@ class PreferencesManager(context: Context) {
 
         private const val KEY_ACTION_LONG_PRESS = "action_long_press"
 
+        private const val KEY_ACTION_SWIPE_UP = "action_swipe_up"
+        private const val KEY_ACTION_SWIPE_DOWN = "action_swipe_down"
+        
+
         private const val KEY_PARALLAX_ENABLED = "parallax_enabled"
         private const val KEY_PARALLAX_STRENGTH = "parallax_strength"
+
+        // Transient State for Anti-Tampering (Not saved to disk)
+        private var transientIsUndead = false
     }
 
     init {
         migrateToPerVideoSettings()
+        migrateParallaxSettings()
+    }
+
+    private fun migrateParallaxSettings() {
+        if (sharedPrefs.contains(KEY_PARALLAX_STRENGTH)) {
+            val current = sharedPrefs.getFloat(KEY_PARALLAX_STRENGTH, 0.4f)
+            if (current > 1.5f) {
+                sharedPrefs.edit { putFloat(KEY_PARALLAX_STRENGTH, 0.4f) }
+            }
+        }
     }
 
     private fun migrateToPerVideoSettings() {
@@ -195,6 +213,14 @@ class PreferencesManager(context: Context) {
         cachedPlaylistSettings = playlist
         sharedPrefs.edit(commit = true)
         { putString(KEY_PLAYLIST_SETTINGS, jsonString) }
+    }
+
+    fun getActivePage(): Int {
+        return sharedPrefs.getInt(KEY_ACTIVE_PAGE, 0)
+    }
+
+    fun saveActivePage(page: Int) {
+        sharedPrefs.edit { putInt(KEY_ACTIVE_PAGE, page) }
     }
 
     fun updateVideoSettings(fileName: String, updater: (VideoSettings) -> VideoSettings) {
@@ -357,7 +383,15 @@ class PreferencesManager(context: Context) {
     }
 
     fun getParallaxStrength(): Float {
-        return sharedPrefs.getFloat(KEY_PARALLAX_STRENGTH, 0.4f)
+        return sharedPrefs.getFloat(KEY_PARALLAX_STRENGTH, 0.4f).coerceIn(0.1f, 1.5f)
+    }
+
+    fun setUndead(isUndead: Boolean) {
+        transientIsUndead = isUndead
+    }
+
+    fun isUndead(): Boolean {
+        return transientIsUndead
     }
 
 }

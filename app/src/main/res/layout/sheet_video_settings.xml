@@ -33,8 +33,9 @@
                 android:layout_width="88dp"
                 android:layout_height="88dp"
                 android:scaleType="centerCrop"
-                android:background="@android:color/darker_gray"
-                app:shapeAppearanceOverlay="@style/CornerStyle" />
+                android:alpha="0"
+                app:shapeAppearanceOverlay="@style/CornerStyle"
+                tools:alpha="1" />
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -292,6 +293,54 @@
                         android:layout_height="24dp"
                         android:layout_marginStart="16dp"
                         android:src="@drawable/ic_rotate_right"
+                        android:alpha="0.5"
+                        app:tint="?android:attr/textColorSecondary" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/mirror_label"
+                    android:text="@string/mirror_video"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textColor="?android:attr/textColorSecondary" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <com.google.android.material.chip.ChipGroup
+                        android:id="@+id/mirror_group"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        app:chipSpacingHorizontal="8dp"
+                        app:singleSelection="false"
+                        app:selectionRequired="false">
+
+                        <com.google.android.material.chip.Chip
+                            android:id="@+id/chip_flip_horizontal"
+                            style="@style/Widget.MaterialComponents.Chip.Choice"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/flip_horizontal" />
+
+                        <com.google.android.material.chip.Chip
+                            android:id="@+id/chip_flip_vertical"
+                            style="@style/Widget.MaterialComponents.Chip.Choice"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/flip_vertical" />
+                    </com.google.android.material.chip.ChipGroup>
+
+                    <ImageView
+                        android:id="@+id/mirror_icon"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_marginStart="16dp"
+                        android:src="@drawable/ic_flip"
                         android:alpha="0.5"
                         app:tint="?android:attr/textColorSecondary" />
                 </LinearLayout>

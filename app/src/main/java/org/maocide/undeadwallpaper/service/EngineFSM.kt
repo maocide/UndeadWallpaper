@@ -64,6 +64,7 @@ class EngineFSM(private val context: android.content.Context) {
         private set
 
 
+    @Synchronized
     fun transition(event: EngineEvent): EngineEffect {
         val (nextState, effect) = reduce(state, event)
         this.state = nextState
@@ -184,7 +185,7 @@ class EngineFSM(private val context: android.content.Context) {
             val diffAbs = kotlin.math.abs(diff)
             val clamped = kotlin.math.min(1, diffAbs)
             (1 - clamped).toFloat()
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             1.0f
         }
     }

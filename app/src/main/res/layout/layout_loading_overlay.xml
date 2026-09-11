@@ -13,52 +13,53 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
+        android:layout_margin="24dp"
         app:cardCornerRadius="24dp"
         app:strokeColor="?attr/colorPrimary"
         app:strokeWidth="1dp"
         app:cardElevation="8dp"
         app:cardBackgroundColor="?attr/colorSurfaceContainer">
 
-        <LinearLayout
+        <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="24dp"
-            android:gravity="center">
+            android:padding="24dp">
 
-            <LinearLayout
+            <TextView
+                android:id="@+id/tv_loading_message"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="bottom">
+                android:text="@string/importing_video"
+                android:textAppearance="?attr/textAppearanceTitleMedium"
+                android:textStyle="bold"
+                android:textColor="?attr/colorPrimary"
+                app:layout_constrainedWidth="true"
+                app:layout_constraintHorizontal_chainStyle="packed"
+                app:layout_constraintHorizontal_bias="0.5"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toStartOf="@id/loading_dots"
+                app:layout_constraintTop_toTopOf="parent" />
 
-                <TextView
-                    android:id="@+id/tv_loading_message"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/importing_video"
-                    android:textAppearance="?attr/textAppearanceTitleMedium"
-                    android:textStyle="bold"
-                    android:textColor="?attr/colorPrimary" />
-
-                <org.maocide.undeadwallpaper.ui.BouncingDotView
-                    android:layout_width="wrap_content"
-                    android:layout_height="24dp"
-                    android:layout_marginStart="4dp"
-                    android:layout_marginBottom="4dp" />
-
-            </LinearLayout>
+            <org.maocide.undeadwallpaper.ui.BouncingDotView
+                android:id="@+id/loading_dots"
+                android:layout_width="wrap_content"
+                android:layout_height="24dp"
+                android:layout_marginStart="4dp"
+                app:layout_constraintStart_toEndOf="@id/tv_loading_message"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintBottom_toBottomOf="@id/tv_loading_message" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_cancel_loading"
                 style="@style/Widget.Material3.Button.TonalButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_gravity="end"
                 android:layout_marginTop="16dp"
-                android:text="@string/cancel" />
+                android:text="@string/cancel"
+                app:layout_constraintTop_toBottomOf="@id/tv_loading_message"
+                app:layout_constraintEnd_toEndOf="parent" />
 
-        </LinearLayout>
+        </androidx.constraintlayout.widget.ConstraintLayout>
     </com.google.android.material.card.MaterialCardView>
 
 </FrameLayout>

@@ -4,7 +4,7 @@ So, you want to join the horde and help build this abomination? Awesome. Contrib
 
 However, this project was brought back from the dead with a very specific vision. To keep the codebase clean, performant, and focused, we play by a strict set of rules. Before you open an issue or submit a Pull Request, read this. 
 
-**Note: We only accept PRs and issue reports for the latest active version. Legacy architectures (v1.3.7 and earlier) are officially deprecated and unsupported.**
+**Note: We only accept PRs and issue reports for the latest active version. Legacy architectures (v1.3.8 and earlier) are officially deprecated and unsupported.**
 
 ## The Three Pillars of Survival
 
@@ -30,16 +30,6 @@ The core user experience is sacred: **Pick a video, hit the button, done.** Two 
 If your feature proposal disrupts this core flow or crams another control into the main view without consideration, it will be rejected. 
 
 This applies to both Pull Requests and Issue proposals. If you open an Issue suggesting an architectural rewrite or a feature outside our core scope, it will be closed immediately.
-
-## Reporting Bugs? Bring Receipts. 🧾
-"The app crashed" or "Shuffle is not random enough" helps nobody. We don't guess, we verify.
-
-UndeadWallpaper has a built-in logging tool specifically for this.
-1. Go to the **About** page in the app.
-2. Toggle the local logging switch to capture your session.
-3. Reproduce the crash or bug.
-4. Export the log directly from the app.
-**If you open a bug report without attaching the exported text logs, the issue will be closed.** No excuses. 
 
 ## The AI Policy (Human Accountability)
 It's 2026. We know you use AI tools. We use AI tools with a human brain. They are the modern equivalent of Stack Overflow or a good compiler. 

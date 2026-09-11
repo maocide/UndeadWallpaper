@@ -14,7 +14,7 @@
     <string name="trim_video">Trim Video</string>
     <string name="setting_audio_enabled">Enable Audio</string>
     <string name="playback_mode_setting">Playback Mode</string>
-    <string name="recent_files">Playlist / Recent Files</string>
+    <string name="recent_files">Playlist</string>
     <string name="playlist_instructions">Long-press to reorder. Swipe left or right to remove.</string>
     <string name="error_cannot_remove_last_video">Cannot remove the last video in the playlist.</string>
     <string name="apply_trim">Apply</string>
@@ -60,6 +60,9 @@
     <string name="speed">Speed</string>
     <string name="reset">Reset</string>
     <string name="rotation">Rotation</string>
+    <string name="mirror_video">Mirror Video</string>
+    <string name="flip_horizontal">Horizontal</string>
+    <string name="flip_vertical">Vertical</string>
 
     <!-- Home Screen Gestures -->
     <string name="gesture_controls_header">Home Screen Gestures</string>
@@ -92,7 +95,8 @@
 
     <!-- UI Headers & Sections -->
     <string name="custom_settings_header">Custom Settings</string>
-    <string name="importing_video">Importing Video</string>
+    <string name="importing_video">Infesting new files</string>
+    <string name="preparing_assets">Awakening the undead</string>
     <string name="positioning_header">Positioning</string>
     <string name="general_header">General</string>
     <string name="volume_label">Volume</string>
@@ -144,10 +148,12 @@
     <string name="log_cleared_toast">Log file cleared</string>
 
     <!-- Parallax -->
-    <string name="parallax_icon_description">Experimental</string>
-    <string name="parallax_card_title">Parallax Experiment</string>
+    <string name="parallax_icon_description">Parallax</string>
+    <string name="parallax_card_title">Parallax</string>
     <string name="parallax_toggle_label">Home Screen Parallax</string>
     <string name="parallax_description">Makes the video shift as you swipe pages. Zoom in the video slightly to hide black edges. Note: Not supported by all custom system launchers.</string>
     <string name="parallax_strength_label">Parallax Strength</string>
 
+    <string name="error_file_too_large">Selected video exceeds the 500 MB limit.</string>
+    <string name="warning_status_bar_oem">May not be supported by all launchers.</string>
 </resources>
