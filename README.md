@@ -7,7 +7,7 @@
 
 
 <div align="center">
-  <video src="assets/app_demo_vertical.mp4" width="300" controls autoplay loop muted></video>
+  <img src="assets/app_demo_vertical.webp" width="300" alt="UndeadWallpaper Demo">
 </div>
 <br>
 
