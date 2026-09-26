@@ -95,7 +95,16 @@ class GLVideoRenderer(private val context: Context, private val onGlContextLost:
 
     // Parallax offset variables.
     @Volatile
-    private var parallaxTranslateX = 0.0f;
+    private var parallaxTranslateX = 0.0f
+
+    // Transition lockout to prevent stale frames from rendering with pending matrix updates
+    @Volatile
+    private var isTransitioning = false
+
+    // Preview watermark overlay
+    @Volatile
+    private var isPreview = false
+    private val badgeOverlay by lazy { PreviewBadgeOverlay(context) }
 
     private val vertexShaderCode = """
         attribute vec4 aPosition;
@@ -219,7 +228,9 @@ class GLVideoRenderer(private val context: Context, private val onGlContextLost:
      * on old settings until the video resumes playback.
      */
     fun requestRender() {
-        renderSignal.trySend(Unit)
+        if (!isTransitioning) {
+            renderSignal.trySend(Unit)
+        }
     }
 
     fun setParallaxOffset(xOffsetFromCenter: Float) {
@@ -227,7 +238,24 @@ class GLVideoRenderer(private val context: Context, private val onGlContextLost:
         if (parallaxTranslateX != xOffsetFromCenter) {
             parallaxTranslateX = xOffsetFromCenter
             isPendingMatrixUpdate = true
-            requestRender() // Force a draw even if paused!
+            if (!isTransitioning) {
+                requestRender() // Force a draw even if paused!
+            }
+        }
+    }
+
+    fun setIsTransitioning(transitioning: Boolean) {
+        this.isTransitioning = transitioning
+    }
+
+    fun isTransitioning(): Boolean = isTransitioning
+
+    fun setIsPreview(preview: Boolean) {
+        if (this.isPreview != preview) {
+            this.isPreview = preview
+            if (preview) {
+                badgeOverlay.randomizePlacement()
+            }
         }
     }
 
@@ -375,11 +403,21 @@ class GLVideoRenderer(private val context: Context, private val onGlContextLost:
             GLES20.glBindTexture(36197, textureId) // GL_TEXTURE_EXTERNAL_OES
             GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
         }
+
+        if (isPreview) {
+            badgeOverlay.draw(viewportWidth, viewportHeight, programId)
+        }
     }
 
-    // The Matrix calculation
+    // ============================================================================
+    // FORENSIC GEOMETRY CONTRACT:
+    // The rotation, bounding box, scaling modes (FIT/FILL/STRETCH), and translation
+    // equations here are mirrored in 2D View pixel space inside
+    // VideoSettingsSheet.applyPreviewTransform().
+    // If modifying projection or aspect math here, keep both in sync!
+    // ============================================================================
     private fun updateMatrix() {
-        if (screenWidth == 0 || screenHeight == 0 || viewportWidth == 0 || viewportHeight == 0) {
+        if (screenWidth == 0 || screenHeight == 0 || viewportWidth == 0 || viewportHeight == 0 || videoWidth == 0 || videoHeight == 0) {
             Matrix.setIdentityM(mvpMatrix, 0)
             return
         }
@@ -585,6 +623,12 @@ class GLVideoRenderer(private val context: Context, private val onGlContextLost:
         muSTMatrixHandle = GLES20.glGetUniformLocation(programId, "uSTMatrix")
         muBrightnessHandle = GLES20.glGetUniformLocation(programId, "uBrightness")
 
+        val sTextureHandle = GLES20.glGetUniformLocation(programId, "sTexture")
+        GLES20.glUseProgram(programId)
+        if (sTextureHandle != -1) {
+            GLES20.glUniform1i(sTextureHandle, 0)
+        }
+
         // Check compile status
         val compileStatus = IntArray(1)
         GLES20.glGetShaderiv(fragmentShader, GLES20.GL_COMPILE_STATUS, compileStatus, 0)
@@ -603,11 +647,17 @@ class GLVideoRenderer(private val context: Context, private val onGlContextLost:
             FileLogger.e(tag, "Vertex Shader compile error: $errorMsg")
             throw IllegalStateException("Vertex Shader compile error: $errorMsg")
         }
-        FileLogger.i(tag, "GL Initialized!")
 
+        if (isPreview) {
+            badgeOverlay.initGL(programId)
+        }
+
+        FileLogger.i(tag, "GL Initialized!")
     }
 
     private fun releaseGL() {
+        badgeOverlay.release()
+
         if (eglDisplay !== EGL10.EGL_NO_DISPLAY) {
             egl!!.eglMakeCurrent(eglDisplay, EGL10.EGL_NO_SURFACE, EGL10.EGL_NO_SURFACE, EGL10.EGL_NO_CONTEXT)
             egl!!.eglDestroySurface(eglDisplay, eglSurface)

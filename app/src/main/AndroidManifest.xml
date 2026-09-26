@@ -9,6 +9,10 @@
 
     <!-- Removed storage permissions (READ_MEDIA_VIDEO, READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE) as SAF handles this natively -->
 
+    <!-- Stripped permissions injected by third-party libraries (Media3 ExoPlayer) -->
+    <!-- The app strictly plays local offline files and requires zero network awareness or access -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove" />
+
     <!-- Haptic Feedback for Gestures -->
     <uses-permission android:name="android.permission.VIBRATE" />
 

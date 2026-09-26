@@ -5,22 +5,24 @@
     <string name="action_faq">Help / FAQ</string>
 
     <!-- Strings used for fragments for navigation -->
-    <string name="first_fragment_label">Undead Settings</string>
+    <string name="first_fragment_label">Undead Wallpaper</string>
     <string name="second_fragment_label">About</string>
     <string name="previous">Previous</string>
 
     <!-- UI Strings -->
     <string name="pick_video">Pick Video</string>
-    <string name="trim_video">Trim Video</string>
     <string name="setting_audio_enabled">Enable Audio</string>
     <string name="playback_mode_setting">Playback Mode</string>
     <string name="recent_files">Playlist</string>
     <string name="playlist_instructions">Long-press to reorder. Swipe left or right to remove.</string>
+    <string name="playlist_instructions_empty">The grave is empty. Tap to add a video.</string>
     <string name="error_cannot_remove_last_video">Cannot remove the last video in the playlist.</string>
-    <string name="apply_trim">Apply</string>
     <string name="wallpaper_description">A live wallpaper that plays video.</string>
     <string name="activating_wallpaper_message">Activating wallpaper…</string>
+    <string name="resurrecting_wallpaper_message" translatable="false">[0xDEADBEEF] † U̶W̶U̸_̵R̸I̶S̶E̷ †</string>
     <string name="select_video_first_message">Please select a video first</string>
+    <string name="dismiss_preview">Dismiss preview</string>
+    <string name="restore_preview">Restore floating preview</string>
 
     <!-- SharedPreferences Keys. These are not meant for translation. -->
     <string name="video_uri" translatable="false">video_uri</string>
@@ -153,6 +155,7 @@
     <string name="parallax_toggle_label">Home Screen Parallax</string>
     <string name="parallax_description">Makes the video shift as you swipe pages. Zoom in the video slightly to hide black edges. Note: Not supported by all custom system launchers.</string>
     <string name="parallax_strength_label">Parallax Strength</string>
+    <string name="parallax_position_hint">Parallax active: home screen swipes shift position from this preview.</string>
 
     <string name="error_file_too_large">Selected video exceeds the 500 MB limit.</string>
     <string name="warning_status_bar_oem">May not be supported by all launchers.</string>

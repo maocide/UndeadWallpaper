@@ -39,7 +39,7 @@ object HapticHelper {
                         VibrationEffect.createOneShot(30L, VibrationEffect.DEFAULT_AMPLITUDE)
                     }
 
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                         val attrs = VibrationAttributes.Builder()
                             .setUsage(VibrationAttributes.USAGE_TOUCH)
                             .build()
@@ -52,8 +52,8 @@ object HapticHelper {
                     vibrator.vibrate(35)
                 }
             }
-        } catch (e: Exception) {
-            FileLogger.e(TAG, "Failed to perform gesture haptic feedback", e)
+        } catch (t: Throwable) {
+            FileLogger.e(TAG, "Failed to perform gesture haptic feedback", t)
         }
     }
 }

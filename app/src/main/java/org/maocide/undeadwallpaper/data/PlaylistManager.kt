@@ -59,6 +59,10 @@ class PlaylistManager(
         for (setting in pagedSettings) {
             if (physicalFilesSet.contains(setting.fileName)) {
                 val file = File(videosDir, setting.fileName)
+                if (setting.expectedFileSize != null && file.length() != setting.expectedFileSize) {
+                    FileLogger.w(TAG, "File size mismatch for ${setting.fileName} (expected: ${setting.expectedFileSize}, actual: ${file.length()}). Skipping corrupted or modified file.")
+                    continue
+                }
                 validUris.add(Uri.fromFile(file).toString())
             } else {
                 FileLogger.w(TAG, "File in playlist not found on disk: ${setting.fileName}")

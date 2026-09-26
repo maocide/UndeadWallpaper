@@ -5,19 +5,18 @@
     <string name="action_faq">Aiuto / FAQ</string>
 
     <!-- Strings used for fragments for navigation -->
-    <string name="first_fragment_label">Impostazioni Undead</string>
+    <string name="first_fragment_label">Undead Wallpaper</string>
     <string name="second_fragment_label">Informazioni</string>
     <string name="previous">Precedente</string>
 
     <!-- UI Strings -->
     <string name="pick_video">Scegli Video</string>
-    <string name="trim_video">Taglia Video</string>
     <string name="setting_audio_enabled">Abilita Audio</string>
     <string name="playback_mode_setting">Modalita Playback</string>
     <string name="recent_files">Playlist</string>
     <string name="playlist_instructions">Tieni premuto per riordinare. Scorri a sinistra o a destra per rimuovere.</string>
+    <string name="playlist_instructions_empty">La tomba è vuota. Tocca per aggiungere un video.</string>
     <string name="error_cannot_remove_last_video">Impossibile rimuovere l\'ultimo video nella playlist.</string>
-    <string name="apply_trim">Applica</string>
     <string name="wallpaper_description">Uno sfondo animato che riproduce video.</string>
     <string name="activating_wallpaper_message">Attivazione dello sfondo…</string>
     <string name="select_video_first_message">Si prega di selezionare un video</string>
@@ -138,6 +137,7 @@
     <string name="parallax_toggle_label">Parallasse Home Screen</string>
     <string name="parallax_description">Sposta il video mentre scorri le pagine. Zoomma leggermente il video per nascondere i bordi neri. Nota: potrebbe non funzionare con alcuni launcher personalizzati.</string>
     <string name="parallax_strength_label">Intensità Parallasse</string>
+    <string name="parallax_position_hint">Parallasse attivo: lo scorrimento della home sposta la posizione rispetto all\'anteprima.</string>
 
 
     <string name="mirror_video">Specchia Video</string>

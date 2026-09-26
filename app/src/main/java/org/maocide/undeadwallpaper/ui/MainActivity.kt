@@ -5,6 +5,8 @@ import org.maocide.undeadwallpaper.databinding.ActivityMainBinding
 import org.maocide.undeadwallpaper.R
 
 import org.maocide.undeadwallpaper.data.PreferencesManager
+import org.maocide.undeadwallpaper.event.WallpaperEvent
+import org.maocide.undeadwallpaper.event.WallpaperEventBus
 import org.maocide.undeadwallpaper.service.UndeadWallpaperService
 
 import android.app.WallpaperManager
@@ -14,13 +16,14 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.net.Uri
+import android.view.KeyEvent
 import android.view.MotionEvent
 import org.maocide.undeadwallpaper.utils.FileLogger
+import org.maocide.undeadwallpaper.utils.SafeKeyDebouncer
 import org.maocide.undeadwallpaper.utils.setSafeOnClickListener
 import java.io.File
 import android.view.Menu
 import android.view.MenuItem
-import android.view.animation.BounceInterpolator
 import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
@@ -37,7 +40,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-
 class MainActivity : AppCompatActivity() {
 
     private lateinit var appBarConfiguration: AppBarConfiguration
@@ -45,6 +47,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var preferencesManager: PreferencesManager
 
     private val sharedViewModel: SettingsViewModel by viewModels()
+    private val keyDebouncer = SafeKeyDebouncer(debounceMs = 300L)
+
+    private lateinit var tombstoneController: TombstoneController
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -64,36 +69,11 @@ class MainActivity : AppCompatActivity() {
 
         preferencesManager = PreferencesManager(this)
 
-        binding.fabSetWallpaper.doOnLayout { fab ->
-            // Anchor pivot to the bottom-right corner so it stands and leans like a tombstone
-            fab.pivotX = fab.width.toFloat()
-            fab.pivotY = fab.height.toFloat()
-
-            // 70% to be intact, 30% to be broken
-            // Decay states: intact (0°), slight lean (-4° to -7°), or heavy broken sag (-10° to -12°)
-            val leanAngle =
-                when ((1..100).random()) {
-                    in 1..70 -> 0f
-                    else -> when ((1..3).random()) {
-                        1 -> -7f
-                        2 -> -10f
-                        else -> (-12..-3).random().toFloat()
-                    }
-                }
-
-            if (savedInstanceState == null) {
-                fab.rotation = 0f
-                if (leanAngle != 0f) {
-                    fab.animate()
-                        .setStartDelay(1400L)
-                        .rotation(leanAngle)
-                        .setDuration(750L)
-                        .setInterpolator(BounceInterpolator())
-                        .start()
-                }
-            } else {
-                fab.rotation = leanAngle
-            }
+        tombstoneController = TombstoneController(
+            fab = binding.fabSetWallpaper,
+            preferencesManager = preferencesManager
+        ).apply {
+            setup()
         }
 
         binding.fabSetWallpaper.setSafeOnClickListener(debounceMs = 300L) { view ->
@@ -102,27 +82,28 @@ class MainActivity : AppCompatActivity() {
 
                 if (videoUri != null) {
                     preferencesManager.saveActiveVideoUri(videoUri.toString())
-                    // Changed from hardcoded string to string resource
-                    Snackbar.make(view, getString(R.string.activating_wallpaper_message), Snackbar.LENGTH_SHORT)
-                        .setAnchorView(R.id.fab_set_wallpaper).show()
-                    val intent = Intent(
-                        WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER
-                    )
-                    intent.putExtra(
-                        WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
-                        ComponentName(this@MainActivity, UndeadWallpaperService::class.java)
-                    )
-                    try {
-                        startActivity(intent)
-                    } catch (_: Exception) {
-                        Toast.makeText(
-                            this@MainActivity,
-                            getString(R.string.error_device_not_supported),
-                            Toast.LENGTH_LONG
-                        ).show()
+                    WallpaperEventBus.emit(WallpaperEvent.VideoUriChanged)
+
+                    if (tombstoneController.isBroken) {
+                        Snackbar.make(
+                            view,
+                            getString(R.string.resurrecting_wallpaper_message),
+                            Snackbar.LENGTH_SHORT
+                        ).setAnchorView(R.id.fab_set_wallpaper).show()
+
+                        tombstoneController.resurrect {
+                            launchWallpaperPicker()
+                        }
+                    } else {
+                        Snackbar.make(
+                            view,
+                            getString(R.string.activating_wallpaper_message),
+                            Snackbar.LENGTH_SHORT
+                        ).setAnchorView(R.id.fab_set_wallpaper).show()
+
+                        launchWallpaperPicker()
                     }
                 } else {
-                    // Changed from hardcoded string to string resource
                     Toast.makeText(
                         this@MainActivity,
                         getString(R.string.select_video_first_message),
@@ -133,9 +114,36 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Handles manual video interaction from playlist curation,
+     * checking against the Unlucky 13 threshold to trigger the break animation.
+     */
+    fun onManualVideoInteraction() {
+        tombstoneController.onManualTap()
+    }
+
+    private fun launchWallpaperPicker() {
+        val intent = Intent(
+            WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER
+        )
+        intent.putExtra(
+            WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
+            ComponentName(this@MainActivity, UndeadWallpaperService::class.java)
+        )
+        try {
+            startActivity(intent)
+        } catch (_: Exception) {
+            Toast.makeText(
+                this@MainActivity,
+                getString(R.string.error_device_not_supported),
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
     private suspend fun getValidWallpaperUri(): Uri? = withContext(Dispatchers.IO) {
         val uri = sharedViewModel.selectedVideoUri
-            ?: preferencesManager.getActiveVideoUri()?.takeIf { it.isNotEmpty() && it != "null" }?.toUri()
+            ?: preferencesManager.getActiveVideoUri()?.toUri()
         val path = uri?.path ?: return@withContext null
         val file = File(path)
         if (file.exists() && file.isFile) uri else null
@@ -195,6 +203,23 @@ class MainActivity : AppCompatActivity() {
             return true
         }
         return super.dispatchTouchEvent(ev)
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        // Drop throttled action keys (Back, Enter, Dpad Center, Media) or machine-gun repeats
+        if (keyDebouncer.shouldDropKeyEvent(event)) {
+            return true
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        keyDebouncer.reset()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
     }
 
     override fun onSupportNavigateUp(): Boolean {

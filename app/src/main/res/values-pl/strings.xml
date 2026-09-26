@@ -4,18 +4,17 @@
     <string name="action_battery_optimization">Optymalizacja Baterii</string>
     <string name="action_faq">Pomoc / FAQ</string>
 
-    <string name="first_fragment_label">Ustawienia Undead</string>
+    <string name="first_fragment_label">Undead Wallpaper</string>
     <string name="second_fragment_label">O Undead</string>
     <string name="previous">Wróć</string>
 
     <string name="pick_video">Wybierz Wideo</string>
-    <string name="trim_video">Przytnij Wideo</string>
     <string name="setting_audio_enabled">Włącz Audio</string>
     <string name="playback_mode_setting">Tryb Odtwarzania</string>
     <string name="recent_files">Playlista</string>
     <string name="playlist_instructions">Przytrzymaj żeby zmienić kolejność. Przesuń w lewo lub w prawo żeby usunąć.</string>
+    <string name="playlist_instructions_empty">Grób jest pusty. Dotknij, aby dodać wideo.</string>
     <string name="error_cannot_remove_last_video">Nie można usunąć ostatniego pliku z playlisty.</string>
-    <string name="apply_trim">Ustaw</string>
     <string name="wallpaper_description">Żywa tapeta odtwarzająca wideo.</string>
     <string name="activating_wallpaper_message">Włączanie tapety…</string>
     <string name="select_video_first_message">Najpierw zaznacz wideo</string>
@@ -140,6 +139,7 @@
     <string name="parallax_toggle_label">Paralaksa ekranu głównego</string>
     <string name="parallax_description">Przesuwa wideo podczas przewijania stron. Zbliż nieco wideo, aby ukryć czarne krawędzie. Uwaga: funkcja może nie być obsługiwana przez niektóre niestandardowe launchery.</string>
     <string name="parallax_strength_label">Siła paralaksy</string>
+    <string name="parallax_position_hint">Paralaksa aktywna: przewijanie ekranu głównego przesuwa pozycję względem tego podglądu.</string>
 
 
     <string name="mirror_video">Odbicie lustrzane</string>

@@ -15,6 +15,8 @@ import kotlinx.serialization.json.Json
 import android.net.Uri
 import org.maocide.undeadwallpaper.model.GestureType
 import org.maocide.undeadwallpaper.model.WallpaperAction
+import org.maocide.undeadwallpaper.utils.FileLogger
+import java.io.File
 
 /**
  * Manages SharedPreferences for the application.
@@ -22,7 +24,7 @@ import org.maocide.undeadwallpaper.model.WallpaperAction
  *
  * @param context The application context.
  */
-class PreferencesManager(context: Context, prefsName: String = PREFS_NAME) {
+class PreferencesManager(private val context: Context, prefsName: String = PREFS_NAME) {
 
     private val sharedPrefs: SharedPreferences =
         context.getSharedPreferences(prefsName, Context.MODE_PRIVATE)
@@ -32,13 +34,14 @@ class PreferencesManager(context: Context, prefsName: String = PREFS_NAME) {
     private var cachedPlaylistSettingsString: String? = null
     private var cachedPlaylistSettings: List<VideoSettings>? = null
 
+    private val checksumHelper = ConfigChecksumHelper()
+
     companion object {
+        private const val TAG = "PreferencesManager"
         private const val PREFS_NAME = "DEFAULT"
         private const val KEY_VIDEO_URI = "video_uri"
         private const val KEY_VIDEO_AUDIO_ENABLED = "video_audio_enabled"
-        private const val KEY_VIDEO_START_MS = "video_start_ms"
         private const val KEY_LOGGING_ENABLED = "logging_enabled"
-        private const val KEY_VIDEO_END_MS = "video_end_ms"
         private const val KEY_PLAYBACK_MODE = "playback_mode"
         private const val KEY_SCALING_MODE = "scaling_mode"
         private const val KEY_POSITION_X = "video_position_x"
@@ -57,25 +60,87 @@ class PreferencesManager(context: Context, prefsName: String = PREFS_NAME) {
         private const val KEY_ACTIVE_PAGE = "active_page"
 
         private const val KEY_ACTION_DOUBLE_TAP = "action_double_tap"
-
         private const val KEY_ACTION_TRIPLE_TAP = "action_triple_tap"
-
-        private const val KEY_ACTION_LONG_PRESS = "action_long_press"
-
-        private const val KEY_ACTION_SWIPE_UP = "action_swipe_up"
-        private const val KEY_ACTION_SWIPE_DOWN = "action_swipe_down"
-        
 
         private const val KEY_PARALLAX_ENABLED = "parallax_enabled"
         private const val KEY_PARALLAX_STRENGTH = "parallax_strength"
+        private const val KEY_FLOATING_PREVIEW_ENABLED = "floating_preview_enabled"
 
-        // Transient State for Anti-Tampering (Not saved to disk)
+        const val KEY_TOMBSTONE_LEAN_ANGLE = "tombstone_lean_angle"
+        const val KEY_TOMBSTONE_IS_BROKEN = "tombstone_is_broken"
+        const val KEY_TOMBSTONE_MANUAL_TAP_COUNT = "tombstone_manual_tap_count"
+
+        // Transient State for ConfigCRC
         private var transientIsUndead = false
     }
 
     init {
         migrateToPerVideoSettings()
         migrateParallaxSettings()
+        migrateIntegritySeal()
+    }
+
+    private fun migrateIntegritySeal() {
+        val hasHardwareKey = checksumHelper.hasHardwareKey()
+        val storedChecksum = sharedPrefs.getString(ConfigChecksumHelper.KEY_CONFIG_CRC, null)
+        val hasChecksum = storedChecksum != null
+
+        when (hasHardwareKey to hasChecksum) {
+            false to false -> {
+                // Genuine 1.4.0 Upgrade (First-time initialization)
+                val rawUri = sharedPrefs.getString(KEY_VIDEO_URI, null)
+                if (rawUri == "null" || rawUri.isNullOrBlank()) {
+                    sharedPrefs.edit(commit = true) { remove(KEY_VIDEO_URI) }
+                }
+                checksumHelper.generateHardwareKey()
+                updateSeal()
+            }
+
+            true to true -> {
+                // Normal Steady State
+                val playlistJson = sharedPrefs.getString(KEY_PLAYLIST_SETTINGS, null)
+                val activeUri = sharedPrefs.getString(KEY_VIDEO_URI, null)
+                if (!checksumHelper.verifyChecksum(playlistJson, activeUri, storedChecksum)) {
+                    FileLogger.e(TAG, "Config checksum mismatch on boot, restoring defaults.")
+                    resetCorruptedPrefs()
+                }
+            }
+
+            true to false -> {
+                // Unverified migration state
+                FileLogger.e(TAG, "Config checksum missing on migration, resetting state.")
+                resetCorruptedPrefs()
+            }
+
+            false to true -> {
+                // Orphaned configuration state
+                FileLogger.e(TAG, "Unrecognized configuration state, restoring defaults.")
+                resetCorruptedPrefs()
+            }
+        }
+    }
+
+    private fun updateSeal() {
+        val playlistJson = sharedPrefs.getString(KEY_PLAYLIST_SETTINGS, null)
+        val activeUri = sharedPrefs.getString(KEY_VIDEO_URI, null)
+        val checksum = checksumHelper.computeChecksum(playlistJson, activeUri)
+        sharedPrefs.edit(commit = true) {
+            putString(ConfigChecksumHelper.KEY_CONFIG_CRC, checksum)
+        }
+    }
+
+    private fun resetCorruptedPrefs() {
+        sharedPrefs.edit(commit = true) {
+            remove(KEY_PLAYLIST_SETTINGS)
+            remove(KEY_VIDEO_URI)
+            remove(KEY_ACTIVE_PAGE)
+            remove(ConfigChecksumHelper.KEY_CONFIG_CRC)
+        }
+        cachedPlaylistSettingsString = null
+        cachedPlaylistSettings = null
+
+        checksumHelper.generateHardwareKey()
+        updateSeal()
     }
 
     private fun migrateParallaxSettings() {
@@ -188,6 +253,15 @@ class PreferencesManager(context: Context, prefsName: String = PREFS_NAME) {
      */
     fun getPlaylistSettings(): List<VideoSettings> {
         val jsonString = sharedPrefs.getString(KEY_PLAYLIST_SETTINGS, null)
+        val activeUri = sharedPrefs.getString(KEY_VIDEO_URI, null)
+        val storedChecksum = sharedPrefs.getString(ConfigChecksumHelper.KEY_CONFIG_CRC, null)
+
+        if (!checksumHelper.verifyChecksum(jsonString, activeUri, storedChecksum)) {
+            FileLogger.e(TAG, "Playlist checksum mismatch, restoring defaults.")
+            resetCorruptedPrefs()
+            return emptyList()
+        }
+
         if (jsonString.isNullOrBlank()) {
             cachedPlaylistSettingsString = null
             cachedPlaylistSettings = null
@@ -211,8 +285,12 @@ class PreferencesManager(context: Context, prefsName: String = PREFS_NAME) {
         val jsonString = jsonParser.encodeToString(playlist)
         cachedPlaylistSettingsString = jsonString
         cachedPlaylistSettings = playlist
-        sharedPrefs.edit(commit = true)
-        { putString(KEY_PLAYLIST_SETTINGS, jsonString) }
+        val activeUri = sharedPrefs.getString(KEY_VIDEO_URI, null)
+        val checksum = checksumHelper.computeChecksum(jsonString, activeUri)
+        sharedPrefs.edit(commit = true) {
+            putString(KEY_PLAYLIST_SETTINGS, jsonString)
+            putString(ConfigChecksumHelper.KEY_CONFIG_CRC, checksum)
+        }
     }
 
     fun getActivePage(): Int {
@@ -246,8 +324,15 @@ class PreferencesManager(context: Context, prefsName: String = PREFS_NAME) {
      * @param uri The URI of the video to save.
      */
     fun saveActiveVideoUri(uri: String) {
+        if (uri.isBlank() || uri == "null") {
+            FileLogger.w(TAG, "Attempted to save invalid URI string: '$uri', ignoring.")
+            return
+        }
+        val playlistJson = sharedPrefs.getString(KEY_PLAYLIST_SETTINGS, null)
+        val checksum = checksumHelper.computeChecksum(playlistJson, uri)
         sharedPrefs.edit(commit = true) {
             putString(KEY_VIDEO_URI, uri)
+            putString(ConfigChecksumHelper.KEY_CONFIG_CRC, checksum)
         }
     }
 
@@ -257,43 +342,18 @@ class PreferencesManager(context: Context, prefsName: String = PREFS_NAME) {
      * @return The saved video URI, or null if not found.
      */
     fun getActiveVideoUri(): String? {
-        return sharedPrefs.getString(KEY_VIDEO_URI, null)
-    }
+        val jsonString = sharedPrefs.getString(KEY_PLAYLIST_SETTINGS, null)
+        val activeUri = sharedPrefs.getString(KEY_VIDEO_URI, null)
+        val storedChecksum = sharedPrefs.getString(ConfigChecksumHelper.KEY_CONFIG_CRC, null)
 
-    /**
-     * Saves the video clipping times to SharedPreferences.
-     *
-     * @param startMs The start time in milliseconds.
-     * @param endMs The end time in milliseconds.
-     */
-    fun saveClippingTimes(startMs: Long, endMs: Long) {
-        sharedPrefs.edit {
-            putLong(KEY_VIDEO_START_MS, startMs)
-            putLong(KEY_VIDEO_END_MS, endMs)
+        if (!checksumHelper.verifyChecksum(jsonString, activeUri, storedChecksum)) {
+            FileLogger.e(TAG, "Active URI checksum mismatch, restoring defaults.")
+            resetCorruptedPrefs()
+            return sharedPrefs.getString(KEY_VIDEO_URI, null)
         }
+        return activeUri?.takeIf { it.isNotBlank() && it != "null" }
     }
 
-    /**
-     * Retrieves the video clipping times from SharedPreferences.
-     *
-     * @return A Pair containing the start and end times in milliseconds.
-     *         Defaults to (0L, -1L), where -1L signifies end of source.
-     */
-    fun getClippingTimes(): Pair<Long, Long> {
-        val startMs = sharedPrefs.getLong(KEY_VIDEO_START_MS, 0L)
-        val endMs = sharedPrefs.getLong(KEY_VIDEO_END_MS, -1L)
-        return Pair(startMs, endMs)
-    }
-
-    /**
-     * Removes the video clipping times from SharedPreferences.
-     */
-    fun removeClippingTimes() {
-        sharedPrefs.edit {
-            remove(KEY_VIDEO_START_MS)
-            remove(KEY_VIDEO_END_MS)
-        }
-    }
 
     /**
      * Gets the current playback mode from SharedPreferences.
@@ -386,6 +446,14 @@ class PreferencesManager(context: Context, prefsName: String = PREFS_NAME) {
         return sharedPrefs.getFloat(KEY_PARALLAX_STRENGTH, 0.4f).coerceIn(0.1f, 1.5f)
     }
 
+    fun setFloatingPreviewEnabled(enabled: Boolean) {
+        sharedPrefs.edit { putBoolean(KEY_FLOATING_PREVIEW_ENABLED, enabled) }
+    }
+
+    fun isFloatingPreviewEnabled(): Boolean {
+        return sharedPrefs.getBoolean(KEY_FLOATING_PREVIEW_ENABLED, true)
+    }
+
     fun setUndead(isUndead: Boolean) {
         transientIsUndead = isUndead
     }
@@ -394,4 +462,29 @@ class PreferencesManager(context: Context, prefsName: String = PREFS_NAME) {
         return transientIsUndead
     }
 
+    fun getTombstoneLeanAngle(): Float {
+        return sharedPrefs.getFloat(KEY_TOMBSTONE_LEAN_ANGLE, 0f)
+    }
+
+    fun isTombstoneBroken(): Boolean {
+        return sharedPrefs.getBoolean(KEY_TOMBSTONE_IS_BROKEN, false)
+    }
+
+    fun getTombstoneTapCount(): Int {
+        return sharedPrefs.getInt(KEY_TOMBSTONE_MANUAL_TAP_COUNT, 0)
+    }
+
+    fun saveTombstoneState(angle: Float, isBroken: Boolean, tapCount: Int) {
+        sharedPrefs.edit {
+            putFloat(KEY_TOMBSTONE_LEAN_ANGLE, angle)
+            putBoolean(KEY_TOMBSTONE_IS_BROKEN, isBroken)
+            putInt(KEY_TOMBSTONE_MANUAL_TAP_COUNT, tapCount)
+        }
+    }
+
+    fun saveTombstoneTapCount(tapCount: Int) {
+        sharedPrefs.edit { putInt(KEY_TOMBSTONE_MANUAL_TAP_COUNT, tapCount) }
+    }
+
 }
+

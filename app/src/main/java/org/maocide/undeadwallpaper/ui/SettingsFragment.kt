@@ -8,29 +8,32 @@ import org.maocide.undeadwallpaper.BuildConfig
 import org.maocide.undeadwallpaper.data.PreferencesManager
 import org.maocide.undeadwallpaper.data.VideoFileManager
 import org.maocide.undeadwallpaper.model.PlaybackMode
-import org.maocide.undeadwallpaper.model.RecentFile
 import org.maocide.undeadwallpaper.model.StartTime
 import org.maocide.undeadwallpaper.model.StatusBarColor
-import org.maocide.undeadwallpaper.service.UndeadWallpaperService
+import org.maocide.undeadwallpaper.event.WallpaperEvent
+import org.maocide.undeadwallpaper.event.WallpaperEventBus
+import org.maocide.undeadwallpaper.utils.BlurHelper
 import org.maocide.undeadwallpaper.utils.FileLogger
 import org.maocide.undeadwallpaper.utils.preventDoubleInput
 import org.maocide.undeadwallpaper.utils.setSafeOnClickListener
 import java.io.File
 
-import android.Manifest
 import android.app.Activity
 import android.content.ActivityNotFoundException
-import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
-import android.content.pm.PackageManager
-import org.maocide.undeadwallpaper.utils.MediaAnalyzer
+import android.content.res.Configuration
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
+import android.text.Spannable
+import android.text.SpannableString
+import android.text.style.ForegroundColorSpan
+import android.transition.TransitionManager
+import java.io.FileNotFoundException
 
 
 import android.view.LayoutInflater
@@ -41,15 +44,16 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.OptIn
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.ItemTouchHelper
-import androidx.recyclerview.widget.RecyclerView
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.isActive
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -61,47 +65,36 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.upstream.DefaultAllocator
-import org.maocide.undeadwallpaper.model.GestureType
-import org.maocide.undeadwallpaper.model.WallpaperAction
 
 /**
  * A simple [Fragment] subclass as the default destination in the navigation.
  * This fragment allows the user to select a video and set it as a live wallpaper.
  */
+@UnstableApi
 class SettingsFragment : Fragment() {
 
+    private val tag = "UndeadWallpaperSettings"
     private var _binding: FragmentSettingsBinding? = null
     private val binding get() = _binding!!
-    private val tag: String = javaClass.simpleName
     private var brainsTapCount = 0
     private var targetTapCount = 0
     private var lastBrainsTapTime = 0L
     private lateinit var preferencesManager: PreferencesManager
     private lateinit var videoFileManager: VideoFileManager
-    private lateinit var recentFilesAdapter: RecentFilesAdapter
-    private val recentFiles = mutableListOf<RecentFile>()
+    private var playlistController: PlaylistController? = null
+    private var gestureControlsController: GestureControlsController? = null
+    private var accordionController: AccordionController? = null
     private var previewPlayer: ExoPlayer? = null
     private var randomStartTimeWarned = false
     private var isUpdatingUi = false
-    private var hasWarnedAboutGestures = false
     private var statusBarColorWarned = false
-    private var currentPage = 0
-    private var engineSyncJob: kotlinx.coroutines.Job? = null
-    private var undeadActivationJob: kotlinx.coroutines.Job? = null
+
+    private var undeadActivationJob: Job? = null
     private var lastUpdateVideoSourceTime = 0L
+    private var floatingPreviewController: FloatingPreviewController? = null
 
     // Initialize the shared ViewModel
     private val sharedViewModel: SettingsViewModel by activityViewModels()
-
-    private val videoSettingsChangedReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action == UndeadWallpaperService.ACTION_VIDEO_SETTINGS_CHANGED) {
-                if (::recentFilesAdapter.isInitialized) {
-                    recentFilesAdapter.notifyDataSetChanged()
-                }
-            }
-        }
-    }
 
     companion object {
         private const val DEBOUNCE_PAGINATION_MS = 500L
@@ -135,16 +128,75 @@ class SettingsFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         // UI SETUP this first
-        setupRecyclerView()
+        playlistController = PlaylistController(
+            binding = binding,
+            preferencesManager = preferencesManager,
+            videoFileManager = videoFileManager,
+            coroutineScope = viewLifecycleOwner.lifecycleScope,
+            fragmentManager = childFragmentManager,
+            onVideoSelected = { uri, isManualTap ->
+                val isAlreadySelected = (sharedViewModel.selectedVideoUri == uri &&
+                    preferencesManager.getActiveVideoUri() == uri.toString())
+                val needsRecovery = previewPlayer == null || previewPlayer?.playerError != null
+
+                if (!isAlreadySelected || needsRecovery) {
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        updateVideoSource(uri, forceChange = true, isManualTap = isManualTap)
+                    }
+                }
+                if (isManualTap) {
+                    (activity as? MainActivity)?.onManualVideoInteraction()
+                }
+            },
+            onAddVideoClick = {
+                openFilePicker()
+            },
+            onEnsureDefaultVideo = {
+                ensureDefaultVideoExists()
+            },
+            getActiveVideoUri = {
+                sharedViewModel.selectedVideoUri?.toString() ?: preferencesManager.getActiveVideoUri()
+            }
+        ).apply {
+            setup()
+        }
         setupBatteryWarningCard()
+        setupLandscapeInsetsBalancing()
+        
+        floatingPreviewController = FloatingPreviewController(binding, preferencesManager).apply {
+            setup()
+        }
+        gestureControlsController = GestureControlsController(
+            binding = binding,
+            preferencesManager = preferencesManager,
+            isUpdatingUi = { isUpdatingUi }
+        ).apply {
+            setup()
+        }
+        accordionController = AccordionController(
+            rootView = binding.root as ViewGroup,
+            binding = binding
+        ).apply {
+            setup()
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                WallpaperEventBus.events.collect { event ->
+                    if (event is WallpaperEvent.VideoSettingsChanged) {
+                        playlistController?.notifyDataSetChanged()
+                    }
+                }
+            }
+        }
 
         // ASYNC TASKS (Data Loading)
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             // This might take time on first run (copying file)
             ensureDefaultVideoExists()
 
             // load the data/settings
-            syncUiState()
+            syncUiState(savedInstanceState)
             setupListeners()
         }
 
@@ -167,17 +219,12 @@ class SettingsFragment : Fragment() {
         }
         lastUpdateVideoSourceTime = currentTime
 
-        // Clear any previous trimming data
-        preferencesManager.removeClippingTimes()
 
         // Store the new video URI as a shared value
         sharedViewModel.selectedVideoUri = uri
 
         // Update the active video highlight in the adapter
-        if (::recentFilesAdapter.isInitialized) {
-            recentFilesAdapter.currentVideoUriString = uri.toString()
-            recentFilesAdapter.notifyDataSetChanged()
-        }
+        playlistController?.setActiveVideoUri(uri.toString())
         // Only spawn a new player if the user actively clicked
         // If the app is booting up, onResume will handle it
         if (isResumed) {
@@ -187,251 +234,34 @@ class SettingsFragment : Fragment() {
         // Save the preference and notify the service to reload the video from that value
         if (forceChange) {
             preferencesManager.saveActiveVideoUri(uri.toString())
-            val intent = Intent(UndeadWallpaperService.ACTION_VIDEO_URI_CHANGED).apply {
-                setPackage(context?.packageName)
-            }
-            context?.sendBroadcast(intent)
+            WallpaperEventBus.emit(WallpaperEvent.VideoUriChanged)
         }
     }
 
 
-    /**
-     * Sets up the RecyclerView for displaying recent files.
-     */
-    private fun setupRecyclerView() {
-        val currentUri = sharedViewModel.selectedVideoUri?.toString() ?: preferencesManager.getActiveVideoUri()
-        recentFilesAdapter = RecentFilesAdapter(
-            recentFiles,
-            currentVideoUriString = currentUri,
-            preferencesManager = preferencesManager,
-            onItemClick = { recentFile ->
-                val fileUri = Uri.fromFile(recentFile.file)
-                viewLifecycleOwner.lifecycleScope.launch {
-                    engineSyncJob?.cancel() // Prevent debounced page load from overriding manual selection
-                    updateVideoSource(fileUri, true, isManualTap = true)
-                }
-            },
-            onSettingsClick = { recentFile ->
-                val bottomSheet =
-                    VideoSettingsSheet.newInstance(recentFile.file.name, recentFile.getFormattedMetadata())
-                bottomSheet.show(childFragmentManager, "VideoSettingsBottomSheet")
-            }
-        )
-        binding.recyclerViewRecentFiles.layoutManager = LinearLayoutManager(context)
-        binding.recyclerViewRecentFiles.adapter = recentFilesAdapter
-
-        val itemTouchHelperCallback = object : ItemTouchHelper.SimpleCallback(
-            ItemTouchHelper.UP or ItemTouchHelper.DOWN, // Drag directions
-            ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT // Swipe directions
-        ) {
-            override fun onMove(
-                recyclerView: RecyclerView,
-                viewHolder: RecyclerView.ViewHolder,
-                target: RecyclerView.ViewHolder
-            ): Boolean {
-                val fromPos = viewHolder.bindingAdapterPosition
-                val toPos = target.bindingAdapterPosition
-                recentFilesAdapter.onItemMove(fromPos, toPos)
-                return true
-            }
-
-            override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
-                val position = viewHolder.bindingAdapterPosition
-                val item = recentFilesAdapter.getItems()[position]
-
-                if (recentFilesAdapter.itemCount <= 1) {
-                    if (currentPage == 0) {
-                        Toast.makeText(context, getString(R.string.error_cannot_remove_last_video), Toast.LENGTH_SHORT)
-                            .show()
-                        recentFilesAdapter.notifyItemChanged(position)
-                        return
-                    }
-                }
-
-                val settings = preferencesManager.getVideoSettings(item.file.name)
-                MaterialAlertDialogBuilder(requireContext())
-                    .setTitle(getString(R.string.remove_file_title))
-                    .setMessage(getString(R.string.remove_file_message, settings.getEffectiveDisplayName()))
-                    .setPositiveButton(getString(R.string.remove_action)) { _, _ ->
-                        val deletedUriString = Uri.fromFile(item.file).toString()
-                        val uiSelectedUriString =
-                            sharedViewModel.selectedVideoUri?.toString() ?: preferencesManager.getActiveVideoUri()
-                        val backgroundActiveUriString = preferencesManager.getActiveVideoUri()
-
-                        // Remove from adapter safely using the object reference
-                        recentFilesAdapter.onItemDismiss(item)
-
-                        // Delete physical file and thumbnail
-                        if (item.file.exists()) {
-                            item.file.delete()
-
-                            // Clean up cached thumbnail
-                            val thumbnailsDir = java.io.File(
-                                requireContext().getExternalFilesDir(android.os.Environment.DIRECTORY_MOVIES),
-                                "thumbnails"
-                            )
-                            val thumbnailFile = java.io.File(thumbnailsDir, "${item.file.nameWithoutExtension}.jpg")
-                            if (thumbnailFile.exists()) {
-                                thumbnailFile.delete()
-                            }
-                        }
-
-                        // Save new list order
-                        saveCurrentPlaylistOrder()
-
-                        val wasActive =
-                            (deletedUriString == uiSelectedUriString || deletedUriString == backgroundActiveUriString)
-
-                        if (recentFilesAdapter.itemCount == 0) {
-                            // Current page is now empty -> reload to let collapseEmptyPages bring higher pages down
-                            viewLifecycleOwner.lifecycleScope.launch {
-                                engineSyncJob?.cancel()
-                                loadRecentFiles()
-                                val reloadedNextItem = recentFilesAdapter.getItems().firstOrNull()
-
-                                if (reloadedNextItem != null) {
-                                    // Higher page collapsed down to currentPage!
-                                    if (wasActive) {
-                                        updateVideoSource(Uri.fromFile(reloadedNextItem.file), true, isManualTap = true)
-                                    } else {
-                                        val intent = Intent(UndeadWallpaperService.ACTION_PLAYLIST_REORDERED).apply {
-                                            setPackage(requireContext().packageName)
-                                        }
-                                        requireContext().applicationContext.sendBroadcast(intent)
-                                    }
-                                } else {
-                                    // Truly empty page, navigate to previous page
-                                    if (currentPage > 0) {
-                                        changePage(currentPage - 1, slideRight = false)
-                                    } else {
-                                        // Fallback if list is entirely empty (shouldn't happen due to 1 video at least enforced)
-                                        preferencesManager.saveActiveVideoUri("")
-                                        ensureDefaultVideoExists()
-                                        val defaultUri = preferencesManager.getActiveVideoUri()
-                                        if (defaultUri != null) {
-                                            updateVideoSource(defaultUri.toUri(), true, isManualTap = true)
-                                            loadRecentFiles()
-                                        }
-                                    }
-                                }
-                                updatePaginationUI()
-                            }
-                        } else {
-                            if (wasActive) {
-                                val nextItem = recentFilesAdapter.getItems().first()
-                                viewLifecycleOwner.lifecycleScope.launch {
-                                    updateVideoSource(Uri.fromFile(nextItem.file), true, isManualTap = true)
-                                }
-                            } else {
-                                val intent = Intent(UndeadWallpaperService.ACTION_PLAYLIST_REORDERED).apply {
-                                    setPackage(requireContext().packageName)
-                                }
-                                requireContext().applicationContext.sendBroadcast(intent)
-                            }
-                            updatePaginationUI()
-                        }
-                    }
-                    .setNegativeButton(getString(R.string.cancel)) { dialog, _ ->
-                        recentFilesAdapter.restoreItem(item)
-                        dialog.dismiss()
-                    }
-                    .setOnCancelListener {
-                        recentFilesAdapter.restoreItem(item)
-                    }
-                    .show()
-            }
-
-            override fun clearView(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder) {
-                super.clearView(recyclerView, viewHolder)
-                // Called when drag or swipe is completed (dropped)
-                saveCurrentPlaylistOrder()
-
-                // Send intent to the service to notify a change
-                val intent = Intent(UndeadWallpaperService.ACTION_PLAYLIST_REORDERED).apply {
-                    setPackage(requireContext().packageName)
-                }
-                requireContext().applicationContext.sendBroadcast(intent)
-            }
-
-            override fun getSwipeDirs(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder): Int {
-                val position = viewHolder.bindingAdapterPosition
-                if (position == RecyclerView.NO_POSITION) return 0
-                return super.getSwipeDirs(recyclerView, viewHolder)
-            }
-        }
-
-        ItemTouchHelper(itemTouchHelperCallback).attachToRecyclerView(binding.recyclerViewRecentFiles)
-    }
-
-    /**
-     * Saves the current order of files from the adapter to SharedPreferences.
-     */
-    private fun saveCurrentPlaylistOrder() {
-        val currentFileNames = recentFilesAdapter.getItems().map { it.file.name }
-        val currentSettings = preferencesManager.getPlaylistSettings()
-
-        // Settings for other pages
-        val otherPagesSettings = currentSettings.filter { it.page != currentPage }
-
-        // Build an indexed map: O(N) complexity
-        val settingsMap = currentSettings.associateBy { it.fileName }
-
-        // Lookups are now O(1), making the whole block O(N) instead of O(N^2)
-        val currentPageSettings = currentFileNames.mapNotNull { settingsMap[it] }
-
-        val newSettingsList = otherPagesSettings + currentPageSettings
-
-        preferencesManager.savePlaylistSettings(newSettingsList.sortedBy { it.page })
-    }
-
-    /**
-     * Loads the list of recent files and updates the RecyclerView.
-     */
-    private suspend fun loadRecentFiles() {
-        val files = withContext(Dispatchers.IO) {
-            videoFileManager.loadRecentFiles()
-        }
-
-        val settings = preferencesManager.getPlaylistSettings()
-        val filesOnPage = settings.filter { it.page == currentPage }.map { it.fileName }.toSet()
-        val filteredFiles = files.filter { it.file.name in filesOnPage }
-
-        recentFiles.clear()
-        recentFiles.addAll(filteredFiles)
-
-        val currentUri = sharedViewModel.selectedVideoUri?.toString() ?: preferencesManager.getActiveVideoUri()
-        recentFilesAdapter.currentVideoUriString = currentUri
-
-        if (recentFiles.isEmpty()) {
-            binding.recyclerViewRecentFiles.visibility = android.view.View.GONE
-            binding.layoutEmptyPlaylist.visibility = android.view.View.VISIBLE
-        } else {
-            binding.recyclerViewRecentFiles.visibility = android.view.View.VISIBLE
-            binding.layoutEmptyPlaylist.visibility = android.view.View.GONE
-        }
-
-        recentFilesAdapter.notifyDataSetChanged()
-        binding.recyclerViewRecentFiles.scheduleLayoutAnimation()
-        updatePaginationUI()
-    }
 
     private suspend fun ensureDefaultVideoExists() {
         if (preferencesManager.getActiveVideoUri().isNullOrEmpty()) {
-            withLoadingOverlay(getString(R.string.preparing_assets), cancellable = false) {
-                withContext(Dispatchers.IO) {
+            val preparingMessage = getString(R.string.preparing_assets)
+            val defaultFileName = getString(R.string.default_video_filename)
+            withLoadingOverlay(preparingMessage, cancellable = false) {
+                val defaultUri = withContext(NonCancellable + Dispatchers.IO) {
                     val defaultFile = videoFileManager.createDefaultFileFromResource(R.raw.zombillie_default)
 
                     if (defaultFile != null) {
-                        val defaultFileName = getString(R.string.default_video_filename)
                         preferencesManager.updateVideoSettings(defaultFile.name) {
                             it.copy(displayName = defaultFileName, expectedFileSize = defaultFile.length())
                         }
-                        val defaultUri = Uri.fromFile(defaultFile)
-                        withContext(Dispatchers.Main) {
-                            preferencesManager.saveActiveVideoUri(defaultUri.toString())
-                            updateVideoSource(defaultUri, forceChange = false)
-                        }
+                        val uri = Uri.fromFile(defaultFile)
+                        preferencesManager.saveActiveVideoUri(uri.toString())
+                        uri
+                    } else {
+                        null
                     }
+                }
+
+                if (defaultUri != null && _binding != null) {
+                    updateVideoSource(defaultUri, forceChange = false)
                 }
             }
         }
@@ -441,12 +271,11 @@ class SettingsFragment : Fragment() {
      * Update all Buttons/Switches to match Preferences.
      * Calling this BEFORE listeners prevents accidental triggers.
      */
-    private suspend fun syncUiState() {
+    private suspend fun syncUiState(savedInstanceState: Bundle? = null) {
         // SET to avoid overriding
         isUpdatingUi = true
 
         try {
-            currentPage = preferencesManager.getActivePage()
 
             // Playback Mode
             when (preferencesManager.getPlaybackMode()) {
@@ -470,14 +299,6 @@ class SettingsFragment : Fragment() {
                 StatusBarColor.LIGHT -> binding.statusBarColorGroup.check(binding.statusBarLight.id)
             }
 
-            // Expand global settings accordion if user has customized them
-            if (preferencesManager.getStartTime() != StartTime.RESUME ||
-                preferencesManager.getStatusBarColor() != StatusBarColor.AUTO
-            ) {
-                binding.contentGlobalSettings.visibility = View.VISIBLE
-                binding.iconGlobalSettingsChevron.rotation = 180f
-            }
-
             // Load Video Preview and set the video as selected
             val savedUri = preferencesManager.getActiveVideoUri()
             if (savedUri != null) {
@@ -485,26 +306,8 @@ class SettingsFragment : Fragment() {
                 sharedViewModel.selectedVideoUri = savedUri.toUri()
             }
 
-            val doubleTapAction = preferencesManager.getActionForGesture(GestureType.DOUBLE_TAP)
-            when (doubleTapAction) {
-                WallpaperAction.NONE -> binding.doubleTapGroup.check(binding.doubleTapNone.id)
-                WallpaperAction.PLAY_PAUSE -> binding.doubleTapGroup.check(binding.doubleTapPause.id)
-                WallpaperAction.SKIP_NEXT -> binding.doubleTapGroup.check(binding.doubleTapSkip.id)
-            }
-
-            // Triple Tap Gesture
-            val tripleTapAction = preferencesManager.getActionForGesture(GestureType.TRIPLE_TAP)
-            when (tripleTapAction) {
-                WallpaperAction.NONE -> binding.tripleTapGroup.check(binding.tripleTapNone.id)
-                WallpaperAction.PLAY_PAUSE -> binding.tripleTapGroup.check(binding.tripleTapPause.id)
-                WallpaperAction.SKIP_NEXT -> binding.tripleTapGroup.check(binding.tripleTapSkip.id)
-            }
-
-            // Auto-expand touch controls if enabled
-            if (doubleTapAction != WallpaperAction.NONE || tripleTapAction != WallpaperAction.NONE) {
-                binding.contentTouchControls.visibility = View.VISIBLE
-                binding.iconTouchChevron.rotation = 180f
-            }
+            // Sync Home Screen Gestures
+            val hasActiveGestures = gestureControlsController?.syncFromPreferences() ?: false
 
             // Experimental Parallax
             val isParallaxEnabled = preferencesManager.isParallaxEnabled()
@@ -512,14 +315,19 @@ class SettingsFragment : Fragment() {
             binding.sliderParallaxStrength.value = preferencesManager.getParallaxStrength()
             binding.layoutParallaxStrength.visibility = if (isParallaxEnabled) View.VISIBLE else View.GONE
 
-            if (isParallaxEnabled) {
-                binding.contentParallax.visibility = View.VISIBLE
-                binding.iconParallaxChevron.rotation = 180f
-            }
+            // Sync or Restore Accordion States
+            val hasCustomGlobalSettings = preferencesManager.getStartTime() != StartTime.RESUME ||
+                preferencesManager.getStatusBarColor() != StatusBarColor.AUTO
+            accordionController?.restoreOrInitialize(
+                savedInstanceState = savedInstanceState,
+                defaultGlobal = hasCustomGlobalSettings,
+                defaultTouch = hasActiveGestures,
+                defaultParallax = isParallaxEnabled
+            )
 
             // Regardless of having a selected video or not, we need to load the recent files
             // into the RecyclerView adapter ONCE during UI initialization.
-            loadRecentFiles()
+            playlistController?.loadRecentFiles(performMaintenance = false)
         } finally {
             isUpdatingUi = false
         }
@@ -549,13 +357,13 @@ class SettingsFragment : Fragment() {
      * Sets up the listeners for battery card controls.
      */
     private fun setupBatteryWarningCard() {
-        binding.btnFixBattery.setOnClickListener {
+        binding.btnFixBattery.setSafeOnClickListener {
             // Expand the instructions and hide the fix button
             binding.btnFixBattery.visibility = View.GONE
             binding.layoutBatteryInstructions.visibility = View.VISIBLE
         }
 
-        binding.btnGoToSettings.setOnClickListener {
+        binding.btnGoToSettings.setSafeOnClickListener {
             try {
                 // Drop them directly into Undead Wallpaper's specific App Info page
                 val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
@@ -570,13 +378,11 @@ class SettingsFragment : Fragment() {
         }
     }
 
+
     private fun setupListeners() {
         // Helper to broadcast changes
         fun notifySettingsChanged() {
-            val intent = Intent(UndeadWallpaperService.ACTION_PLAYBACK_MODE_CHANGED).apply {
-                setPackage(requireContext().packageName)
-            }
-            requireContext().applicationContext.sendBroadcast(intent)
+            WallpaperEventBus.emit(WallpaperEvent.PlaybackModeChanged)
         }
 
         // Playback Mode
@@ -602,14 +408,16 @@ class SettingsFragment : Fragment() {
             // Forcing an update to current uri in case we switch back from playlist to single video.
             // We use the adapter's highlighted URI to guarantee the background service plays
             // the exact video the user is currently looking at in the UI list.
-            if (::recentFilesAdapter.isInitialized && recentFilesAdapter.currentVideoUriString?.isNotEmpty() == true) {
-                val highlightedUri = recentFilesAdapter.currentVideoUriString!!
-                sharedViewModel.selectedVideoUri = Uri.parse(highlightedUri)
+            val highlightedUri = playlistController?.currentVideoUriString
+            if (!highlightedUri.isNullOrEmpty()) {
+                sharedViewModel.selectedVideoUri = highlightedUri.toUri()
                 preferencesManager.saveActiveVideoUri(highlightedUri)
             } else {
                 val currentSelectedUri =
                     sharedViewModel.selectedVideoUri?.toString() ?: preferencesManager.getActiveVideoUri()
-                preferencesManager.saveActiveVideoUri(currentSelectedUri.toString())
+                if (currentSelectedUri != null) {
+                    preferencesManager.saveActiveVideoUri(currentSelectedUri)
+                }
             }
 
             notifySettingsChanged()
@@ -636,11 +444,8 @@ class SettingsFragment : Fragment() {
                 randomStartTimeWarned = true
             }
 
-            // Specific intent sent to apply
-            val intent = Intent(UndeadWallpaperService.ACTION_PLAYBACK_MODE_CHANGED).apply {
-                setPackage(requireContext().packageName)
-            }
-            requireContext().applicationContext.sendBroadcast(intent)
+            // Specific event sent to apply
+            WallpaperEventBus.emit(WallpaperEvent.PlaybackModeChanged)
         }
 
         // StatusBar Color
@@ -664,74 +469,11 @@ class SettingsFragment : Fragment() {
                 statusBarColorWarned = true
             }
 
-            // Specific intent sent to not reload video
-            val intent = Intent(UndeadWallpaperService.ACTION_STATUS_BAR_COLOR_CHANGED).apply {
-                setPackage(requireContext().packageName)
-            }
-            requireContext().applicationContext.sendBroadcast(intent)
+            // Specific event sent to not reload video
+            WallpaperEventBus.emit(WallpaperEvent.StatusBarColorChanged)
         }
 
-        // Helper function for the warning Toast
-        fun showGestureWarningIfNeeded() {
-            if (!hasWarnedAboutGestures) {
-                Toast.makeText(
-                    requireContext(),
-                    getString(R.string.gesture_launcher_warning),
-                    Toast.LENGTH_LONG
-                ).show()
-                hasWarnedAboutGestures = true
-            }
-        }
 
-        // Double Tap Gesture
-        binding.doubleTapNone.preventDoubleInput()
-        binding.doubleTapPause.preventDoubleInput()
-        binding.doubleTapSkip.preventDoubleInput()
-        binding.doubleTapGroup.setOnCheckedStateChangeListener { _, checkedIds ->
-            if (isUpdatingUi || checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
-
-            val action = when (checkedIds[0]) {
-                binding.doubleTapPause.id -> WallpaperAction.PLAY_PAUSE
-                binding.doubleTapSkip.id -> WallpaperAction.SKIP_NEXT
-                else -> WallpaperAction.NONE
-            }
-
-            preferencesManager.setActionForGesture(GestureType.DOUBLE_TAP, action)
-
-            if (action != WallpaperAction.NONE) {
-                showGestureWarningIfNeeded()
-            }
-
-            val intent = Intent(UndeadWallpaperService.ACTION_VIDEO_SETTINGS_CHANGED).apply {
-                setPackage(requireContext().packageName)
-            }
-            requireContext().applicationContext.sendBroadcast(intent)
-        }
-
-        // Triple Tap Gesture
-        binding.tripleTapNone.preventDoubleInput()
-        binding.tripleTapPause.preventDoubleInput()
-        binding.tripleTapSkip.preventDoubleInput()
-        binding.tripleTapGroup.setOnCheckedStateChangeListener { _, checkedIds ->
-            if (isUpdatingUi || checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
-
-            val action = when (checkedIds[0]) {
-                binding.tripleTapPause.id -> WallpaperAction.PLAY_PAUSE
-                binding.tripleTapSkip.id -> WallpaperAction.SKIP_NEXT
-                else -> WallpaperAction.NONE
-            }
-
-            preferencesManager.setActionForGesture(GestureType.TRIPLE_TAP, action)
-
-            if (action != WallpaperAction.NONE) {
-                showGestureWarningIfNeeded()
-            }
-
-            val intent = Intent(UndeadWallpaperService.ACTION_VIDEO_SETTINGS_CHANGED).apply {
-                setPackage(requireContext().packageName)
-            }
-            requireContext().applicationContext.sendBroadcast(intent)
-        }
 
         // Parallax Toggle
         binding.switchParallax.preventDoubleInput()
@@ -741,16 +483,13 @@ class SettingsFragment : Fragment() {
             preferencesManager.setParallaxEnabled(isChecked)
 
             // Animation
-            android.transition.TransitionManager.beginDelayedTransition(binding.root as android.view.ViewGroup)
+            TransitionManager.beginDelayedTransition(binding.root as ViewGroup)
 
             // Changing visibility will make TransitionManager animate
             binding.layoutParallaxStrength.visibility = if (isChecked) View.VISIBLE else View.GONE
 
             if (!isChecked) {
-                val intent = Intent(UndeadWallpaperService.ACTION_VIDEO_SETTINGS_CHANGED).apply {
-                    setPackage(requireContext().packageName)
-                }
-                requireContext().applicationContext.sendBroadcast(intent)
+                WallpaperEventBus.emit(WallpaperEvent.ParallaxChanged)
             }
         }
 
@@ -768,29 +507,9 @@ class SettingsFragment : Fragment() {
             }
         })
 
-        // Accordion Toggles
-        binding.headerGlobalSettingsChevron.setSafeOnClickListener(debounceMs = 200L) {
-            val isVisible = binding.contentGlobalSettings.visibility == View.VISIBLE
-            android.transition.TransitionManager.beginDelayedTransition(binding.root as android.view.ViewGroup)
-            binding.contentGlobalSettings.visibility = if (isVisible) View.GONE else View.VISIBLE
-            binding.iconGlobalSettingsChevron.animate().rotation(if (isVisible) 0f else 180f).setDuration(200).start()
-        }
 
-        binding.headerTouchControls.setSafeOnClickListener(debounceMs = 200L) {
-            val isVisible = binding.contentTouchControls.visibility == View.VISIBLE
-            android.transition.TransitionManager.beginDelayedTransition(binding.root as android.view.ViewGroup)
-            binding.contentTouchControls.visibility = if (isVisible) View.GONE else View.VISIBLE
-            binding.iconTouchChevron.animate().rotation(if (isVisible) 0f else 180f).setDuration(200).start()
-        }
 
-        binding.headerParallax.setSafeOnClickListener(debounceMs = 200L) {
-            val isVisible = binding.contentParallax.visibility == View.VISIBLE
-            android.transition.TransitionManager.beginDelayedTransition(binding.root as android.view.ViewGroup)
-            binding.contentParallax.visibility = if (isVisible) View.GONE else View.VISIBLE
-            binding.iconParallaxChevron.animate().rotation(if (isVisible) 0f else 180f).setDuration(200).start()
-        }
-
-        // Video Picker
+        // Video Picker & Floating Preview Dismiss
         binding.buttonPickVideo.setSafeOnClickListener {
             openFilePicker()
         }
@@ -798,17 +517,10 @@ class SettingsFragment : Fragment() {
             openFilePicker()
         }
 
-        binding.btnPrevPage.setSafeOnClickListener(debounceMs = 250L) {
-            changePage(
-                currentPage - 1,
-                slideRight = false
-            )
-        }
-        binding.btnNextPage.setSafeOnClickListener(debounceMs = 250L) { changePage(currentPage + 1, slideRight = true) }
-        binding.btnAddToPlaylist.setSafeOnClickListener { openFilePicker() }
-        binding.layoutEmptyPlaylist.setSafeOnClickListener { openFilePicker() }
-        binding.tvPageNumber.setSafeOnClickListener(debounceMs = 150L) { showPaginationDropdown() }
+        setupBrainsEasterEgg()
+    }
 
+    private fun setupBrainsEasterEgg() {
         binding.tvBrains.setSafeOnClickListener(debounceMs = 0L) { view ->
             val now = System.currentTimeMillis()
             if (now - lastBrainsTapTime > 1100L) {
@@ -840,7 +552,7 @@ class SettingsFragment : Fragment() {
 
             if (brainsTapCount == targetTapCount) {
                 undeadActivationJob = viewLifecycleOwner.lifecycleScope.launch {
-                    kotlinx.coroutines.delay(1000)
+                    delay(1000)
                     Toast.makeText(requireContext(), "you walk with the undead.", Toast.LENGTH_SHORT).show()
                     setUndeadState(true)
                     brainsTapCount = 0
@@ -860,95 +572,8 @@ class SettingsFragment : Fragment() {
             preferencesManager.saveLoggingEnabled(false)
             FileLogger.setLoggingEnabled(false)
         }
-        updateActionBarTitle()
-    }
-
-    private fun updatePaginationUI() {
-        if (_binding == null) return
-        binding.tvPageNumber.text = String.format("%02d", currentPage + 1)
-
-        binding.btnPrevPage.isEnabled = currentPage > 0
-        binding.btnPrevPage.alpha = if (currentPage > 0) 1.0f else 0.3f
-
-        val settings = preferencesManager.getPlaylistSettings()
-        val hasItemsOnCurrentPage = settings.any { it.page == currentPage }
-
-        binding.btnNextPage.isEnabled = hasItemsOnCurrentPage
-        binding.btnNextPage.alpha = if (hasItemsOnCurrentPage) 1.0f else 0.3f
-    }
-
-    private fun showPaginationDropdown() {
-        val settings = preferencesManager.getPlaylistSettings()
-        val maxPage = settings.maxOfOrNull { it.page } ?: 0
-        val targetMaxPage = if (settings.any { it.page == maxPage }) maxPage + 1 else maxPage
-
-        val popup = android.widget.PopupMenu(requireContext(), binding.tvPageNumber)
-        for (i in 0..targetMaxPage) {
-            val title = if (i == targetMaxPage && i > 0 && settings.none { it.page == i }) {
-                "Slot ${String.format("%02d", i + 1)} (New)"
-            } else {
-                "Slot ${String.format("%02d", i + 1)}"
-            }
-            popup.menu.add(0, i, 0, title)
-        }
-
-        popup.setOnMenuItemClickListener { item ->
-            val targetPage = item.itemId
-            val slideRight = targetPage > currentPage
-            changePage(targetPage, slideRight)
-            true
-        }
-        popup.show()
-    }
-
-    /**
-     * Checks whether the currently selected active video actually exists on disk
-     * and is registered in the playlist settings. Runs safely on Dispatchers.IO.
-     */
-    private suspend fun isCurrentVideoValid(): Boolean = withContext(Dispatchers.IO) {
-        val currentUriString = sharedViewModel.selectedVideoUri?.toString()
-            ?: preferencesManager.getActiveVideoUri()
-        if (currentUriString.isNullOrEmpty() || currentUriString == "null") return@withContext false
-
-        val path = currentUriString.toUri().path ?: return@withContext false
-        val file = File(path)
-        if (!file.exists() || !file.isFile) return@withContext false
-
-        val settings = preferencesManager.getPlaylistSettings()
-        settings.any { it.fileName == file.name }
-    }
-
-    private fun changePage(newPage: Int, slideRight: Boolean) {
-        if (newPage == currentPage) return
-        currentPage = newPage
-        preferencesManager.saveActivePage(currentPage)
-        updatePaginationUI()
-
-        val animRes = if (slideRight) R.anim.layout_anim_slide_right else R.anim.layout_anim_slide_left
-        val controller = android.view.animation.AnimationUtils.loadLayoutAnimation(requireContext(), animRes)
-        binding.recyclerViewRecentFiles.layoutAnimation = controller
-
-        viewLifecycleOwner.lifecycleScope.launch {
-            loadRecentFiles()
-        }
-
-        // Engine sync: ONLY auto-select if the current active video is missing, deleted, or invalid
-        engineSyncJob?.cancel()
-        engineSyncJob = viewLifecycleOwner.lifecycleScope.launch {
-            if (!isCurrentVideoValid()) {
-                val settings = preferencesManager.getPlaylistSettings()
-                if (settings.any { it.page == currentPage }) {
-                    val firstFileOnPage = withContext(Dispatchers.IO) {
-                        val files = videoFileManager.loadRecentFiles()
-                        val filesOnPage = settings.filter { it.page == currentPage }.map { it.fileName }.toSet()
-                        files.firstOrNull { it.file.name in filesOnPage }
-                    }
-                    if (firstFileOnPage != null) {
-                        // Automatically sync the first video on the page and broadcast URI change
-                        updateVideoSource(android.net.Uri.fromFile(firstFileOnPage.file), true, isManualTap = true)
-                    }
-                }
-            }
+        if (isAdded) {
+            updateActionBarTitle()
         }
     }
 
@@ -1008,7 +633,7 @@ class SettingsFragment : Fragment() {
                     withContext(Dispatchers.IO) {
                         videoFileManager.createFileFromContentUri(uri)
                     }
-                } catch (_: kotlinx.coroutines.CancellationException) {
+                } catch (_: CancellationException) {
                     null // Return null to skip the block
                 }
 
@@ -1023,7 +648,7 @@ class SettingsFragment : Fragment() {
                                 it.copy(
                                     displayName = originalName,
                                     expectedFileSize = copiedFile.length(),
-                                    page = currentPage
+                                    page = playlistController?.currentPage ?: 0
                                 )
                             }
                         }
@@ -1036,7 +661,7 @@ class SettingsFragment : Fragment() {
                         }
 
                         // Load the new file into the RecyclerView
-                        loadRecentFiles()
+                        playlistController?.loadRecentFiles()
 
                         // Update the current video (now that the file is in the adapter)
                         updateVideoSource(
@@ -1046,10 +671,7 @@ class SettingsFragment : Fragment() {
                         ) // Automatically set as active wallpaper
 
                         // Notifies the service of a change in the playlist
-                        val intent = Intent(UndeadWallpaperService.ACTION_PLAYLIST_REORDERED).apply {
-                            setPackage(requireContext().packageName)
-                        }
-                        requireContext().applicationContext.sendBroadcast(intent)
+                        WallpaperEventBus.emit(WallpaperEvent.PlaylistReordered)
                     }
 
                     is VideoFileManager.CopyResult.SizeLimitExceeded -> {
@@ -1131,7 +753,7 @@ class SettingsFragment : Fragment() {
                         var isFileNotFound = false
                         var currentCause: Throwable? = error
                         while (currentCause != null) {
-                            if (currentCause is java.io.FileNotFoundException) {
+                            if (currentCause is FileNotFoundException) {
                                 isFileNotFound = true
                                 break
                             }
@@ -1143,7 +765,7 @@ class SettingsFragment : Fragment() {
                             val newUri = preferencesManager.getActiveVideoUri()
                             if (newUri != null) {
                                 viewLifecycleOwner.lifecycleScope.launch {
-                                    updateVideoSource(android.net.Uri.parse(newUri), false)
+                                    updateVideoSource(newUri.toUri(), false)
                                 }
                             }
                             return
@@ -1166,20 +788,13 @@ class SettingsFragment : Fragment() {
         uri.path?.let { path ->
             viewLifecycleOwner.lifecycleScope.launch {
                 try {
-                    val file = java.io.File(path)
+                    val file = File(path)
                     if (file.exists()) {
-                        val bitmap = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        val bitmap = withContext(Dispatchers.IO) {
                             videoFileManager.getOrGenerateThumbnail(file)
                         }
-                        if (bitmap != null) {
-                            binding.ivVideoBlurBg.setImageBitmap(bitmap)
-                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                                binding.ivVideoBlurBg.setRenderEffect(
-                                    android.graphics.RenderEffect.createBlurEffect(
-                                        50f, 50f, android.graphics.Shader.TileMode.CLAMP
-                                    )
-                                )
-                            }
+                        if (bitmap != null && _binding != null) {
+                            BlurHelper.applyBlurToImageView(binding.ivVideoBlurBg, bitmap)
                         }
                     }
                 } catch (e: Exception) {
@@ -1190,13 +805,78 @@ class SettingsFragment : Fragment() {
     }
 
     private fun releasePreviewPlayer() {
+        // Detach SurfaceView first so HWUI/BLASTBufferQueue does not hold locks during window stop
+        _binding?.videoPreview?.player = null
+        // Stop playback and clear video surface
+        previewPlayer?.stop()
+        previewPlayer?.clearVideoSurface()
+        // Release player safely
         previewPlayer?.release()
         previewPlayer = null
-        binding.videoPreview.player = null
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        if (_binding != null) {
+            floatingPreviewController?.onConfigurationChanged()
+            binding.root.post {
+                if (_binding != null) {
+                    ViewCompat.requestApplyInsets(binding.settingsScrollView)
+                }
+            }
+        }
+    }
+
+    private fun setupLandscapeInsetsBalancing() {
+        ViewCompat.setOnApplyWindowInsetsListener(binding.settingsScrollView) { view, windowInsets ->
+            val rootInsets = ViewCompat.getRootWindowInsets(view) ?: windowInsets
+            val cutout = rootInsets.getInsets(WindowInsetsCompat.Type.displayCutout())
+            val sysBars = rootInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+
+            val leftInset = maxOf(cutout.left, sysBars.left)
+            val rightInset = maxOf(cutout.right, sysBars.right)
+
+            val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+            val basePadding = (16 * resources.displayMetrics.density).toInt()
+
+            if (isLandscape) {
+                val diffLeft = maxOf(0, rightInset - leftInset)
+                val diffRight = maxOf(0, leftInset - rightInset)
+                binding.settingsContentContainer.setPadding(
+                    basePadding + diffLeft,
+                    basePadding,
+                    basePadding + diffRight,
+                    basePadding
+                )
+            } else {
+                binding.settingsContentContainer.setPadding(
+                    basePadding,
+                    basePadding,
+                    basePadding,
+                    basePadding
+                )
+            }
+            windowInsets
+        }
+        ViewCompat.requestApplyInsets(binding.settingsScrollView)
+    }
+
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        accordionController?.onSaveInstanceState(outState)
     }
 
     override fun onDestroyView() {
         super.onDestroyView()
+        floatingPreviewController?.cleanup()
+        floatingPreviewController = null
+        playlistController?.cleanup()
+        playlistController = null
+        gestureControlsController = null
+        accordionController = null
+        undeadActivationJob?.cancel()
+        undeadActivationJob = null
         // Ensure we don't leak the preview player
         releasePreviewPlayer()
         _binding = null
@@ -1205,12 +885,6 @@ class SettingsFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         checkBatteryOptimization()
-        ContextCompat.registerReceiver(
-            requireContext(),
-            videoSettingsChangedReceiver,
-            IntentFilter(UndeadWallpaperService.ACTION_VIDEO_SETTINGS_CHANGED),
-            ContextCompat.RECEIVER_NOT_EXPORTED
-        )
         // Snapshot Sync: Pull the latest active video from the background service when the UI opens.
         val activeUriString = preferencesManager.getActiveVideoUri()
         if (!activeUriString.isNullOrEmpty()) {
@@ -1221,27 +895,18 @@ class SettingsFragment : Fragment() {
                 sharedViewModel.selectedVideoUri = activeUri
 
                 // Update the adapter highlight
-                if (::recentFilesAdapter.isInitialized) {
-                    recentFilesAdapter.currentVideoUriString = activeUriString
-                    recentFilesAdapter.notifyDataSetChanged()
-                }
+                playlistController?.setActiveVideoUri(activeUriString)
             }
         }
 
         // Resume playback or initialize the player if it doesn't exist
-        sharedViewModel.selectedVideoUri?.let { uri ->
+        val targetUri = sharedViewModel.selectedVideoUri
+            ?: preferencesManager.getActiveVideoUri()?.toUri()
+        targetUri?.let { uri ->
             if (previewPlayer == null) {
                 setupVideoPreview(uri)
             } else {
                 previewPlayer?.playWhenReady = true
-            }
-        } ?: run {
-            preferencesManager.getActiveVideoUri()?.takeIf { it.isNotEmpty() && it != "null" }?.let { uriString ->
-                if (previewPlayer == null) {
-                    setupVideoPreview(uriString.toUri())
-                } else {
-                    previewPlayer?.playWhenReady = true
-                }
             }
         }
 
@@ -1252,7 +917,7 @@ class SettingsFragment : Fragment() {
         // Highlight "Undead" in the action bar title if we are undead
         if (preferencesManager.isUndead()) {
             val title = getString(R.string.first_fragment_label)
-            val spannable = android.text.SpannableString(title)
+            val spannable = SpannableString(title)
 
             var index = title.indexOf("Undead", ignoreCase = true)
             var length = 6
@@ -1262,12 +927,12 @@ class SettingsFragment : Fragment() {
             }
 
             if (index != -1) {
-                val greenColor = androidx.core.content.ContextCompat.getColor(requireContext(), R.color.light_green)
+                val greenColor = ContextCompat.getColor(requireContext(), R.color.light_green)
                 spannable.setSpan(
-                    android.text.style.ForegroundColorSpan(greenColor),
+                    ForegroundColorSpan(greenColor),
                     index,
                     index + length,
-                    android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
                 )
                 (activity as? androidx.appcompat.app.AppCompatActivity)?.supportActionBar?.title = spannable
             }
@@ -1282,11 +947,6 @@ class SettingsFragment : Fragment() {
         // Aggressively release resources when the settings screen is not active
         // This frees up the decoder for the actual wallpaper service
         releasePreviewPlayer()
-        try {
-            requireContext().unregisterReceiver(videoSettingsChangedReceiver)
-        } catch (_: IllegalArgumentException) {
-            // Receiver not registered
-        }
     }
 
 }

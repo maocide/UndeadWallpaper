@@ -6,6 +6,11 @@ import org.maocide.undeadwallpaper.utils.FileLogger
 import android.app.Application
 import android.util.Log
 import androidx.appcompat.app.AppCompatDelegate
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import org.maocide.undeadwallpaper.data.VideoFileManager
 
 class UndeadWallpaperApplication : Application() {
 
@@ -26,6 +31,15 @@ class UndeadWallpaperApplication : Application() {
 
         FileLogger.setLoggingEnabled(prefs.isLoggingEnabled())
         FileLogger.init(this)
+
+        // Asynchronously perform storage and playlist startup maintenance on Dispatchers.IO
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            try {
+                VideoFileManager(this@UndeadWallpaperApplication).performStartupMaintenance()
+            } catch (e: Exception) {
+                FileLogger.e("UndeadWallpaperApplication", "Startup maintenance failed", e)
+            }
+        }
 
         // Setup the Global Crash Handler
         /*

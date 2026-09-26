@@ -21,7 +21,8 @@
             android:id="@+id/toolbar"
             android:background="@android:color/transparent"
             android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize" />
+            android:layout_height="?attr/actionBarSize"
+            app:titleTextAppearance="@style/TextAppearance.UndeadWallpaper.ToolbarTitle" />
 
     </com.google.android.material.appbar.AppBarLayout>
 
