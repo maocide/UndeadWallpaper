@@ -89,6 +89,22 @@ data class VideoSettings(
      * a visual snap from the renderer matrix updating.
      */
     fun hasSameVisualTransformsAs(other: VideoSettings): Boolean {
+        val thisW = this.width ?: 0
+        val thisH = this.height ?: 0
+        val otherW = other.width ?: 0
+        val otherH = other.height ?: 0
+
+        // If both videos have valid dimensions, verify their aspect ratios match.
+        // Differing aspect ratios require different MVP projection geometry; chunking them
+        // gaplessly risks an asynchronous 16ms compositor slip on the transition seam.
+        if (thisW > 0 && thisH > 0 && otherW > 0 && otherH > 0) {
+            val thisAspect = thisW.toFloat() / thisH.toFloat()
+            val otherAspect = otherW.toFloat() / otherH.toFloat()
+            if (kotlin.math.abs(thisAspect - otherAspect) > 0.05f) {
+                return false
+            }
+        }
+
         return this.scalingMode == other.scalingMode &&
                 this.positionX == other.positionX &&
                 this.positionY == other.positionY &&

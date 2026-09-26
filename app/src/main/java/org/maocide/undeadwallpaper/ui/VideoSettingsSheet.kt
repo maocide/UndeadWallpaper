@@ -1,6 +1,6 @@
 package org.maocide.undeadwallpaper.ui
 
-import android.content.Intent
+import android.graphics.drawable.BitmapDrawable
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -11,15 +11,18 @@ import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.doOnLayout
+import androidx.core.view.updateLayoutParams
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.slider.Slider
 import org.maocide.undeadwallpaper.data.PreferencesManager
 import org.maocide.undeadwallpaper.databinding.SheetVideoSettingsBinding
+import org.maocide.undeadwallpaper.event.WallpaperEvent
+import org.maocide.undeadwallpaper.event.WallpaperEventBus
 import org.maocide.undeadwallpaper.model.ScalingMode
 import org.maocide.undeadwallpaper.model.VideoSettings
-import org.maocide.undeadwallpaper.service.UndeadWallpaperService
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -37,6 +40,7 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
     private lateinit var fileName: String
     private lateinit var metadata: String
     private var isUpdatingUi = false
+    private var previewPeekController: PreviewPeekController? = null
 
     companion object {
         private const val ARG_FILE_NAME = "file_name"
@@ -101,6 +105,20 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
             binding.videoMetadata.text = metadata
         }
 
+        val peekController = PreviewPeekController(
+            overlayContainer = binding.peekOverlayContainer,
+            peekCard = binding.peekCard,
+            peekThumbnail = binding.peekThumbnail,
+            previewContainer = binding.previewFrameContainer,
+            sourceThumbnail = binding.thumbnailPreview,
+            parallaxBadge = binding.peekParallaxBadge,
+            isParallaxEnabled = preferencesManager.isParallaxEnabled()
+        )
+        peekController.setup()
+        previewPeekController = peekController
+
+        setupAdaptivePreviewSize()
+
         // Load thumbnail using cached disk representation (self-heals if missing)
         lifecycleScope.launch(Dispatchers.IO) {
             val videoFileManager = VideoFileManager(requireContext())
@@ -117,6 +135,9 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
                                 .alpha(1f)
                                 .setDuration(150L)
                                 .start()
+                            binding.thumbnailPreview.doOnLayout {
+                                applyPreviewTransform()
+                            }
                         }
                     }
                 }
@@ -125,6 +146,57 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
 
         syncUiState()
         setupListeners()
+    }
+
+    private fun setupAdaptivePreviewSize() {
+        val metrics = resources.displayMetrics
+        val isLandscape = metrics.widthPixels > metrics.heightPixels
+        val targetHeightDp = if (isLandscape) 64 else 116
+        val targetHeightPx = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP,
+            targetHeightDp.toFloat(),
+            metrics
+        ).roundToInt()
+        val screenRatio = metrics.widthPixels.toFloat() / metrics.heightPixels.toFloat()
+        val targetWidthPx = (targetHeightPx * screenRatio).roundToInt()
+
+        binding.previewFrameContainer.updateLayoutParams<ViewGroup.LayoutParams> {
+            width = targetWidthPx
+            height = targetHeightPx
+        }
+
+        previewPeekController?.updateDimensions(metrics)
+    }
+
+    // ============================================================================
+    // FORENSIC GEOMETRY CONTRACT:
+    // 2D Canvas equivalent of GLVideoRenderer.updateMatrix().
+    // Translates OpenGL NDC center-origin math into Android View pixel matrix space.
+    // If modifying projection or aspect math in GLVideoRenderer, keep both in sync!
+    // ============================================================================
+    private fun applyPreviewTransform() {
+        val binding = _binding ?: return
+        val bmp = (binding.thumbnailPreview.drawable as? BitmapDrawable)?.bitmap ?: return
+        if (bmp.width <= 0 || bmp.height <= 0) return
+
+        val checkedId = binding.scalingModeGroup.checkedChipId
+        val scalingMode = when (checkedId) {
+            binding.scalingModeFit.id -> ScalingMode.FIT
+            binding.scalingModeStretch.id -> ScalingMode.STRETCH
+            else -> ScalingMode.FILL
+        }
+
+        previewPeekController?.updateTransform(
+            bmp = bmp,
+            flipHorizontal = binding.chipFlipHorizontal.isChecked,
+            flipVertical = binding.chipFlipVertical.isChecked,
+            rotation = binding.rotationSlider.value,
+            scalingMode = scalingMode,
+            zoom = binding.zoomSlider.value,
+            positionX = binding.positionXSlider.value,
+            positionY = binding.positionYSlider.value,
+            brightness = binding.brightnessSlider.value
+        )
     }
 
     private fun syncUiState() {
@@ -152,6 +224,8 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
 
             binding.positionXSlider.setValueSafe(settings.positionX)
             binding.positionXLabel.markIfModified(binding.positionXIcon, settings.positionX, defaults.positionX)
+            binding.positionXParallaxHint.visibility =
+                if (preferencesManager.isParallaxEnabled()) View.VISIBLE else View.GONE
 
             binding.positionYSlider.setValueSafe(settings.positionY)
             binding.positionYLabel.markIfModified(binding.positionYIcon, settings.positionY, defaults.positionY)
@@ -174,6 +248,7 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
         } finally {
             isUpdatingUi = false
         }
+        applyPreviewTransform()
     }
 
     private fun updateSettings(updater: (VideoSettings) -> VideoSettings) {
@@ -182,10 +257,7 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
     }
 
     private fun notifySettingsChanged() {
-        val intent = Intent(UndeadWallpaperService.ACTION_VIDEO_SETTINGS_CHANGED).apply {
-            setPackage(requireContext().packageName)
-        }
-        requireContext().applicationContext.sendBroadcast(intent)
+        WallpaperEventBus.emit(WallpaperEvent.VideoSettingsChanged(fileName))
     }
 
     private fun setupListeners() {
@@ -196,8 +268,14 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
             label: TextView,
             icon: ImageView,
             defaultVal: Float,
+            onLiveChange: ((Float) -> Unit)? = null,
             saveAction: (Float) -> Unit
         ) {
+            slider.addOnChangeListener { _, value, fromUser ->
+                if (fromUser && !isUpdatingUi) {
+                    onLiveChange?.invoke(value)
+                }
+            }
             slider.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
                 override fun onStartTrackingTouch(slider: Slider) {}
 
@@ -207,10 +285,7 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
                     label.markIfModified(icon, slider.value, defaultVal)
                 }
             })
-
-
         }
-
 
         binding.scalingModeGroup.setOnCheckedStateChangeListener { _, checkedIds ->
             if (checkedIds.isEmpty() || isUpdatingUi) return@setOnCheckedStateChangeListener
@@ -221,6 +296,7 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
             }
             updateSettings { it.copy(scalingMode = newMode) }
             binding.scalingModeLabel.markIfModified(binding.scalingModeIcon, newMode, defaults.scalingMode)
+            applyPreviewTransform()
         }
 
         binding.chipFlipHorizontal.setOnCheckedChangeListener { _, isChecked ->
@@ -231,6 +307,7 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
                 isChecked || binding.chipFlipVertical.isChecked,
                 false
             )
+            applyPreviewTransform()
         }
 
         binding.chipFlipVertical.setOnCheckedChangeListener { _, isChecked ->
@@ -241,44 +318,56 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
                 binding.chipFlipHorizontal.isChecked || isChecked,
                 false
             )
+            applyPreviewTransform()
         }
 
         setupSafeSlider(
             binding.positionXSlider,
             binding.positionXLabel,
             binding.positionXIcon,
-            defaults.positionX
+            defaults.positionX,
+            onLiveChange = { applyPreviewTransform() }
         ) { value -> updateSettings { it.copy(positionX = value) } }
+
         setupSafeSlider(
             binding.positionYSlider,
             binding.positionYLabel,
             binding.positionYIcon,
-            defaults.positionY
+            defaults.positionY,
+            onLiveChange = { applyPreviewTransform() }
         ) { value -> updateSettings { it.copy(positionY = value) } }
+
         setupSafeSlider(
             binding.zoomSlider,
             binding.zoomLabel,
             binding.zoomIcon,
-            defaults.zoom
+            defaults.zoom,
+            onLiveChange = { applyPreviewTransform() }
         ) { value -> updateSettings { it.copy(zoom = value) } }
+
         setupSafeSlider(
             binding.rotationSlider,
             binding.rotationLabel,
             binding.rotationIcon,
-            defaults.rotation
+            defaults.rotation,
+            onLiveChange = { applyPreviewTransform() }
         ) { value -> updateSettings { it.copy(rotation = value) } }
+
         setupSafeSlider(
             binding.brightnessSlider,
             binding.brightnessLabel,
             binding.brightnessIcon,
-            defaults.brightness
+            defaults.brightness,
+            onLiveChange = { applyPreviewTransform() }
         ) { value -> updateSettings { it.copy(brightness = value) } }
+
         setupSafeSlider(
             binding.speedSlider,
             binding.speedLabel,
             binding.speedIcon,
             defaults.speed
         ) { value -> updateSettings { it.copy(speed = value) } }
+
         setupSafeSlider(
             binding.volumeSlider,
             binding.volumeLabel,
@@ -398,6 +487,8 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        previewPeekController?.cleanup()
+        previewPeekController = null
         _binding = null
     }
 }

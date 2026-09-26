@@ -5,18 +5,17 @@
     <string name="action_battery_optimization">电池优化</string>
     <string name="action_faq">帮助 / 常见问题</string>
 
-    <string name="first_fragment_label">亡灵设置</string>
+    <string name="first_fragment_label">亡灵壁纸</string>
     <string name="second_fragment_label">关于</string>
     <string name="previous">返回</string>
 
     <string name="pick_video">选择视频</string>
-    <string name="trim_video">裁剪视频</string>
     <string name="setting_audio_enabled">启用音频</string>
     <string name="playback_mode_setting">播放模式</string>
     <string name="recent_files">播放列表</string>
     <string name="playlist_instructions">长按以重新排序。向左或向右滑动以移除。</string>
+    <string name="playlist_instructions_empty">墓穴为空。点击以添加视频。</string>
     <string name="error_cannot_remove_last_video">无法移除播放列表中的最后一个视频。</string>
-    <string name="apply_trim">应用</string>
     <string name="wallpaper_description">播放视频的动态壁纸。</string>
     <string name="activating_wallpaper_message">正在激活壁纸…</string>
     <string name="select_video_first_message">请先选择一个视频</string>
@@ -129,6 +128,7 @@
     <string name="parallax_toggle_label">主屏幕视差</string>
     <string name="parallax_description">使视频随您滑动页面而移动。稍微放大视频以隐藏黑边。注意：并非所有自定义系统桌面应用都支持。</string>
     <string name="parallax_strength_label">视差强度</string>
+    <string name="parallax_position_hint">视差效果已启用：在主屏幕滑动时位置将偏离此预览。</string>
 
 
     <string name="mirror_video">镜像视频</string>

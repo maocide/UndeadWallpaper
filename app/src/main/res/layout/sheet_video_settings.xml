@@ -1,13 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<org.maocide.undeadwallpaper.ui.GestureSafeScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/settings_scroll_view"
+    android:id="@+id/sheet_root_container"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/bg_sheet_rim"
-    android:clipToPadding="false"
+    android:clipToOutline="true"
     tools:context=".ui.VideoSettingsSheet">
+
+    <org.maocide.undeadwallpaper.ui.GestureSafeScrollView
+        android:id="@+id/settings_scroll_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipToPadding="false">
 
     <LinearLayout
         android:id="@+id/settings_content_layout"
@@ -28,14 +34,38 @@
             android:paddingHorizontal="16dp"
             android:paddingBottom="16dp">
 
-            <com.google.android.material.imageview.ShapeableImageView
-                android:id="@+id/thumbnail_preview"
-                android:layout_width="88dp"
-                android:layout_height="88dp"
-                android:scaleType="centerCrop"
-                android:alpha="0"
-                app:shapeAppearanceOverlay="@style/CornerStyle"
-                tools:alpha="1" />
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/preview_frame_container"
+                android:layout_width="52dp"
+                android:layout_height="116dp"
+                android:layout_gravity="center_vertical"
+                app:cardBackgroundColor="@android:color/black"
+                app:cardCornerRadius="10dp"
+                app:strokeWidth="1.5dp"
+                app:strokeColor="?attr/colorOutline"
+                app:cardElevation="0dp"
+                android:clickable="true"
+                android:focusable="true">
+
+                <ImageView
+                    android:id="@+id/thumbnail_preview"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="matrix"
+                    android:alpha="0"
+                    android:contentDescription="@null"
+                    android:importantForAccessibility="no"
+                    tools:alpha="1" />
+
+                <View
+                    android:id="@+id/thumbnail_camera_hole"
+                    android:layout_width="3.5dp"
+                    android:layout_height="3.5dp"
+                    android:layout_gravity="top|center_horizontal"
+                    android:layout_marginTop="3.5dp"
+                    android:background="@drawable/bg_camera_punch_hole"
+                    android:importantForAccessibility="no" />
+            </com.google.android.material.card.MaterialCardView>
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -62,6 +92,17 @@
                     android:text="@string/custom_settings_header"
                     android:textAppearance="?attr/textAppearanceBodySmall"
                     android:textColor="?android:attr/textColorSecondary" />
+
+                <TextView
+                    android:id="@+id/position_x_parallax_hint"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/parallax_position_hint"
+                    android:textAppearance="?attr/textAppearanceBodySmall"
+                    android:textStyle="italic"
+                    android:textColor="@color/light_green"
+                    tools:visibility="visible" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/button_reset_advanced"
@@ -153,6 +194,7 @@
                         android:layout_height="24dp"
                         android:layout_marginStart="16dp"
                         android:src="@drawable/ic_fit_screen"
+                        android:contentDescription="@null"
                         android:alpha="0.5"
                         app:tint="?android:attr/textColorSecondary" />
                 </LinearLayout>
@@ -188,6 +230,7 @@
                         android:layout_height="24dp"
                         android:layout_marginStart="16dp"
                         android:src="@drawable/ic_zoom_in"
+                        android:contentDescription="@null"
                         android:alpha="0.5"
                         app:tint="?android:attr/textColorSecondary" />
                 </LinearLayout>
@@ -211,8 +254,8 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:valueFrom="-1"
-                        android:valueTo="1"
+                        android:valueFrom="-2"
+                        android:valueTo="2"
                         android:value="0.0"
                         android:stepSize="0.025"
                         app:tickVisible="false" app:trackStopIndicatorSize="0dp" />
@@ -223,6 +266,7 @@
                         android:layout_height="24dp"
                         android:layout_marginStart="16dp"
                         android:src="@drawable/ic_swap_horiz"
+                        android:contentDescription="@null"
                         android:alpha="0.5"
                         app:tint="?android:attr/textColorSecondary" />
                 </LinearLayout>
@@ -246,8 +290,8 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:valueFrom="-1"
-                        android:valueTo="1"
+                        android:valueFrom="-2"
+                        android:valueTo="2"
                         android:value="0.0"
                         android:stepSize="0.025"
                         app:tickVisible="false" app:trackStopIndicatorSize="0dp" />
@@ -258,6 +302,7 @@
                         android:layout_height="24dp"
                         android:layout_marginStart="16dp"
                         android:src="@drawable/ic_swap_vert"
+                        android:contentDescription="@null"
                         android:alpha="0.5"
                         app:tint="?android:attr/textColorSecondary" />
                 </LinearLayout>
@@ -293,6 +338,7 @@
                         android:layout_height="24dp"
                         android:layout_marginStart="16dp"
                         android:src="@drawable/ic_rotate_right"
+                        android:contentDescription="@null"
                         android:alpha="0.5"
                         app:tint="?android:attr/textColorSecondary" />
                 </LinearLayout>
@@ -341,6 +387,7 @@
                         android:layout_height="24dp"
                         android:layout_marginStart="16dp"
                         android:src="@drawable/ic_flip"
+                        android:contentDescription="@null"
                         android:alpha="0.5"
                         app:tint="?android:attr/textColorSecondary" />
                 </LinearLayout>
@@ -403,6 +450,7 @@
                         android:layout_height="24dp"
                         android:layout_marginStart="16dp"
                         android:src="@drawable/ic_volume_up"
+                        android:contentDescription="@null"
                         android:alpha="0.5"
                         app:tint="?android:attr/textColorSecondary" />
                 </LinearLayout>
@@ -438,6 +486,7 @@
                         android:layout_height="24dp"
                         android:layout_marginStart="16dp"
                         android:src="@drawable/ic_speed"
+                        android:contentDescription="@null"
                         android:alpha="0.5"
                         app:tint="?android:attr/textColorSecondary" />
                 </LinearLayout>
@@ -473,6 +522,7 @@
                         android:layout_height="24dp"
                         android:layout_marginStart="16dp"
                         android:src="@drawable/ic_light_mode"
+                        android:contentDescription="@null"
                         android:alpha="0.5"
                         app:tint="?android:attr/textColorSecondary" />
                 </LinearLayout>
@@ -483,4 +533,83 @@
 
 
     </LinearLayout>
-</org.maocide.undeadwallpaper.ui.GestureSafeScrollView>
+    </org.maocide.undeadwallpaper.ui.GestureSafeScrollView>
+
+    <FrameLayout
+        android:id="@+id/peek_overlay_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#B3000000"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone"
+        tools:visibility="visible">
+
+        <LinearLayout
+            android:id="@+id/peek_content_layout"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/peek_card"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:cardBackgroundColor="@android:color/black"
+                app:cardCornerRadius="20dp"
+                app:strokeWidth="2dp"
+                app:strokeColor="?attr/colorOutline"
+                app:cardElevation="16dp">
+
+                <ImageView
+                    android:id="@+id/peek_thumbnail"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="matrix"
+                    android:contentDescription="@null"
+                    android:importantForAccessibility="no" />
+
+                <View
+                    android:id="@+id/peek_camera_hole"
+                    android:layout_width="7dp"
+                    android:layout_height="7dp"
+                    android:layout_gravity="top|center_horizontal"
+                    android:layout_marginTop="7dp"
+                    android:background="@drawable/bg_camera_punch_hole"
+                    android:importantForAccessibility="no" />
+            </com.google.android.material.card.MaterialCardView>
+
+            <LinearLayout
+                android:id="@+id/peek_parallax_badge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="5dp"
+                android:background="@drawable/bg_parallax_pill"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <ImageView
+                    android:layout_width="15dp"
+                    android:layout_height="15dp"
+                    android:src="@drawable/ic_swap_horiz"
+                    app:tint="?android:attr/textColorSecondary"
+                    android:importantForAccessibility="no" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:text="@string/parallax_card_title"
+                    android:textAppearance="?attr/textAppearanceLabelMedium"
+                    android:textColor="?android:attr/textColorSecondary"
+                    android:textStyle="normal" />
+            </LinearLayout>
+        </LinearLayout>
+    </FrameLayout>
+</FrameLayout>

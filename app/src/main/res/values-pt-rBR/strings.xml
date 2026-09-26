@@ -5,19 +5,18 @@
     <string name="action_faq">Ajuda / FAQ</string>
 
     <!-- Strings used for fragments for navigation -->
-    <string name="first_fragment_label">Configurações do Undead</string>
+    <string name="first_fragment_label">Undead Wallpaper</string>
     <string name="second_fragment_label">Sobre</string>
     <string name="previous">Anterior</string>
 
     <!-- UI Strings -->
     <string name="pick_video">Escolher Vídeo</string>
-    <string name="trim_video">Cortar Vídeo</string>
     <string name="setting_audio_enabled">Habilitar Áudio</string>
     <string name="playback_mode_setting">Modo de Reprodução</string>
     <string name="recent_files">Playlist</string>
     <string name="playlist_instructions">Toque longo para reordenar. Deslize para a esquerda ou direita para remover.</string>
+    <string name="playlist_instructions_empty">O túmulo está vazio. Toque para adicionar um vídeo.</string>
     <string name="error_cannot_remove_last_video">Não é possível remover o último vídeo da playlist.</string>
-    <string name="apply_trim">Aplicar</string>
     <string name="wallpaper_description">Um wallpaper vivo que reproduz vídeos.</string>
     <string name="activating_wallpaper_message">Ativando wallpaper…</string>
     <string name="select_video_first_message">Por favor, escolha um vídeo primeiro</string>
@@ -147,6 +146,7 @@
     <string name="parallax_toggle_label">Parallax na Tela Inicial</string>
     <string name="parallax_description">Faz o vídeo se mover ao deslizar as páginas. Aproxime ligeiramente o vídeo para esconder as bordas pretas. Nota: Pode não ser compatível com todos os launchers personalizados.</string>
     <string name="parallax_strength_label">Intensidade do Parallax</string>
+    <string name="parallax_position_hint">Paralaxe ativado: deslizar na tela inicial desloca a posição em relação a esta prévia.</string>
 
 
     <string name="mirror_video">Espelhar Vídeo</string>

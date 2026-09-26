@@ -6,19 +6,18 @@
     <string name="action_faq">Ayuda / FAQ</string>
 
     <!-- Strings used for fragments for navigation -->
-    <string name="first_fragment_label">Ajustes de Undead</string>
+    <string name="first_fragment_label">Undead Wallpaper</string>
     <string name="second_fragment_label">Acerca de</string>
     <string name="previous">Anterior</string>
 
     <!-- UI Strings -->
     <string name="pick_video">Seleccionar Video</string>
-    <string name="trim_video">Recortar Video</string>
     <string name="setting_audio_enabled">Habilitar Audio</string>
     <string name="playback_mode_setting">Modo de Reproducción</string>
     <string name="recent_files">Lista de reproducción</string>
     <string name="playlist_instructions">Mantén presionado para reordenar. Desliza a la izquierda o derecha para remover.</string>
+    <string name="playlist_instructions_empty">La tumba está vacía. Toca para añadir un video.</string>
     <string name="error_cannot_remove_last_video">No se puede remover el último video en la lista de reproducción.</string>
-    <string name="apply_trim">Aplicar</string>
     <string name="wallpaper_description">Un fondo de pantalla animado que reproduce video.</string>
     <string name="activating_wallpaper_message">Activando fondo de pantalla…</string>
     <string name="select_video_first_message">Por favor, selecciona un video primero</string>
@@ -139,6 +138,7 @@
     <string name="parallax_toggle_label">Paralaje de Pantalla de Inicio</string>
     <string name="parallax_description">Hace que el video se desplace al deslizar las páginas. Acerca ligeramente el video para ocultar los bordes negros. Nota: No es compatible con todos los launchers personalizados.</string>
     <string name="parallax_strength_label">Intensidad del Paralaje</string>
+    <string name="parallax_position_hint">Paralaje activo: deslizar la pantalla de inicio desplaza la posición respecto a esta vista previa.</string>
 
 
     <string name="mirror_video">Reflejar Video</string>

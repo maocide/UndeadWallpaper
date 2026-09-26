@@ -9,6 +9,7 @@ import androidx.fragment.app.Fragment
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import org.maocide.undeadwallpaper.R
+import org.maocide.undeadwallpaper.utils.setSafeOnClickListener
 
 /**
  * A Flutter-style UI Helper for displaying an indeterminate progress overlay.
@@ -22,6 +23,7 @@ suspend fun Fragment.withLoadingOverlay(
     val rootView = requireActivity().findViewById<ViewGroup>(android.R.id.content) ?: return@coroutineScope block()
     
     val overlayView = LayoutInflater.from(requireContext()).inflate(R.layout.layout_loading_overlay, rootView, false)
+    overlayView.filterTouchesWhenObscured = true
     
     // Set message
     overlayView.findViewById<TextView>(R.id.tv_loading_message)?.text = message
@@ -32,7 +34,7 @@ suspend fun Fragment.withLoadingOverlay(
     // Bind cancel button to the child job if cancellable
     val cancelButton = overlayView.findViewById<Button>(R.id.btn_cancel_loading)
     if (cancellable) {
-        cancelButton?.setOnClickListener {
+        cancelButton?.setSafeOnClickListener {
             taskJob.cancel()
         }
     } else {

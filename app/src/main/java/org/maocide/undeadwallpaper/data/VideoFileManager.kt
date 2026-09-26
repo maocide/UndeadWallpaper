@@ -4,6 +4,8 @@ import org.maocide.undeadwallpaper.R
 import org.maocide.undeadwallpaper.BuildConfig
 
 import org.maocide.undeadwallpaper.model.RecentFile
+import org.maocide.undeadwallpaper.event.WallpaperEvent
+import org.maocide.undeadwallpaper.event.WallpaperEventBus
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -23,6 +25,8 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
@@ -185,48 +189,99 @@ class VideoFileManager(
      * Loads the list of recent video files from the app's storage,
      * synchronizing it with the persisted order.
      *
+     * @param performMaintenance If true, executes data migration, orphaned file garbage collection,
+     * and thumbnail pruning. If false, performs a non-destructive read suitable for routine pagination.
      * @return A list of [RecentFile] objects in the correct order.
      */
-    suspend fun loadRecentFiles(): List<RecentFile> = withContext(Dispatchers.IO) {
-        val videosDir = getAppSpecificAlbumStorageDir(context, videosDirectoryName)
-        var physicalFiles = videosDir.listFiles() ?: return@withContext emptyList()
-        val preferencesManager = PreferencesManager(context, prefsName)
+    suspend fun loadRecentFiles(performMaintenance: Boolean = false): List<RecentFile> = fileOpsMutex.withLock {
+        withContext(Dispatchers.IO) {
+            val videosDir = getAppSpecificAlbumStorageDir(context, videosDirectoryName)
+            var physicalFiles = videosDir.listFiles() ?: return@withContext emptyList()
+            val preferencesManager = PreferencesManager(context, prefsName)
 
-        // Get the persisted list of settings
-        val rawSettings = preferencesManager.getPlaylistSettings()
+            // Get the persisted list of settings
+            val rawSettings = preferencesManager.getPlaylistSettings()
 
-        // Data Migration
-        val (migratedSettings, wasMigrated) = performDataMigration(
-            videosDir,
-            physicalFiles,
-            rawSettings,
-            preferencesManager
-        )
-        if (wasMigrated) {
-            physicalFiles = videosDir.listFiles() ?: emptyArray() // Refresh physical files
+            // Data Migration
+            val (migratedSettings, wasMigrated) = if (performMaintenance) {
+                val (settings, migrated) = performDataMigration(
+                    videosDir,
+                    physicalFiles,
+                    rawSettings,
+                    preferencesManager
+                )
+                if (migrated) {
+                    physicalFiles = videosDir.listFiles() ?: emptyArray() // Refresh physical files
+                }
+                Pair(settings, migrated)
+            } else {
+                Pair(rawSettings.toMutableList(), false)
+            }
+
+            // Garbage Collection
+            val (cleanFiles, cleanSettings) = if (performMaintenance) {
+                performGarbageCollection(physicalFiles, migratedSettings)
+            } else {
+                // Non-destructive in-memory reconciliation (no physical file deletion)
+                val persistedFileNames = migratedSettings.map { it.fileName }.toSet()
+                val physicalFileNames = physicalFiles.map { it.name }.toSet()
+                val safeFiles = physicalFiles.filter { it.name in persistedFileNames }.toTypedArray()
+                migratedSettings.retainAll { it.fileName in physicalFileNames }
+                Pair(safeFiles, migratedSettings)
+            }
+
+            // Pagination Clean-up
+            val playlistManager = PlaylistManager(context, preferencesManager)
+            val collapseOccurred = playlistManager.collapseEmptyPages(cleanSettings)
+
+            // Save & Notify if needed
+            if (wasMigrated || cleanSettings.size != rawSettings.size || collapseOccurred) {
+                preferencesManager.savePlaylistSettings(cleanSettings)
+                WallpaperEventBus.emit(WallpaperEvent.PlaylistReordered)
+            }
+
+            // Generate Thumbnails & Return
+            return@withContext generateThumbnailsAsync(cleanFiles, cleanSettings, preferencesManager)
         }
+    }
 
-        // Garbage Collection
-        val (cleanFiles, cleanSettings) = performGarbageCollection(physicalFiles, migratedSettings)
+    /**
+     * Performs cold-boot maintenance on storage and playlist state without generating thumbnails.
+     * Executes legacy data migration, orphaned file garbage collection (sparing files in grace period),
+     * and collapses empty playlist pages.
+     */
+    suspend fun performStartupMaintenance(): Unit = fileOpsMutex.withLock {
+        withContext(Dispatchers.IO) {
+            val videosDir = getAppSpecificAlbumStorageDir(context, videosDirectoryName)
+            var physicalFiles = videosDir.listFiles() ?: return@withContext
+            val preferencesManager = PreferencesManager(context, prefsName)
 
-        // Pagination Clean-up
-        val playlistManager = PlaylistManager(context, preferencesManager)
-        val collapseOccurred = playlistManager.collapseEmptyPages(cleanSettings)
+            val rawSettings = preferencesManager.getPlaylistSettings()
 
-        // Save & Broadcast if needed
-        if (wasMigrated || cleanSettings.size != rawSettings.size || collapseOccurred) {
-            preferencesManager.savePlaylistSettings(cleanSettings)
+            // 1. Data Migration
+            val (migratedSettings, wasMigrated) = performDataMigration(
+                videosDir,
+                physicalFiles,
+                rawSettings,
+                preferencesManager
+            )
+            if (wasMigrated) {
+                physicalFiles = videosDir.listFiles() ?: emptyArray()
+            }
 
-            val intent =
-                android.content.Intent(org.maocide.undeadwallpaper.service.UndeadWallpaperService.ACTION_PLAYLIST_REORDERED)
-                    .apply {
-                        setPackage(context.packageName)
-                    }
-            context.applicationContext.sendBroadcast(intent)
+            // 2. Garbage Collection (with 60s grace period)
+            val (_, cleanSettings) = performGarbageCollection(physicalFiles, migratedSettings)
+
+            // 3. Pagination Clean-up
+            val playlistManager = PlaylistManager(context, preferencesManager)
+            val collapseOccurred = playlistManager.collapseEmptyPages(cleanSettings)
+
+            // 4. Save & Notify if changed
+            if (wasMigrated || cleanSettings.size != rawSettings.size || collapseOccurred) {
+                preferencesManager.savePlaylistSettings(cleanSettings)
+                WallpaperEventBus.emit(WallpaperEvent.PlaylistReordered)
+            }
         }
-
-        // Generate Thumbnails & Return
-        return@withContext generateThumbnailsAsync(cleanFiles, cleanSettings, preferencesManager)
     }
 
     /**
@@ -321,7 +376,14 @@ class VideoFileManager(
         // Security / Garbage Collection: Delete unindexed physical files
         var cleanPhysicalFiles = physicalFiles
         if (orphanedFiles.isNotEmpty()) {
+            val now = System.currentTimeMillis()
             for (file in orphanedFiles) {
+                val lastModified = file.lastModified()
+                val ageMs = now - lastModified
+                if (lastModified > 0L && ageMs < ORPHAN_GRACE_PERIOD_MS) {
+                    FileLogger.d(tag, "Skipping fresh unindexed file (in grace period, age=${ageMs}ms): ${file.name}")
+                    continue
+                }
                 FileLogger.w(tag, "Deleting unindexed/injected physical file: ${file.name}")
                 file.delete()
             }
@@ -332,7 +394,43 @@ class VideoFileManager(
         persistedFileNames.retainAll(physicalFileNames)
         persistedSettings.retainAll { it.fileName in physicalFileNames }
 
+        // Security / Garbage Collection: Prune orphaned cached thumbnails
+        try {
+            val thumbnailsDir = getAppSpecificAlbumStorageDir(context, "thumbnails")
+            val physicalThumbnailFiles = thumbnailsDir.listFiles() ?: emptyArray()
+            val expectedThumbnailNames = cleanPhysicalFiles.map { "${it.nameWithoutExtension}.jpg" }.toSet()
+            val deadline = System.currentTimeMillis() + THUMBNAIL_GC_TIME_BUDGET_MS
+            var prunedCount = 0
+
+            val now = System.currentTimeMillis()
+            for (thumb in physicalThumbnailFiles) {
+                if (prunedCount >= MAX_THUMBNAIL_PRUNES_PER_PASS || System.currentTimeMillis() >= deadline) {
+                    FileLogger.d(tag, "Thumbnail GC budget reached (pruned: $prunedCount). Deferring remainder.")
+                    break
+                }
+                val thumbAgeMs = now - thumb.lastModified()
+                if (thumb.lastModified() > 0L && thumbAgeMs < ORPHAN_GRACE_PERIOD_MS) {
+                    continue
+                }
+                if (thumb.isFile && !thumb.name.startsWith(".") && thumb.name !in expectedThumbnailNames) {
+                    if (thumb.delete()) {
+                        prunedCount++
+                        FileLogger.w(tag, "Deleting orphaned thumbnail: ${thumb.name}")
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            FileLogger.e(tag, "Failed to garbage collect thumbnails", e)
+        }
+
         return Pair(cleanPhysicalFiles, persistedSettings)
+    }
+
+    companion object {
+        private val fileOpsMutex = Mutex()
+        private const val ORPHAN_GRACE_PERIOD_MS = 60_000L
+        private const val MAX_THUMBNAIL_PRUNES_PER_PASS = 50
+        private const val THUMBNAIL_GC_TIME_BUDGET_MS = 15L
     }
 
     /**
@@ -437,16 +535,22 @@ class VideoFileManager(
     }
 
     /**
-     * Creates a thumbnail for a video file.
+     * Extracts a scaled thumbnail from a video file without loading massive 4K raw frames into memory.
      *
      * @param filePath The path of the video file.
-     * @return A [Bitmap] thumbnail, or null if creation fails.
+     * @return The scaled thumbnail bitmap, or null if creation failed.
      */
     private fun createVideoThumbnail(filePath: String): Bitmap? {
         val retriever = android.media.MediaMetadataRetriever()
         return try {
             retriever.setDataSource(filePath)
-            retriever.getFrameAtTime()
+            // minSdk is 28: getScaledFrameAtTime scales hardware-decoded frame directly to max 512x512
+            retriever.getScaledFrameAtTime(
+                -1L,
+                android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+                512,
+                512
+            ) ?: retriever.frameAtTime
         } catch (_: Exception) {
             FileLogger.w(tag, "Thumbnail failure. Media corrupted.")
             null
@@ -461,13 +565,23 @@ class VideoFileManager(
 
     /**
      * Gets a cached thumbnail from disk, or generates and caches one if missing.
+     * Downsamples legacy cached files if they exceed thumbnail bounds.
      */
     fun getOrGenerateThumbnail(videoFile: File): Bitmap? {
         val thumbnailsDir = getAppSpecificAlbumStorageDir(context, "thumbnails")
         val thumbnailFile = File(thumbnailsDir, "${videoFile.nameWithoutExtension}.jpg")
 
         if (thumbnailFile.exists()) {
-            return android.graphics.BitmapFactory.decodeFile(thumbnailFile.absolutePath)
+            val boundsOptions = android.graphics.BitmapFactory.Options().apply {
+                inJustDecodeBounds = true
+            }
+            android.graphics.BitmapFactory.decodeFile(thumbnailFile.absolutePath, boundsOptions)
+            val sampleSize = calculateInSampleSize(boundsOptions, 512, 512)
+            val decodeOptions = android.graphics.BitmapFactory.Options().apply {
+                inSampleSize = sampleSize
+                inPreferredConfig = Bitmap.Config.RGB_565 // Conserves 50% memory for thumbnails
+            }
+            return android.graphics.BitmapFactory.decodeFile(thumbnailFile.absolutePath, decodeOptions)
         }
 
         val bitmap = createVideoThumbnail(videoFile.absolutePath)
@@ -481,6 +595,38 @@ class VideoFileManager(
             }
         }
         return bitmap
+    }
+
+    /**
+     * Deletes a video file along with its cached thumbnail from disk.
+     *
+     * @param videoFile The video file to be deleted.
+     * @return True if the physical video file was deleted, false otherwise.
+     */
+    fun deleteVideoAndThumbnail(videoFile: File): Boolean {
+        val thumbnailsDir = getAppSpecificAlbumStorageDir(context, "thumbnails")
+        val thumbnailFile = File(thumbnailsDir, "${videoFile.nameWithoutExtension}.jpg")
+        if (thumbnailFile.exists()) {
+            thumbnailFile.delete()
+        }
+        return if (videoFile.exists()) videoFile.delete() else false
+    }
+
+    private fun calculateInSampleSize(
+        options: android.graphics.BitmapFactory.Options,
+        reqWidth: Int,
+        reqHeight: Int
+    ): Int {
+        val (height: Int, width: Int) = options.outHeight to options.outWidth
+        var inSampleSize = 1
+        if (height > reqHeight || width > reqWidth) {
+            val halfHeight: Int = height / 2
+            val halfWidth: Int = width / 2
+            while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
+                inSampleSize *= 2
+            }
+        }
+        return inSampleSize
     }
 
     /**

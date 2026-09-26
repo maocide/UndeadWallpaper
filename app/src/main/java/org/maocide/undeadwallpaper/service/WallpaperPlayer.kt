@@ -104,6 +104,16 @@ class WallpaperPlayer(
         player?.setVideoSurface(surface)
     }
 
+    suspend fun clearVideoSurfaceSuspend() = kotlinx.coroutines.withContext(playbackDispatcher) {
+        player?.stop()
+        player?.clearVideoSurface()
+    }
+
+    fun clearVideoSurfaceAsync() = playbackScope.launch {
+        player?.stop()
+        player?.clearVideoSurface()
+    }
+
     fun prepareAsync() = playbackScope.launch {
         player?.prepare()
     }
@@ -286,6 +296,10 @@ class WallpaperPlayer(
             // and artificially trigger playlist transitions during UI mode changes.
             playerListener?.let { p.removeListener(it) }
             playerListener = null
+
+            // Stop decoding and detach surface immediately to prevent MediaCodec use-after-free
+            p.stop()
+            p.clearVideoSurface()
 
             // Do NOT call clearMediaItems(). It triggers STATE_ENDED on the listener synchronously if we didn't remove it.
             // p.release() handles all cleanup internally.

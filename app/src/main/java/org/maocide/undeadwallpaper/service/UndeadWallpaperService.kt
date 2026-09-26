@@ -55,7 +55,11 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import org.maocide.undeadwallpaper.event.WallpaperEvent
+import org.maocide.undeadwallpaper.event.WallpaperEventBus
 import org.maocide.undeadwallpaper.input.WallpaperGestureManager
 import org.maocide.undeadwallpaper.model.GestureType
 import org.maocide.undeadwallpaper.model.VideoSettings
@@ -67,18 +71,6 @@ import kotlin.random.Random
 
 
 class UndeadWallpaperService : WallpaperService() {
-
-    // FILTERING: Our secret passphrase
-    companion object {
-        const val ACTION_VIDEO_URI_CHANGED = "org.maocide.undeadwallpaper.VIDEO_URI_CHANGED"
-        const val ACTION_PLAYBACK_MODE_CHANGED = "org.maocide.undeadwallpaper.ACTION_PLAYBACK_MODE_CHANGED"
-
-        // for testing trimming
-        const val ACTION_TRIM_TIMES_CHANGED = "org.maocide.undeadwallpaper.TRIM_TIMES_CHANGED"
-        const val ACTION_STATUS_BAR_COLOR_CHANGED = "org.maocide.undeadwallpaper.STATUS_BAR_COLOR_CHANGED"
-        const val ACTION_PLAYLIST_REORDERED = "org.maocide.undeadwallpaper.PLAYLIST_REORDERED"
-        const val ACTION_VIDEO_SETTINGS_CHANGED = "org.maocide.undeadwallpaper.VIDEO_SETTINGS_CHANGED"
-    }
 
     override fun onCreateEngine(): Engine {
         return MyWallpaperEngine()
@@ -222,22 +214,38 @@ class UndeadWallpaperService : WallpaperService() {
             }
             lastActionExecutionTimeMs = now
 
-            // Provide Haptic Feedback for successful gesture
-            HapticHelper.performGestureFeedback(this@UndeadWallpaperService)
-
             when (action) {
                 WallpaperAction.NONE -> return // Already handled above, but needed for exhaustiveness
                 WallpaperAction.SKIP_NEXT -> {
-                    // UX Rule: If they skip, they want to see the new video. Unpause it.
-                    val currentState = fsm.state as? EngineState.Ready
-                    if (currentState?.isManuallyPaused == true) {
-                        processEvent(EngineEvent.UserTogglePause)
+                    if (fsm.state !is EngineState.Ready) return
+
+                    serviceScope.launch {
+                        val playlistUris = playlistManager.getPlaylistUris()
+                        if (playlistUris.size <= 1) {
+                            FileLogger.d(
+                                TAG,
+                                "Gesture SKIP_NEXT ignored: active page only has ${playlistUris.size} video(s)."
+                            )
+                            return@launch
+                        }
+
+                        // Provide Haptic Feedback for successful gesture
+                        HapticHelper.performGestureFeedback(this@UndeadWallpaperService)
+
+                        // UX Rule: If they skip, they want to see the new video. Unpause it.
+                        val currentState = fsm.state as? EngineState.Ready
+                        if (currentState?.isManuallyPaused == true) {
+                            processEvent(EngineEvent.UserTogglePause)
+                        }
+                        skipNextVideo(isManualSkip = true)
                     }
-                    skipNextVideo(isManualSkip = true)
                 }
 
                 WallpaperAction.PLAY_PAUSE -> {
                     if (fsm.state !is EngineState.Ready) return
+
+                    // Provide Haptic Feedback for successful gesture
+                    HapticHelper.performGestureFeedback(this@UndeadWallpaperService)
 
                     // ONE_SHOT CASE: If they "Play" a finished video, restart it!
                     if (currentPlaybackMode == PlaybackMode.ONE_SHOT && hasPlaybackCompleted) {
@@ -283,14 +291,14 @@ class UndeadWallpaperService : WallpaperService() {
             // We can safely enable ExoPlayer's internal REPEAT_MODE_ALL. This gives perfect gapless looping
             // without ever hitting STATE_ENDED and incurring the manual flush pause.
             val canLoopAll = currentPlaybackMode == PlaybackMode.LOOP_ALL
-                && playlistUris.isNotEmpty() && chunkUris.size == playlistUris.size
+                    && playlistUris.isNotEmpty() && chunkUris.size == playlistUris.size
 
             // Single-Item Shuffle Optimization:
             // With only 1 video in the playlist, shuffling has no sequence to regenerate.
             // We can safely loop it seamlessly instead of hitting STATE_ENDED and re-initializing the decoder.
             // NOTE: Multi-video SHUFFLE (> 1) MUST hit STATE_ENDED with REPEAT_MODE_OFF to regenerate a newly randomized sequence loop.
             val canLoopSingleVideoShuffle = currentPlaybackMode == PlaybackMode.SHUFFLE
-                && playlistUris.size == 1 && chunkUris.isNotEmpty()
+                    && playlistUris.size == 1 && chunkUris.isNotEmpty()
 
             if (canLoopAll || canLoopSingleVideoShuffle) {
                 wallpaperPlayer.setRepeatModeAsync(Player.REPEAT_MODE_ALL)
@@ -314,84 +322,100 @@ class UndeadWallpaperService : WallpaperService() {
         }
 
 
-        // The receiver that listens for our signal
-        private val videoChangeReceiver = object : BroadcastReceiver() {
-            @OptIn(UnstableApi::class)
-            override fun onReceive(context: Context?, intent: Intent?) {
-                when (intent?.action) {
-                    // Will be called by changing video
-                    ACTION_VIDEO_URI_CHANGED -> {
-                        FileLogger.i(TAG, "Broadcast received: Video uri changed, full re-initialization requested.")
-                        val currentState = fsm.state as? EngineState.Ready
-                        if (currentState?.isManuallyPaused == true) {
-                            processEvent(EngineEvent.UserTogglePause)
+        // Listen for internal configuration & playback events securely in-process
+        private fun observeWallpaperEvents() {
+            serviceScope.launch {
+                WallpaperEventBus.events.collect { event ->
+                    when (event) {
+                        is WallpaperEvent.VideoUriChanged -> {
+                            FileLogger.i(TAG, "Event received: Video uri changed, full re-initialization requested.")
+                            val currentState = fsm.state as? EngineState.Ready
+                            if (currentState?.isManuallyPaused == true) {
+                                processEvent(EngineEvent.UserTogglePause)
+                            }
+                            resetPlaybackTimeline()
+                            processEvent(EngineEvent.InitializeRequested) // force Reinit
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                notifyColorsChanged()
+                            }
                         }
-                        resetPlaybackTimeline()
-                        processEvent(EngineEvent.InitializeRequested) // force Reinit
-                    }
 
-                    // Will be called by changing scaling, playback mode, all things requiring a reinit
-                    ACTION_PLAYBACK_MODE_CHANGED -> {
-                        FileLogger.i(TAG, "Broadcast received: Playback mode change, full re-initialization requested.")
-                        val currentState = fsm.state as? EngineState.Ready
-                        if (currentState?.isManuallyPaused == true) {
-                            processEvent(EngineEvent.UserTogglePause)
+                        is WallpaperEvent.PlaybackModeChanged -> {
+                            FileLogger.i(TAG, "Event received: Playback mode change, full re-initialization requested.")
+                            val currentState = fsm.state as? EngineState.Ready
+                            if (currentState?.isManuallyPaused == true) {
+                                processEvent(EngineEvent.UserTogglePause)
+                            }
+                            resetPlaybackTimeline()
+                            processEvent(EngineEvent.InitializeRequested) // force Reinit
                         }
-                        resetPlaybackTimeline()
-                        processEvent(EngineEvent.InitializeRequested) // force Reinit
-                    }
 
-                    ACTION_STATUS_BAR_COLOR_CHANGED -> {
-                        FileLogger.i(TAG, "Broadcast received: Color changed -> Update just sys colors.")
-                        // Only notify the system, DO NOT restart the player
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                            notifyColorsChanged()
+                        is WallpaperEvent.StatusBarColorChanged -> {
+                            FileLogger.i(TAG, "Event received: Color changed -> Update just sys colors.")
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                notifyColorsChanged()
+                            }
                         }
-                    }
 
-                    ACTION_PLAYLIST_REORDERED -> {
-                        FileLogger.i(TAG, "Playlist reordered. Syncing ExoPlayer timeline.")
-                        if (fsm.state is EngineState.Ready) {
-                            // Call the helper (Keep playing seamlessly)
-                            serviceScope.launch {
+                        is WallpaperEvent.PlaylistReordered -> {
+                            FileLogger.i(TAG, "Event received: Playlist reordered. Syncing ExoPlayer timeline.")
+                            if (fsm.state is EngineState.Ready) {
                                 bindPlaylistToPlayer(keepCurrentPlayback = true)
                             }
                         }
-                    }
 
-                    ACTION_VIDEO_SETTINGS_CHANGED -> {
-                        FileLogger.i(
-                            TAG,
-                            "Broadcast received: Video settings changed, full re-initialization requested."
-                        )
-                        val currentState = fsm.state as? EngineState.Ready
-                        if (currentState?.isManuallyPaused == true) {
-                            processEvent(EngineEvent.UserTogglePause)
+                        is WallpaperEvent.VideoSettingsChanged -> {
+                            FileLogger.i(
+                                TAG,
+                                "Event received: Video settings changed for ${event.fileName}"
+                            )
+                            if (currentPlaybackMode == PlaybackMode.LOOP_ALL || currentPlaybackMode == PlaybackMode.SHUFFLE) {
+                                val currentState = fsm.state as? EngineState.Ready
+                                if (currentState?.isManuallyPaused == true) {
+                                    processEvent(EngineEvent.UserTogglePause)
+                                }
+                                resetPlaybackTimeline()
+                                processEvent(EngineEvent.InitializeRequested) // force Reinit
+                            } else {
+                                val activeFileName = loadedVideoUriString.toUri().lastPathSegment
+                                if (activeFileName == event.fileName) {
+                                    val activeSettings = prefs.getVideoSettings(event.fileName)
+                                    refreshRenderer()
+                                    applyNonVisualSettings(activeSettings)
+                                    renderer?.requestRender()
+                                }
+                            }
                         }
 
-                        // Reset the parallax offset if the user turned it off so the renderer
-                        // doesn't keep applying the last scroll value on every frame.
-                        if (!prefs.isParallaxEnabled()) {
-                            renderer?.setParallaxOffset(0f)
+                        is WallpaperEvent.TouchControlsChanged -> {
+                            FileLogger.i(TAG, "Event received: Touch controls changed.")
+                            updateTouchListeningState()
                         }
 
-                        // Ensure settings apply completely identical to a URI change to avoid syncing bugs
-                        resetPlaybackTimeline()
-                        processEvent(EngineEvent.InitializeRequested) // force Reinit
-                    }
-
-                    Intent.ACTION_USER_UNLOCKED -> {
-                        FileLogger.i(
-                            TAG,
-                            "Broadcast received: User Unlocked. Initializing player safely and restoring colors."
-                        )
-                        processEvent(EngineEvent.InitializeRequested)
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                            notifyColorsChanged()
+                        is WallpaperEvent.ParallaxChanged -> {
+                            FileLogger.i(TAG, "Event received: Parallax changed.")
+                            if (!prefs.isParallaxEnabled()) {
+                                renderer?.setParallaxOffset(0f)
+                            }
                         }
                     }
                 }
+            }
+        }
 
+        // The receiver that listens exclusively for OS-level Direct Boot unlock
+        private val userUnlockReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent?.action == Intent.ACTION_USER_UNLOCKED) {
+                    FileLogger.i(
+                        TAG,
+                        "Broadcast received: User Unlocked. Initializing player safely and restoring colors."
+                    )
+                    processEvent(EngineEvent.InitializeRequested)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        notifyColorsChanged()
+                    }
+                }
             }
         }
 
@@ -428,28 +452,23 @@ class UndeadWallpaperService : WallpaperService() {
                 updateActiveVideoState(nextUriString)
                 resetPlaybackTimeline()
 
+                // Lock out manual/parallax render requests during transition across boundary
+                renderer?.setIsTransitioning(true)
+
                 // ALWAYS Hot-swap via Chunking!
                 bindPlaylistToPlayer(keepCurrentPlayback = false)
 
-                if (!isManualSkip) {
-                    // AUTOMATIC TRANSITION (STATE_ENDED):
-                    // The decoder buffer is completely empty. We MUST apply the matrix NOW
-                    // so the very first frame of the new video draws perfectly.
-                    FileLogger.i(TAG, "Auto-transition: Applying matrix immediately.")
+                // Stage the new video's matrix transforms BEFORE the first frame arrives
+                if (!isManualSkip) { // Skip if done by user
                     refreshRenderer()
-                } else {
-                    // MANUAL SKIP:
-                    // The buffer has old frames. We DELAY the matrix update until
-                    // onRenderedFirstFrame fires to prevent a visual snap.
-                    FileLogger.i(TAG, "Manual skip: Delaying matrix update to onRenderedFirstFrame.")
                 }
+
+                val activeSettings = getSettingsForUri(loadedVideoUriString)
+                applyNonVisualSettings(activeSettings)
+
+                wallpaperPlayer.prepareAsync()
+                wallpaperPlayer.setPlayWhenReadyAsync(if (isManualSkip) isVisible else true)
             }
-
-            val activeSettings = getSettingsForUri(loadedVideoUriString)
-            applyNonVisualSettings(activeSettings)
-
-            wallpaperPlayer.prepareAsync()
-            wallpaperPlayer.setPlayWhenReadyAsync(if (isManualSkip) isVisible else true)
         }
 
         override fun onTouchEvent(event: MotionEvent?) {
@@ -472,6 +491,12 @@ class UndeadWallpaperService : WallpaperService() {
 
             val activeSettings = getSettingsForUri(loadedVideoUriString)
 
+            val w = activeSettings.width ?: 0
+            val h = activeSettings.height ?: 0
+            if (w > 0 && h > 0) {
+                renderer?.setVideoSize(w, h)
+            }
+
             currentScalingMode = activeSettings.scalingMode
             renderer?.setScalingMode(currentScalingMode)
             renderer?.setTransforms(
@@ -489,9 +514,11 @@ class UndeadWallpaperService : WallpaperService() {
 
         // WallpaperPlayerListener implementations
         override fun onPlayerError(error: PlaybackException) {
+            renderer?.setIsTransitioning(false)
+
             // Check if the file vanished (happens during UUID migration).
-            // We suppress the toast because VideoFileManager will instantly broadcast 
-            // ACTION_PLAYLIST_REORDERED to force a seamless reload.
+            // We suppress the toast because VideoFileManager will instantly emit
+            // WallpaperEvent.PlaylistReordered to force a seamless reload.
             if (error.errorCode == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND) {
                 FileLogger.i(TAG, "Suppressed IO_FILE_NOT_FOUND error (likely a UUID migration in progress).")
                 return
@@ -584,13 +611,16 @@ class UndeadWallpaperService : WallpaperService() {
                 updateActiveVideoState(nextUriString)
             }
 
+            // Sync GL renderer matrix and uniforms to the incoming chunk item without forcing a draw
+            refreshRenderer()
+
             val activeSettings = getSettingsForUri(loadedVideoUriString)
             applyNonVisualSettings(activeSettings)
         }
 
         override fun onRenderedFirstFrame() {
             FileLogger.i(TAG, "SUCCESS: onRenderedFirstFrame called. Decoder actually pushed a frame to the screen!")
-            refreshRenderer() // Applies as late as possible a matrix/uniform recomputation on openGL engine
+            renderer?.setIsTransitioning(false)
         }
 
         /**
@@ -659,12 +689,6 @@ class UndeadWallpaperService : WallpaperService() {
             val mediaUri = getMediaUri()
             loadedVideoUriString = mediaUri?.toString() ?: ""
 
-            // Status bar color refresh, material you notify
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                FileLogger.i(TAG, "notifyColorsChanged Called. Current URI: $loadedVideoUriString")
-                notifyColorsChanged()
-            }
-
             if (mediaUri == null) {
                 FileLogger.e(TAG, "Media URI is null, cannot play video.")
                 return
@@ -694,6 +718,7 @@ class UndeadWallpaperService : WallpaperService() {
 
                 // Call the helper to load playlist
                 bindPlaylistToPlayer(keepCurrentPlayback = false)
+                refreshRenderer()
 
                 var finalSurface: android.view.Surface? = null
 
@@ -762,6 +787,8 @@ class UndeadWallpaperService : WallpaperService() {
          * new player is initialized. The `mediaPlayer` instance is set to null after release.
          */
         private fun releasePlayer() {
+            renderer?.setIsTransitioning(false)
+
             // Stop any startup jobs
             playerSetupJob?.cancel()
 
@@ -839,6 +866,7 @@ class UndeadWallpaperService : WallpaperService() {
                     TAG,
                     "INFO: Non-standard lifecycle detected! onSurfaceCreated called without onSurfaceDestroyed. Renderer already exists."
                 )
+                renderer?.setIsPreview(this.isPreview)
                 return
             }
 
@@ -848,9 +876,14 @@ class UndeadWallpaperService : WallpaperService() {
                     processEvent(EngineEvent.HardwareFailure("GL Context Lost"))
                     processEvent(EngineEvent.InitializeRequested)
                 }
+                renderer?.setIsPreview(this.isPreview)
                 renderer?.onSurfaceCreated(holder)
             } else {
                 FileLogger.i(TAG, "Using fallback surface, skipping GL Renderer creation")
+            }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                notifyColorsChanged()
             }
 
             processEvent(EngineEvent.InitializeRequested)
@@ -872,6 +905,18 @@ class UndeadWallpaperService : WallpaperService() {
             FileLogger.i(TAG, "onSurfaceDestroyed")
             playbackWatchdog.stop()
             processEvent(EngineEvent.ReleaseRequested)
+
+            // Synchronously detach surface from ExoPlayer before destroying GL renderer/context
+            try {
+                runBlocking {
+                    withTimeoutOrNull(250) {
+                        wallpaperPlayer.clearVideoSurfaceSuspend()
+                    }
+                }
+            } catch (e: Exception) {
+                FileLogger.w(TAG, "Timeout or error clearing video surface on surface destroyed", e)
+            }
+
             releaseRenderer()
             this.surfaceHolder = null
         }
@@ -879,16 +924,27 @@ class UndeadWallpaperService : WallpaperService() {
         override fun onDestroy() {
             super.onDestroy()
             FileLogger.i(TAG, "Engine onDestroy")
-            serviceScope.cancel()
             playbackWatchdog.stop() // Kill the playback watchdog
             processEvent(EngineEvent.ReleaseRequested)
+
+            try {
+                runBlocking {
+                    withTimeoutOrNull(250) {
+                        wallpaperPlayer.clearVideoSurfaceSuspend()
+                    }
+                }
+            } catch (e: Exception) {
+                FileLogger.w(TAG, "Timeout or error clearing video surface on engine destroy", e)
+            }
+
             releaseRenderer()
             gestureManager.destroy()
             try {
-                unregisterReceiver(videoChangeReceiver)
+                unregisterReceiver(userUnlockReceiver)
             } catch (_: IllegalArgumentException) {
                 FileLogger.w(TAG, "Receiver was not registered, skipping unregister.")
             }
+            serviceScope.cancel()
         }
 
 
@@ -901,6 +957,7 @@ class UndeadWallpaperService : WallpaperService() {
             )
 
             if (visible) {
+                renderer?.setIsPreview(this.isPreview)
                 val currentUriOnDisk = getMediaUri().toString()
                 val isSurfaceDead = surfaceHolder?.surface?.isValid != true
                 var wasJustInitialized = false
@@ -1012,20 +1069,14 @@ class UndeadWallpaperService : WallpaperService() {
                 FileLogger.i(TAG, "Brains and parts detected...")
             }
 
-            // Turn on filter to start listening
-            val intentFilter = IntentFilter().apply {
-                addAction(ACTION_VIDEO_URI_CHANGED)
-                addAction(ACTION_PLAYBACK_MODE_CHANGED)
-                addAction(ACTION_STATUS_BAR_COLOR_CHANGED)
-                addAction(ACTION_PLAYLIST_REORDERED)
-                addAction(ACTION_VIDEO_SETTINGS_CHANGED)
-                addAction(Intent.ACTION_USER_UNLOCKED)
-            }
-            // Registering the broadcast receiver with ContextCompat.RECEIVER_NOT_EXPORTED
-            // ensures it is secure across all API levels by preventing external intent injection.
+            // Start listening for in-process UI configuration events
+            observeWallpaperEvents()
+
+            // OS-level Direct Boot broadcast
+            val intentFilter = IntentFilter(Intent.ACTION_USER_UNLOCKED)
             ContextCompat.registerReceiver(
                 this@UndeadWallpaperService,
-                videoChangeReceiver,
+                userUnlockReceiver,
                 intentFilter,
                 ContextCompat.RECEIVER_NOT_EXPORTED
             )
