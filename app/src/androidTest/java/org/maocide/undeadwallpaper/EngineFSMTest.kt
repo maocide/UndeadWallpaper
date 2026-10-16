@@ -106,4 +106,39 @@ class EngineFSMTest {
         assertEquals(EngineState.Initializing, fsm.state)
         assertTrue(effect3 is EngineEffect.StartInitialization)
     }
+
+    @Test
+    fun testThanatosisLifecycleAndResurrection() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val fsm = EngineFSM(context)
+
+        // Enter Thanatosis from Ready
+        fsm.transition(EngineEvent.InitializeRequested)
+        fsm.transition(EngineEvent.InitializationComplete)
+
+        val effect1 = fsm.transition(EngineEvent.EnterThanatosis("Container malformed", isZeroDecoder = false))
+        assertEquals(EngineState.Thanatosis("Container malformed", isZeroDecoder = false), fsm.state)
+        assertTrue(effect1 is EngineEffect.StartThanatosis)
+
+        // Tactile taps are ignored (plays dead)
+        val effect2 = fsm.transition(EngineEvent.UserTogglePause)
+        assertEquals(EngineState.Thanatosis("Container malformed", isZeroDecoder = false), fsm.state)
+        assertTrue(effect2 is EngineEffect.None)
+
+        // Visibility throttles playback
+        val effect3 = fsm.transition(EngineEvent.VisibilityChanged(isVisible = false))
+        assertEquals(EngineEffect.ApplyPlayWhenReady(false), effect3)
+
+        val effect4 = fsm.transition(EngineEvent.VisibilityChanged(isVisible = true))
+        assertEquals(EngineEffect.ApplyPlayWhenReady(true), effect4)
+
+        // User picks video in UI -> Resurrection exit ramp
+        val effect5 = fsm.transition(EngineEvent.InitializeRequested)
+        assertEquals(EngineState.Initializing, fsm.state)
+        assertTrue(effect5 is EngineEffect.StartInitialization)
+
+        fsm.transition(EngineEvent.InitializationComplete)
+        assertEquals(EngineState.Ready(isManuallyPaused = false), fsm.state)
+    }
 }
+

@@ -2,15 +2,18 @@ package org.maocide.undeadwallpaper.utils
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.Context
 import android.os.Build
 import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
+import android.view.accessibility.AccessibilityManager
+import org.maocide.undeadwallpaper.BuildConfig
 
 /**
- * Replaces standard click listeners with a debounced click listener that prevents double inputs
- * and validates touch events against window focus and system overlays.
+ * Replaces standard click listeners with a debounced click listener that prevents double inputs,
+ * validates touch events against window focus and overlays enforcing physical touch.
  */
 @SuppressLint("ClickableViewAccessibility")
 fun View.setSafeOnClickListener(
@@ -21,38 +24,47 @@ fun View.setSafeOnClickListener(
     this.filterTouchesWhenObscured = true
 
     var downTime = 0L
-    var wasPartiallyObscured = false
+    var lastPhysicalTouchUpTime = 0L
     var lastClickTime = 0L
 
     this.setOnTouchListener { v, event ->
         val flags = event.flags
         val activity = v.context as? Activity
 
+        // Obscuration Check: Drop immediately if fully or partially obscured
         if ((flags and MotionEvent.FLAG_WINDOW_IS_OBSCURED) != 0) {
             return@setOnTouchListener true
         }
 
-        val isPartiallyObscured = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            (flags and MotionEvent.FLAG_WINDOW_IS_PARTIALLY_OBSCURED) != 0
-        } else {
-            false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if ((flags and MotionEvent.FLAG_WINDOW_IS_PARTIALLY_OBSCURED) != 0) {
+                return@setOnTouchListener true
+            }
+        }
+
+        // Hardware device check: Drop invalid hardware device touch injection in release builds
+        if (!BuildConfig.DEBUG) {
+            val device = event.device
+            if (device != null && device.isVirtual) {
+                return@setOnTouchListener true
+            }
         }
 
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 downTime = SystemClock.uptimeMillis()
-                wasPartiallyObscured = isPartiallyObscured
                 false
             }
 
             MotionEvent.ACTION_UP -> {
-                val tapDuration = SystemClock.uptimeMillis() - downTime
+                val now = SystemClock.uptimeMillis()
+                val tapDuration = now - downTime
                 val hasFocus = activity?.hasWindowFocus() ?: true
-                val requiredDuration = if (isPartiallyObscured || wasPartiallyObscured) 20L else minTapDurationMs
 
-                if (tapDuration < requiredDuration || !hasFocus) {
+                if (tapDuration < minTapDurationMs || !hasFocus) {
                     true // Consume event silently, blocking the click
                 } else {
+                    lastPhysicalTouchUpTime = now
                     false
                 }
             }
@@ -62,9 +74,23 @@ fun View.setSafeOnClickListener(
     }
 
     this.setOnClickListener { v ->
-        val now = SystemClock.elapsedRealtime()
-        if (now - lastClickTime >= debounceMs) {
-            lastClickTime = now
+        val nowUptime = SystemClock.uptimeMillis()
+        val nowRealtime = SystemClock.elapsedRealtime()
+
+        // Touch Provenance Token: Verify that click originates from recent physical touch
+        // Unless TalkBack / touch exploration is legitimately enabled by the user or running under debug test harness
+        val accessibilityManager = v.context.getSystemService(Context.ACCESSIBILITY_SERVICE) as? AccessibilityManager
+        val isTouchExploration = accessibilityManager?.isTouchExplorationEnabled == true
+
+        val hasPhysicalProvenance = (nowUptime - lastPhysicalTouchUpTime) in 0..200L
+
+        if (!hasPhysicalProvenance && !isTouchExploration && !BuildConfig.DEBUG) {
+            // Block inauthentic input via AccessibilityNodeInfo or reflection
+            return@setOnClickListener
+        }
+
+        if (nowRealtime - lastClickTime >= debounceMs) {
+            lastClickTime = nowRealtime
             action(v)
         }
     }
@@ -80,35 +106,41 @@ fun View.preventDoubleInput(minTapDurationMs: Long = 10L) {
     this.filterTouchesWhenObscured = true
 
     var downTime = 0L
-    var wasPartiallyObscured = false
 
     this.setOnTouchListener { v, event ->
         val flags = event.flags
         val activity = v.context as? Activity
 
+        // Obscuration Check: Drop immediately if fully or partially obscured (anti-tapjacking)
         if ((flags and MotionEvent.FLAG_WINDOW_IS_OBSCURED) != 0) {
             return@setOnTouchListener true
         }
 
-        val isPartiallyObscured = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            (flags and MotionEvent.FLAG_WINDOW_IS_PARTIALLY_OBSCURED) != 0
-        } else {
-            false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if ((flags and MotionEvent.FLAG_WINDOW_IS_PARTIALLY_OBSCURED) != 0) {
+                return@setOnTouchListener true
+            }
+        }
+
+        // Hardware device check: Drop virtual device touch injection in release builds
+        if (!BuildConfig.DEBUG) {
+            val device = event.device
+            if (device != null && device.isVirtual) {
+                return@setOnTouchListener true
+            }
         }
 
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 downTime = SystemClock.uptimeMillis()
-                wasPartiallyObscured = isPartiallyObscured
                 false
             }
 
             MotionEvent.ACTION_UP -> {
                 val tapDuration = SystemClock.uptimeMillis() - downTime
                 val hasFocus = activity?.hasWindowFocus() ?: true
-                val requiredDuration = if (isPartiallyObscured || wasPartiallyObscured) 20L else minTapDurationMs
 
-                if (tapDuration < requiredDuration || !hasFocus) {
+                if (tapDuration < minTapDurationMs || !hasFocus) {
                     true // Consume event silently, blocking the interaction
                 } else {
                     false

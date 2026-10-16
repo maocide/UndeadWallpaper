@@ -36,7 +36,7 @@
 
     <!-- About Page Strings -->
     <string name="about_header_story">A História Por Trás do Nome</string>
-    <string name="about_story_content">Isso não é apenas um trocadilho inteligente com wallpaper <b>vivo</b>. O nome <b>UndeadWallpaper</b> é pessoal. Depois de uma longa e forçada pausa na programação, este projeto foi o primeiro sinal de vida—o momento em que uma paixão que estava enterrada voltou com força à tona. Este app não é apenas <b>vivo</b>; é o símbolo de um criador voltando dos mortos. É <b>imortal</b>, porque algumas coisas são simplesmente teimosas demais para morrer.</string>
+    <string name="about_story_content">Isso não é apenas um trocadilho inteligente com wallpaper <b>vivo</b>. O nome <b>UndeadWallpaper</b> é pessoal. Depois de uma longa e forçada pausa na programação, este projeto foi o primeiro sinal de vida—o momento em que uma paixão que estava enterrada voltou com força à tona. Este app não é apenas <b>vivo</b>; é o símbolo de um desenvolvedor voltando dos mortos. É <b>imortal</b>, porque algumas coisas são simplesmente teimosas demais para morrer.</string>
     <string name="about_header_features">O Que Ele Faz</string>
     <string name="about_feature_loops">• Loops Suaves: Transforma qualquer vídeo do seu telefone em um wallpaper vivo contínuo e sem travamentos.</string>
     <string name="about_feature_freedom">• Liberdade Total: Sem anúncios, sem compras no app, sem frescura. Nunca.</string>

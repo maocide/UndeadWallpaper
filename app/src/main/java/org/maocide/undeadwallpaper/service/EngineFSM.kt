@@ -18,6 +18,14 @@ sealed class EngineState {
      */
     data class Ready(val isManuallyPaused: Boolean = false) : EngineState()
 
+    /**
+     * The organism enters apparent death (stasis) upon encountering unresolvable media corruption
+     * or hardware decoder starvation. Displays the quarantine emergency feed.
+     * @param cause Diagnostic reason for entering stasis.
+     * @param isZeroDecoder True if hardware decoders are starved, forcing static texture rendering without MediaCodec.
+     */
+    data class Thanatosis(val cause: String, val isZeroDecoder: Boolean = false) : EngineState()
+
     /** The player is currently being destroyed. Ignore all startup requests. */
     object Releasing : EngineState()
 }
@@ -44,6 +52,9 @@ sealed class EngineEvent {
 
     /** Irrecoverable hardware decoder failure. */
     data class HardwareFailure(val reason: String) : EngineEvent()
+
+    /** Irrecoverable media failure or decoder starvation triggering apparent death stasis. */
+    data class EnterThanatosis(val cause: String, val isZeroDecoder: Boolean = false) : EngineEvent()
 }
 
 /**
@@ -52,6 +63,7 @@ sealed class EngineEvent {
 sealed class EngineEffect {
     data class StartInitialization(val lumaScale: Float) : EngineEffect()
     data class ApplyPlayWhenReady(val play: Boolean) : EngineEffect()
+    data class StartThanatosis(val cause: String, val isZeroDecoder: Boolean) : EngineEffect()
     object StartRelease : EngineEffect()
     object None : EngineEffect()
 }
@@ -88,6 +100,11 @@ class EngineFSM(private val context: android.content.Context) {
                         }
                     }
 
+                    is EngineEvent.EnterThanatosis -> Pair(
+                        EngineState.Thanatosis(event.cause, event.isZeroDecoder),
+                        EngineEffect.StartThanatosis(event.cause, event.isZeroDecoder)
+                    )
+
                     else -> Pair(currentState, EngineEffect.None)
                 }
             }
@@ -101,6 +118,11 @@ class EngineFSM(private val context: android.content.Context) {
 
                     is EngineEvent.ReleaseRequested -> Pair(EngineState.Releasing, EngineEffect.StartRelease)
                     is EngineEvent.HardwareFailure -> Pair(EngineState.Releasing, EngineEffect.StartRelease)
+
+                    is EngineEvent.EnterThanatosis -> Pair(
+                        EngineState.Thanatosis(event.cause, event.isZeroDecoder),
+                        EngineEffect.StartThanatosis(event.cause, event.isZeroDecoder)
+                    )
 
                     // If a new init comes in while we are already initializing (e.g. from the GL fallback mechanism),
                     // we must allow it to restart the initialization process!
@@ -141,6 +163,53 @@ class EngineFSM(private val context: android.content.Context) {
                         EngineEffect.StartInitialization(computeLumaScale())
                     ) // Force re-init from UI
                     is EngineEvent.HardwareFailure -> Pair(EngineState.Releasing, EngineEffect.StartRelease)
+
+                    is EngineEvent.EnterThanatosis -> Pair(
+                        EngineState.Thanatosis(event.cause, event.isZeroDecoder),
+                        EngineEffect.StartThanatosis(event.cause, event.isZeroDecoder)
+                    )
+
+                    else -> Pair(currentState, EngineEffect.None)
+                }
+            }
+
+            is EngineState.Thanatosis -> {
+                when (event) {
+                    is EngineEvent.VisibilityChanged -> {
+                        if (currentState.isZeroDecoder) {
+                            Pair(currentState, EngineEffect.None)
+                        } else {
+                            Pair(currentState, EngineEffect.ApplyPlayWhenReady(event.isVisible))
+                        }
+                    }
+
+                    is EngineEvent.UserTogglePause -> {
+                        // Ignored! The organism plays dead; tactile input is suppressed.
+                        Pair(currentState, EngineEffect.None)
+                    }
+
+                    is EngineEvent.InitializeRequested -> {
+                        // The Resurrection Exit Ramp: user selected a new video in Settings UI.
+                        Pair(
+                            EngineState.Initializing,
+                            EngineEffect.StartInitialization(computeLumaScale())
+                        )
+                    }
+
+                    is EngineEvent.ReleaseRequested -> Pair(EngineState.Releasing, EngineEffect.StartRelease)
+
+                    is EngineEvent.EnterThanatosis -> {
+                        val upgradedZeroDecoder = currentState.isZeroDecoder || event.isZeroDecoder
+                        Pair(
+                            EngineState.Thanatosis(event.cause, upgradedZeroDecoder),
+                            if (upgradedZeroDecoder != currentState.isZeroDecoder) {
+                                EngineEffect.StartThanatosis(event.cause, true)
+                            } else {
+                                EngineEffect.None
+                            }
+                        )
+                    }
+
                     else -> Pair(currentState, EngineEffect.None)
                 }
             }

@@ -22,6 +22,7 @@ import org.maocide.undeadwallpaper.utils.FileLogger
 import org.maocide.undeadwallpaper.utils.SafeKeyDebouncer
 import org.maocide.undeadwallpaper.utils.setSafeOnClickListener
 import java.io.File
+import android.view.Display
 import android.view.Menu
 import android.view.MenuItem
 import android.widget.Toast
@@ -114,6 +115,31 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        checkDisplayConfinement()
+    }
+
+    private fun checkDisplayConfinement() {
+        val currentDisplayId = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            display?.displayId ?: Display.DEFAULT_DISPLAY
+        } else {
+            @Suppress("DEPRECATION")
+            windowManager.defaultDisplay.displayId
+        }
+
+        if (currentDisplayId != Display.DEFAULT_DISPLAY) {
+            binding.fabSetWallpaper.isEnabled = false
+            Toast.makeText(
+                this,
+                getString(R.string.error_device_not_supported),
+                Toast.LENGTH_LONG
+            ).show()
+        } else {
+            binding.fabSetWallpaper.isEnabled = true
+        }
+    }
+
     /**
      * Handles manual video interaction from playlist curation,
      * checking against the Unlucky 13 threshold to trigger the break animation.
@@ -123,6 +149,22 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun launchWallpaperPicker() {
+        val currentDisplayId = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            display?.displayId ?: Display.DEFAULT_DISPLAY
+        } else {
+            @Suppress("DEPRECATION")
+            windowManager.defaultDisplay.displayId
+        }
+
+        if (currentDisplayId != Display.DEFAULT_DISPLAY) {
+            Toast.makeText(
+                this@MainActivity,
+                getString(R.string.error_device_not_supported),
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+
         val intent = Intent(
             WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER
         )

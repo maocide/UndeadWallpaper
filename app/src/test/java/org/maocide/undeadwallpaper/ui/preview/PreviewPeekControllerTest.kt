@@ -1,13 +1,13 @@
-package org.maocide.undeadwallpaper.ui
+package org.maocide.undeadwallpaper.ui.preview
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.maocide.undeadwallpaper.model.ScalingMode
-import org.maocide.undeadwallpaper.ui.PreviewPeekController.Companion.calculateDimensions
-import org.maocide.undeadwallpaper.ui.PreviewPeekController.Companion.calculateEffectiveScale
-import org.maocide.undeadwallpaper.ui.PreviewPeekController.Companion.calculateScaleRatios
-import org.maocide.undeadwallpaper.ui.PreviewPeekController.Companion.calculateTranslation
+import org.maocide.undeadwallpaper.ui.preview.PreviewPeekController.Companion.calculateDimensions
+import org.maocide.undeadwallpaper.ui.preview.PreviewPeekController.Companion.calculateEffectiveScale
+import org.maocide.undeadwallpaper.ui.preview.PreviewPeekController.Companion.calculateScaleRatios
+import org.maocide.undeadwallpaper.ui.preview.PreviewPeekController.Companion.calculateTranslation
 
 class PreviewPeekControllerTest {
 

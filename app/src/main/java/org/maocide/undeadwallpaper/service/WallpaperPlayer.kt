@@ -27,6 +27,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.android.asCoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.maocide.undeadwallpaper.model.BufferConfig
 import org.maocide.undeadwallpaper.model.PlaybackMode
 import org.maocide.undeadwallpaper.utils.FileLogger
 import kotlin.random.Random
@@ -148,7 +149,8 @@ class WallpaperPlayer(
         surface: Surface?,
         initialVolume: Float,
         speed: Float,
-        playbackMode: PlaybackMode
+        playbackMode: PlaybackMode,
+        bufferConfig: BufferConfig = BufferConfig.DEFAULT
     ) {
         if (player != null) {
             release()
@@ -156,19 +158,16 @@ class WallpaperPlayer(
 
         FileLogger.i(TAG, "Initializing ExoPlayer...")
 
-        // Define a 32MB Memory Cap
-        val targetBufferBytes = 32 * 1024 * 1024
-
         // Configure the LoadControl
         val loadControl = DefaultLoadControl.Builder()
             .setAllocator(DefaultAllocator(true, C.DEFAULT_BUFFER_SEGMENT_SIZE))
             .setBufferDurationsMs(
-                15_000, // Min buffer 15
-                30_000, // Max buffer 30
-                2_500,  // Buffer to start playback
-                5_000   // Buffer for rebuffer
+                bufferConfig.minBufferMs,
+                bufferConfig.maxBufferMs,
+                bufferConfig.bufferForPlaybackMs,
+                bufferConfig.bufferForPlaybackAfterRebufferMs
             )
-            .setTargetBufferBytes(targetBufferBytes)
+            .setTargetBufferBytes(bufferConfig.targetBufferBytes)
             .setPrioritizeTimeOverSizeThresholds(false)
             .build()
 
@@ -312,9 +311,10 @@ class WallpaperPlayer(
         surface: Surface?,
         initialVolume: Float,
         speed: Float,
-        playbackMode: PlaybackMode
+        playbackMode: PlaybackMode,
+        bufferConfig: BufferConfig = BufferConfig.DEFAULT
     ) = playbackScope.launch {
-        initialize(surface, initialVolume, speed, playbackMode)
+        initialize(surface, initialVolume, speed, playbackMode, bufferConfig)
     }
 
     fun releaseAsync() = playbackScope.launch {

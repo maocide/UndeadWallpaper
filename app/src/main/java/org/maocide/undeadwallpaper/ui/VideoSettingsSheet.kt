@@ -30,6 +30,8 @@ import kotlinx.coroutines.withContext
 import androidx.lifecycle.lifecycleScope
 import org.maocide.undeadwallpaper.R
 import org.maocide.undeadwallpaper.data.VideoFileManager
+import org.maocide.undeadwallpaper.ui.preview.PreviewPeekController
+import org.maocide.undeadwallpaper.utils.DisplayGeometryHelper
 import java.io.File
 
 class VideoSettingsSheet : BottomSheetDialogFragment() {
@@ -157,7 +159,7 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
             targetHeightDp.toFloat(),
             metrics
         ).roundToInt()
-        val screenRatio = metrics.widthPixels.toFloat() / metrics.heightPixels.toFloat()
+        val screenRatio = DisplayGeometryHelper.getEffectiveAspectRatio(metrics, preferencesManager)
         val targetWidthPx = (targetHeightPx * screenRatio).roundToInt()
 
         binding.previewFrameContainer.updateLayoutParams<ViewGroup.LayoutParams> {
@@ -165,7 +167,7 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
             height = targetHeightPx
         }
 
-        previewPeekController?.updateDimensions(metrics)
+        previewPeekController?.updateDimensions(metrics, preferencesManager)
     }
 
     // ============================================================================

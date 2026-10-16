@@ -1,13 +1,13 @@
-package org.maocide.undeadwallpaper.ui
+package org.maocide.undeadwallpaper.ui.preview
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
-import org.maocide.undeadwallpaper.ui.FloatingPreviewController.Companion.calculateButtonPickAlpha
-import org.maocide.undeadwallpaper.ui.FloatingPreviewController.Companion.calculateDismissBadgeAlpha
-import org.maocide.undeadwallpaper.ui.FloatingPreviewController.Companion.calculateElevationZ
-import org.maocide.undeadwallpaper.ui.FloatingPreviewController.Companion.calculateGlideX
-import org.maocide.undeadwallpaper.ui.FloatingPreviewController.Companion.calculateProgress
-import org.maocide.undeadwallpaper.ui.FloatingPreviewController.Companion.calculateScale
+import org.maocide.undeadwallpaper.ui.preview.FloatingPreviewController.Companion.calculateButtonPickAlpha
+import org.maocide.undeadwallpaper.ui.preview.FloatingPreviewController.Companion.calculateDismissBadgeAlpha
+import org.maocide.undeadwallpaper.ui.preview.FloatingPreviewController.Companion.calculateElevationZ
+import org.maocide.undeadwallpaper.ui.preview.FloatingPreviewController.Companion.calculateGlideX
+import org.maocide.undeadwallpaper.ui.preview.FloatingPreviewController.Companion.calculateProgress
+import org.maocide.undeadwallpaper.ui.preview.FloatingPreviewController.Companion.calculateScale
 
 class FloatingPreviewControllerTest {
 

@@ -106,6 +106,18 @@ class GLVideoRenderer(private val context: Context, private val onGlContextLost:
     private var isPreview = false
     private val badgeOverlay by lazy { PreviewBadgeOverlay(context) }
 
+    // Type B Thanatosis zero-decoder fallback overlay
+    @Volatile
+    private var isThanatosisZeroDecoder = false
+    private val thanatosisOverlay by lazy { ThanatosisOverlay(context) }
+
+    fun setThanatosisZeroDecoder(enabled: Boolean) {
+        if (isThanatosisZeroDecoder != enabled) {
+            isThanatosisZeroDecoder = enabled
+            requestRender()
+        }
+    }
+
     private val vertexShaderCode = """
         attribute vec4 aPosition;
         attribute vec4 aTextureCoord;
@@ -329,8 +341,10 @@ class GLVideoRenderer(private val context: Context, private val onGlContextLost:
 
                 try {
                     // Update texture MUST happen on the thread with the EGL Context
-                    surfaceTexture?.updateTexImage()
-                    surfaceTexture?.getTransformMatrix(stMatrix)
+                    if (!isThanatosisZeroDecoder) {
+                        surfaceTexture?.updateTexImage()
+                        surfaceTexture?.getTransformMatrix(stMatrix)
+                    }
                 } catch (e: Exception) {
                     // This often happens when the video player is stopped/released
                     // but a frame signal was already in the pipe. Safe to ignore.
@@ -399,9 +413,13 @@ class GLVideoRenderer(private val context: Context, private val onGlContextLost:
         GLES20.glUniform1f(muBrightnessHandle, userBrightness)
 
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
-        if (textureId != 0) {
+        if (textureId != 0 && !isThanatosisZeroDecoder) {
             GLES20.glBindTexture(36197, textureId) // GL_TEXTURE_EXTERNAL_OES
             GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
+        }
+
+        if (isThanatosisZeroDecoder) {
+            thanatosisOverlay.draw(viewportWidth, viewportHeight, programId)
         }
 
         if (isPreview) {
@@ -513,6 +531,17 @@ class GLVideoRenderer(private val context: Context, private val onGlContextLost:
             throw IllegalStateException("eglInitialize failed")
         }
 
+        val configSpecRGBA8888 = intArrayOf(
+            EGL10.EGL_RED_SIZE, 8,
+            EGL10.EGL_GREEN_SIZE, 8,
+            EGL10.EGL_BLUE_SIZE, 8,
+            EGL10.EGL_ALPHA_SIZE, 8,
+            EGL10.EGL_DEPTH_SIZE, 0,
+            EGL10.EGL_STENCIL_SIZE, 0,
+            EGL10.EGL_RENDERABLE_TYPE, 4,
+            EGL10.EGL_NONE
+        )
+
         val configSpecRGBA8888Recordable = intArrayOf(
             EGL10.EGL_RED_SIZE, 8,
             EGL10.EGL_GREEN_SIZE, 8,
@@ -553,26 +582,29 @@ class GLVideoRenderer(private val context: Context, private val onGlContextLost:
 
         var config: EGLConfig? = null
 
+        val primaryConfigSpec = if (isPreview) configSpecRGBA8888 else configSpecRGBA8888Recordable
+        val fallbackConfigSpec = if (isPreview) configSpecRGB565 else configSpecRGB565Recordable
+
         if (egl!!.eglChooseConfig(
                 eglDisplay,
-                configSpecRGBA8888Recordable,
+                primaryConfigSpec,
                 configs,
                 1,
                 numConfig
             ) && numConfig[0] > 0
         ) {
             config = configs[0]
-            FileLogger.i(tag, "Using EGL_RGBA_8888_RECORDABLE config")
+            FileLogger.i(tag, if (isPreview) "Using EGL_RGBA_8888 (Preview) config" else "Using EGL_RGBA_8888_RECORDABLE config")
         } else if (egl!!.eglChooseConfig(
                 eglDisplay,
-                configSpecRGB565Recordable,
+                fallbackConfigSpec,
                 configs,
                 1,
                 numConfig
             ) && numConfig[0] > 0
         ) {
             config = configs[0]
-            FileLogger.i(tag, "Using EGL_RGB_565_RECORDABLE config")
+            FileLogger.i(tag, if (isPreview) "Using EGL_RGB_565 (Preview) config" else "Using EGL_RGB_565_RECORDABLE config")
         } else if (egl!!.eglChooseConfig(eglDisplay, configSpecRGB565, configs, 1, numConfig) && numConfig[0] > 0) {
             config = configs[0]
             FileLogger.i(tag, "Using EGL_RGB_565 fallback config")
@@ -594,6 +626,12 @@ class GLVideoRenderer(private val context: Context, private val onGlContextLost:
         if (!egl!!.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)) {
             throw IllegalStateException("eglMakeCurrent failed")
         }
+
+        // Paint It Black: Instantly clear & swap a pitch-black frame (#000000).
+        // Purges uninitialized Gralloc buffers (preventing YUV 0,0,0 neon green) before ExoPlayer wakes up!
+        GLES20.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
+        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+        egl!!.eglSwapBuffers(eglDisplay, eglSurface)
 
         val textures = IntArray(1)
         GLES20.glGenTextures(1, textures, 0)
@@ -657,6 +695,7 @@ class GLVideoRenderer(private val context: Context, private val onGlContextLost:
 
     private fun releaseGL() {
         badgeOverlay.release()
+        thanatosisOverlay.release()
 
         if (eglDisplay !== EGL10.EGL_NO_DISPLAY) {
             egl!!.eglMakeCurrent(eglDisplay, EGL10.EGL_NO_SURFACE, EGL10.EGL_NO_SURFACE, EGL10.EGL_NO_CONTEXT)

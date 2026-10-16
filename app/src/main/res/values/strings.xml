@@ -41,7 +41,7 @@
 
     <!-- About Page Strings -->
     <string name="about_header_story">The Story Behind the Name</string>
-    <string name="about_story_content">This isn\'t just a clever pun on <b>live</b> wallpaper. The name <b>UndeadWallpaper</b> is personal. After a long, forced hiatus from coding, this project was the first sign of life—the moment a passion that was buried came clawing its way back to the surface. This app isn\'t just <b>live</b>; it\'s a symbol of a creator coming back from the dead. It\'s <b>undead</b>, because some things are just too stubborn to die.</string>
+    <string name="about_story_content">This isn\'t just a clever pun on <b>live</b> wallpaper. The name <b>UndeadWallpaper</b> is personal. After a long, forced hiatus from coding, this project was the first sign of life—the moment a passion that was buried came clawing its way back to the surface. This app isn\'t just <b>live</b>; it\'s a symbol of a developer coming back from the dead. It\'s <b>undead</b>, because some things are just too stubborn to die.</string>
     <string name="about_header_features">What it Does</string>
     <string name="about_feature_loops">• Silky-Smooth Loops: Turns any video on your phone into a seamless, stutter-free live wallpaper.</string>
     <string name="about_feature_freedom">• Total Freedom: No ads, no in-app purchases, no bullshit. Ever.</string>

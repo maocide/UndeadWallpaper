@@ -34,7 +34,7 @@
     <string name="license_url" translatable="false">https://www.gnu.org/licenses/gpl-3.0.en.html</string>
 
     <string name="about_header_story">Historia kryjąca się za nazwą</string>
-    <string name="about_story_content">To nie jest tylko sprytna gra słów o <b>live</b> wallpaper (żywej tapecie). Nazwa <b>UndeadWallpaper</b> ma znaczenie osobiste. Po długiej, przymusowej przerwie od programowania, ten projekt był pierwszym znakiem życia — momentem, w którym pogrzebana pasja powróciła na powierzchnię. Ta aplikacja nie jest tylko <b>live</b>; jest symbolem twórcy powracającego z martwych. Jest <b>undead</b> (nieumarła), ponieważ niektóre rzeczy są po prostu zbyt uparte, by umrzeć.</string>
+    <string name="about_story_content">To nie jest tylko sprytna gra słów o <b>live</b> wallpaper (żywej tapecie). Nazwa <b>UndeadWallpaper</b> ma znaczenie osobiste. Po długiej, przymusowej przerwie od programowania, ten projekt był pierwszym znakiem życia — momentem, w którym pogrzebana pasja powróciła na powierzchnię. Ta aplikacja nie jest tylko <b>live</b>; jest symbolem programisty powracającego z martwych. Jest <b>undead</b> (nieumarła), ponieważ niektóre rzeczy są po prostu zbyt uparte, by umrzeć.</string>
     <string name="about_header_features">Funkcje aplikacji</string>
     <string name="about_feature_loops">• Płynne pętle: Zamienia dowolne wideo na telefonie w idealną animowaną tapetę bez zacięć.</string>
     <string name="about_feature_freedom">• Pełna wolność: <b>Zero</b> reklam, <b>zero</b> mikropłatności, <b>zero</b> kompromisów. <b>Nigdy</b>.</string>

@@ -26,7 +26,7 @@
 
     <!-- About Page Strings -->
     <string name="about_header_story">名前の由来</string>
-    <string name="about_story_content">これは単なる<b>ライブ</b>壁紙の駄洒落ではありません。<b>UndeadWallpaper</b>という名前には個人的な思いが込められています。長い間、強制的にコーディングから離れていた後、このプロジェクトが最初の生命の兆しでした。埋もれていた情熱が表面に這い上がってきた瞬間です。このアプリは単に<b>ライブ</b>なのではなく、死から蘇ったクリエイターの象徴なのです。あるものはあまりにも頑固で死なないため、<b>アンデッド</b>なのです。</string>
+    <string name="about_story_content">これは単なる<b>ライブ</b>壁紙の駄洒落ではありません。<b>UndeadWallpaper</b>という名前には個人的な思いが込められています。長い間、強制的にコーディングから離れていた後、このプロジェクトが最初の生命の兆しでした。埋もれていた情熱が表面に這い上がってきた瞬間です。このアプリは単に<b>ライブ</b>なのではなく、死から蘇った開発者の象徴なのです。あるものはあまりにも頑固で死なないため、<b>アンデッド</b>なのです。</string>
     <string name="about_header_features">機能</string>
     <string name="about_feature_loops">• スムーズなループ再生：お使いの携帯電話のどんなビデオも、シームレスで途切れないライブ壁紙に変えます。</string>
     <string name="about_feature_freedom">• 完全な自由：広告なし、アプリ内購入なし、くだらないもの一切なし。永久に。</string>
