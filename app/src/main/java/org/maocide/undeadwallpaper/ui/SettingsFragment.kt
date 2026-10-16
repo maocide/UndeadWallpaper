@@ -16,6 +16,11 @@ import org.maocide.undeadwallpaper.utils.BlurHelper
 import org.maocide.undeadwallpaper.utils.FileLogger
 import org.maocide.undeadwallpaper.utils.preventDoubleInput
 import org.maocide.undeadwallpaper.utils.setSafeOnClickListener
+import org.maocide.undeadwallpaper.service.BufferPolicyCalculator
+import org.maocide.undeadwallpaper.ui.preview.FloatingPreviewController
+import org.maocide.undeadwallpaper.ui.preview.PreviewFsm
+import androidx.fragment.app.FragmentManager
+import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import java.io.File
 
 import android.app.Activity
@@ -92,6 +97,8 @@ class SettingsFragment : Fragment() {
     private var undeadActivationJob: Job? = null
     private var lastUpdateVideoSourceTime = 0L
     private var floatingPreviewController: FloatingPreviewController? = null
+    private val previewFsm = PreviewFsm()
+    private var childFragmentLifecycleCallbacks: FragmentManager.FragmentLifecycleCallbacks? = null
 
     // Initialize the shared ViewModel
     private val sharedViewModel: SettingsViewModel by activityViewModels()
@@ -136,7 +143,7 @@ class SettingsFragment : Fragment() {
             fragmentManager = childFragmentManager,
             onVideoSelected = { uri, isManualTap ->
                 val isAlreadySelected = (sharedViewModel.selectedVideoUri == uri &&
-                    preferencesManager.getActiveVideoUri() == uri.toString())
+                        preferencesManager.getActiveVideoUri() == uri.toString())
                 val needsRecovery = previewPlayer == null || previewPlayer?.playerError != null
 
                 if (!isAlreadySelected || needsRecovery) {
@@ -162,10 +169,17 @@ class SettingsFragment : Fragment() {
         }
         setupBatteryWarningCard()
         setupLandscapeInsetsBalancing()
-        
-        floatingPreviewController = FloatingPreviewController(binding, preferencesManager).apply {
+
+        floatingPreviewController = FloatingPreviewController(
+            binding = binding,
+            preferencesManager = preferencesManager,
+            onCardVisibilityChanged = { isVisible ->
+                previewFsm.processEvent(PreviewFsm.PreviewEvent.CardVisibilityChanged(isVisible))
+            }
+        ).apply {
             setup()
         }
+        setupChildFragmentLifecycleListener()
         gestureControlsController = GestureControlsController(
             binding = binding,
             preferencesManager = preferencesManager,
@@ -237,7 +251,6 @@ class SettingsFragment : Fragment() {
             WallpaperEventBus.emit(WallpaperEvent.VideoUriChanged)
         }
     }
-
 
 
     private suspend fun ensureDefaultVideoExists() {
@@ -317,7 +330,7 @@ class SettingsFragment : Fragment() {
 
             // Sync or Restore Accordion States
             val hasCustomGlobalSettings = preferencesManager.getStartTime() != StartTime.RESUME ||
-                preferencesManager.getStatusBarColor() != StatusBarColor.AUTO
+                    preferencesManager.getStatusBarColor() != StatusBarColor.AUTO
             accordionController?.restoreOrInitialize(
                 savedInstanceState = savedInstanceState,
                 defaultGlobal = hasCustomGlobalSettings,
@@ -474,7 +487,6 @@ class SettingsFragment : Fragment() {
         }
 
 
-
         // Parallax Toggle
         binding.switchParallax.preventDoubleInput()
         binding.switchParallax.setOnCheckedChangeListener { _, isChecked ->
@@ -508,7 +520,6 @@ class SettingsFragment : Fragment() {
         })
 
 
-
         // Video Picker & Floating Preview Dismiss
         binding.buttonPickVideo.setSafeOnClickListener {
             openFilePicker()
@@ -518,6 +529,27 @@ class SettingsFragment : Fragment() {
         }
 
         setupBrainsEasterEgg()
+    }
+
+    private fun setupChildFragmentLifecycleListener() {
+        val callbacks = object : FragmentManager.FragmentLifecycleCallbacks() {
+            override fun onFragmentStarted(fm: FragmentManager, f: Fragment) {
+                if (f is BottomSheetDialogFragment) {
+                    previewFsm.processEvent(PreviewFsm.PreviewEvent.SheetVisibilityChanged(isOccluded = true))
+                }
+            }
+
+            override fun onFragmentStopped(fm: FragmentManager, f: Fragment) {
+                val hasActiveSheet = fm.fragments.any {
+                    it is BottomSheetDialogFragment && it.isAdded && !it.isRemoving && it != f
+                }
+                if (!hasActiveSheet) {
+                    previewFsm.processEvent(PreviewFsm.PreviewEvent.SheetVisibilityChanged(isOccluded = false))
+                }
+            }
+        }
+        childFragmentLifecycleCallbacks = callbacks
+        childFragmentManager.registerFragmentLifecycleCallbacks(callbacks, false)
     }
 
     private fun setupBrainsEasterEgg() {
@@ -678,21 +710,20 @@ class SettingsFragment : Fragment() {
                         Toast.makeText(context, getString(R.string.error_file_too_large), Toast.LENGTH_LONG).show()
                     }
 
-                    is VideoFileManager.CopyResult.DimensionsExceeded -> {
-                        Toast.makeText(context, getString(R.string.error_video_too_large), Toast.LENGTH_LONG).show()
-                    }
-
-                    is VideoFileManager.CopyResult.CorruptFile -> {
-                        Toast.makeText(context, getString(R.string.error_cannot_play_video), Toast.LENGTH_LONG).show()
-                    }
-
+                    is VideoFileManager.CopyResult.DimensionsExceeded,
+                    is VideoFileManager.CopyResult.CorruptFile,
+                    is VideoFileManager.CopyResult.StaticTissueRejected,
                     is VideoFileManager.CopyResult.Error -> {
-                        if (BuildConfig.DEBUG) {
-                            FileLogger.e(tag, "Failed to copy file from URI: $uri")
+                        if (copyResult is VideoFileManager.CopyResult.Error) {
+                            if (BuildConfig.DEBUG) {
+                                FileLogger.e(tag, "Failed to copy file from URI: $uri")
+                            } else {
+                                FileLogger.e(tag, "Failed to copy file from URI")
+                            }
                         } else {
-                            FileLogger.e(tag, "Failed to copy file from URI")
+                            FileLogger.w(tag, "File ingestion rejected: ${copyResult.javaClass.simpleName}")
                         }
-                        Toast.makeText(context, getString(R.string.error_copy_failed), Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, getString(R.string.error_cannot_play_video), Toast.LENGTH_LONG).show()
                     }
 
                     null -> {
@@ -715,19 +746,24 @@ class SettingsFragment : Fragment() {
         // Release any existing player first
         releasePreviewPlayer()
 
-        // Define a 32MB Memory Cap (matching the service)
-        val targetBufferBytes = 32 * 1024 * 1024
+        val fileName = uri.lastPathSegment ?: ""
+        val videoSettings = preferencesManager.getVideoSettings(fileName)
+        val bufferConfig = BufferPolicyCalculator.compute(
+            playbackMode = PlaybackMode.LOOP,
+            activeVideo = videoSettings,
+            playlist = emptyList()
+        )
 
         // Configure the LoadControl
         val loadControl = DefaultLoadControl.Builder()
             .setAllocator(DefaultAllocator(true, C.DEFAULT_BUFFER_SEGMENT_SIZE))
             .setBufferDurationsMs(
-                15_000, // Min buffer 15
-                30_000, // Max buffer 30
-                2_500,  // Buffer to start playback
-                5_000   // Buffer for rebuffer
+                bufferConfig.minBufferMs,
+                bufferConfig.maxBufferMs,
+                bufferConfig.bufferForPlaybackMs,
+                bufferConfig.bufferForPlaybackAfterRebufferMs
             )
-            .setTargetBufferBytes(targetBufferBytes)
+            .setTargetBufferBytes(bufferConfig.targetBufferBytes)
             .setPrioritizeTimeOverSizeThresholds(false)
             .build()
 
@@ -779,7 +815,8 @@ class SettingsFragment : Fragment() {
                 })
 
                 prepare()
-                playWhenReady = true
+                // Let the FSM govern playback activation based on visibility and occlusion
+                previewFsm.processEvent(PreviewFsm.PreviewEvent.PlayerAttached(this))
             }
 
         binding.videoPreview.player = previewPlayer
@@ -805,6 +842,7 @@ class SettingsFragment : Fragment() {
     }
 
     private fun releasePreviewPlayer() {
+        previewFsm.processEvent(PreviewFsm.PreviewEvent.PlayerReleased)
         // Detach SurfaceView first so HWUI/BLASTBufferQueue does not hold locks during window stop
         _binding?.videoPreview?.player = null
         // Stop playback and clear video surface
@@ -869,6 +907,10 @@ class SettingsFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        childFragmentLifecycleCallbacks?.let {
+            childFragmentManager.unregisterFragmentLifecycleCallbacks(it)
+            childFragmentLifecycleCallbacks = null
+        }
         floatingPreviewController?.cleanup()
         floatingPreviewController = null
         playlistController?.cleanup()
@@ -884,6 +926,7 @@ class SettingsFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
+        previewFsm.processEvent(PreviewFsm.PreviewEvent.HostResumed(true))
         checkBatteryOptimization()
         // Snapshot Sync: Pull the latest active video from the background service when the UI opens.
         val activeUriString = preferencesManager.getActiveVideoUri()
@@ -905,8 +948,6 @@ class SettingsFragment : Fragment() {
         targetUri?.let { uri ->
             if (previewPlayer == null) {
                 setupVideoPreview(uri)
-            } else {
-                previewPlayer?.playWhenReady = true
             }
         }
 
@@ -944,6 +985,7 @@ class SettingsFragment : Fragment() {
 
     override fun onPause() {
         super.onPause()
+        previewFsm.processEvent(PreviewFsm.PreviewEvent.HostResumed(false))
         // Aggressively release resources when the settings screen is not active
         // This frees up the decoder for the actual wallpaper service
         releasePreviewPlayer()

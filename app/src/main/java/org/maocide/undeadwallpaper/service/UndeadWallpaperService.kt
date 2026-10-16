@@ -26,6 +26,7 @@ import android.os.Looper
 import android.os.UserManager
 import android.service.wallpaper.WallpaperService
 import android.util.Log
+import android.view.Display
 import android.view.MotionEvent
 
 
@@ -42,6 +43,8 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.RawResourceDataSource
+import org.maocide.undeadwallpaper.R
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
@@ -92,10 +95,70 @@ class UndeadWallpaperService : WallpaperService() {
         private fun processEvent(event: EngineEvent) {
             val effect = fsm.transition(event)
             when (effect) {
-                is EngineEffect.StartInitialization -> initializePlayer(effect.lumaScale)
+                is EngineEffect.StartInitialization -> {
+                    renderer?.setThanatosisZeroDecoder(false)
+                    initializePlayer(effect.lumaScale)
+                }
+
                 is EngineEffect.ApplyPlayWhenReady -> wallpaperPlayer.setPlayWhenReadyAsync(effect.play)
-                is EngineEffect.StartRelease -> releasePlayer()
+                is EngineEffect.StartThanatosis -> handleThanatosis(effect.cause, effect.isZeroDecoder)
+                is EngineEffect.StartRelease -> {
+                    renderer?.setThanatosisZeroDecoder(false)
+                    releasePlayer()
+                }
+
                 is EngineEffect.None -> { /* no-op */
+                }
+            }
+        }
+
+        @OptIn(UnstableApi::class)
+        private fun handleThanatosis(cause: String, isZeroDecoder: Boolean) {
+            FileLogger.e(TAG, "Entering THANATOSIS (Apparent Death). Cause: $cause, ZeroDecoder: $isZeroDecoder")
+
+            playbackWatchdog.stop()
+            gestureManager.destroy()
+
+            if (isZeroDecoder || wallpaperPlayer.getPlayerInstance() == null) {
+                // Type B: Hardware decoders starved or player instance missing.
+                // Release WallpaperPlayer to return VPU decoders to the OS and render static WebP texture directly via GL.
+                wallpaperPlayer.releaseAsync()
+                renderer?.setThanatosisZeroDecoder(true)
+            } else {
+                // Type A: Media/container corruption with healthy VPU.
+                // Reset renderer transforms so CRT static loop fills the screen cleanly.
+                renderer?.setThanatosisZeroDecoder(false)
+                renderer?.setScalingMode(ScalingMode.FILL)
+                renderer?.setTransforms(
+                    x = 0f,
+                    y = 0f,
+                    zoom = 1.0f,
+                    rotation = 0f,
+                    flipHorizontal = false,
+                    flipVertical = false
+                )
+                renderer?.setBrightness(0f)
+
+                // Loop raw thanatosis_static.mp4 directly via ExoPlayer without disk allocation.
+                val thanatosisUri = RawResourceDataSource.buildRawResourceUri(R.raw.thanatosis_static)
+                loadedVideoUriString = thanatosisUri.toString()
+
+                serviceScope.launch {
+                    wallpaperPlayer.setPlayWhenReadyAsync(false)
+
+                    val dataSourceFactory = DefaultDataSource.Factory(baseContext)
+                    val mediaSourceFactory = ProgressiveMediaSource.Factory(dataSourceFactory)
+                    val mediaItem = MediaItem.Builder()
+                        .setUri(thanatosisUri)
+                        .setMediaId(thanatosisUri.toString())
+                        .build()
+                    val mediaSource = mediaSourceFactory.createMediaSource(mediaItem)
+
+                    wallpaperPlayer.setRepeatModeAsync(Player.REPEAT_MODE_ALL)
+                    wallpaperPlayer.setMediaSourcesAsync(listOf(mediaSource))
+                    wallpaperPlayer.seekToAsync(0, 0L)
+                    wallpaperPlayer.prepareAsync()
+                    wallpaperPlayer.setPlayWhenReadyAsync(isVisible)
                 }
             }
         }
@@ -497,6 +560,17 @@ class UndeadWallpaperService : WallpaperService() {
                 renderer?.setVideoSize(w, h)
             }
 
+            val isConfined = isDefaultDisplay()
+            val displayLumaModifier = if (isPreview && !isConfined) 0.0f else 1.0f
+            val effectiveLumaScale = activeLumaScale * displayLumaModifier
+
+            if (BuildConfig.DEBUG) {
+                FileLogger.d(
+                    TAG,
+                    "DisplayConfinement: isPreview=$isPreview isConfined=$isConfined effectiveLumaScale=$effectiveLumaScale"
+                )
+            }
+
             currentScalingMode = activeSettings.scalingMode
             renderer?.setScalingMode(currentScalingMode)
             renderer?.setTransforms(
@@ -508,25 +582,28 @@ class UndeadWallpaperService : WallpaperService() {
                 flipVertical = activeSettings.flipVertical
             )
 
-            val lumaOffset = -100.0f * (1.0f - activeLumaScale)
-            renderer?.setBrightness((activeSettings.brightness * activeLumaScale) + lumaOffset)
+            val lumaOffset = -100.0f * (1.0f - effectiveLumaScale)
+            renderer?.setBrightness((activeSettings.brightness * effectiveLumaScale) + lumaOffset)
         }
 
         // WallpaperPlayerListener implementations
         override fun onPlayerError(error: PlaybackException) {
             renderer?.setIsTransitioning(false)
 
-            // Check if the file vanished (happens during UUID migration).
-            // We suppress the toast because VideoFileManager will instantly emit
-            // WallpaperEvent.PlaylistReordered to force a seamless reload.
+            // Check if the file vanished (unlinked from disk, deleted, or path missing).
+            // Do NOT silently return here — a missing video file must enter Thanatosis (apparent death)
+            // instead of stalling ExoPlayer and freezing on the last decoded frame!
             if (error.errorCode == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND) {
-                FileLogger.i(TAG, "Suppressed IO_FILE_NOT_FOUND error (likely a UUID migration in progress).")
+                FileLogger.w(TAG, "Active video unlinked or missing (IO_FILE_NOT_FOUND). Entering Thanatosis.")
+                processEvent(EngineEvent.EnterThanatosis(error.errorCodeName, isZeroDecoder = false))
                 return
             }
 
             // Handled mostly by WallpaperPlayer, this is just for non-hardware errors or restart triggers
-            Handler(Looper.getMainLooper()).post {
-                Toast.makeText(baseContext, "Error: ${error.errorCodeName}", Toast.LENGTH_LONG).show()
+            if (BuildConfig.DEBUG) {
+                Handler(Looper.getMainLooper()).post {
+                    Toast.makeText(baseContext, "Error: ${error.errorCodeName}", Toast.LENGTH_LONG).show()
+                }
             }
 
             FileLogger.e(TAG, "PLAYER ERROR: ${error.errorCodeName}.")
@@ -540,8 +617,20 @@ class UndeadWallpaperService : WallpaperService() {
                     error.errorCode == PlaybackException.ERROR_CODE_DECODING_RESOURCES_RECLAIMED
 
             if (isDecoderError) {
-                if (isVisible) {
+                if (fsm.state is EngineState.Thanatosis) {
+                    // Decoder failed even on the fallback asset! Elevate to Type B Zero-Decoder!
+                    processEvent(EngineEvent.EnterThanatosis(error.errorCodeName, isZeroDecoder = true))
+                } else if (isVisible) {
                     processEvent(EngineEvent.InitializeRequested)
+                }
+            } else {
+                // Non-decoder error (corrupted media, missing file, etc.)
+                if (fsm.state is EngineState.Thanatosis) {
+                    // Non-decoder error occurred while already in Thanatosis; escalate to Type B static texture
+                    processEvent(EngineEvent.EnterThanatosis(error.errorCodeName, isZeroDecoder = true))
+                } else {
+                    // Enter Type A Thanatosis!
+                    processEvent(EngineEvent.EnterThanatosis(error.errorCodeName, isZeroDecoder = false))
                 }
             }
         }
@@ -555,7 +644,7 @@ class UndeadWallpaperService : WallpaperService() {
             // Send video size to Renderer for Matrix Calculation
             renderer?.setVideoSize(width, height)
 
-            // No more refreshed here, just on new frame
+            // No more refreshed here, just on transition
             // refreshRenderer()
 
             // Use ExoPlayer's scaling only if fallback surface is used
@@ -713,7 +802,14 @@ class UndeadWallpaperService : WallpaperService() {
                 }
                 isScalingModeSet = false
 
-                wallpaperPlayer.initializeAsync(null, initialVolume, speed, currentPlaybackMode).join()
+                val playlistSettings = prefs.getPlaylistSettings()
+                val bufferConfig = BufferPolicyCalculator.compute(
+                    playbackMode = currentPlaybackMode,
+                    activeVideo = activeSettings,
+                    playlist = playlistSettings
+                )
+
+                wallpaperPlayer.initializeAsync(null, initialVolume, speed, currentPlaybackMode, bufferConfig).join()
                 if (wallpaperPlayer.getPlayerInstance() == null) return@launch
 
                 // Call the helper to load playlist
@@ -842,17 +938,19 @@ class UndeadWallpaperService : WallpaperService() {
          * This prevents a boot loop of the service crashing and restarting.
          */
         private fun handleCriticalError(reason: String) {
-            FileLogger.e(TAG, "CRITICAL ERROR: $reason. Disabling wallpaper.")
+            FileLogger.e(TAG, "CRITICAL ERROR: $reason. Entering Thanatosis (Type B Zero-Decoder).")
 
-            Handler(Looper.getMainLooper()).post {
-                Toast.makeText(baseContext, "Wallpaper Disabled: $reason", Toast.LENGTH_LONG).show()
+            if (BuildConfig.DEBUG) {
+                Handler(Looper.getMainLooper()).post {
+                    Toast.makeText(baseContext, "Wallpaper Disabled: $reason", Toast.LENGTH_LONG).show()
+                }
             }
 
             // Clear the Preference so it doesn't try to load again on restart
             prefs.saveActiveVideoUri("")
 
-            // Kill the player and DO NOT restart it.
-            processEvent(EngineEvent.HardwareFailure(reason))
+            // Transition FSM to Thanatosis (Type B: Hardware decoder starved)
+            processEvent(EngineEvent.EnterThanatosis(reason, isZeroDecoder = true))
         }
 
 
@@ -892,6 +990,8 @@ class UndeadWallpaperService : WallpaperService() {
         override fun onSurfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
             super.onSurfaceChanged(holder, format, width, height)
             FileLogger.i(TAG, "onSurfaceChanged: New dimensions ${width}x${height}")
+
+            prefs.saveRawScreenDimensions(width, height)
 
             this.surfaceHolder = holder
 
@@ -988,8 +1088,8 @@ class UndeadWallpaperService : WallpaperService() {
                 }
 
                 // Handle Timeline
-                // We only apply timeline manipulations if the player wasn't just freshly initialized.
-                if (!wasJustInitialized) {
+                // We only apply timeline manipulations if the player wasn't just freshly initialized and engine is in Ready state.
+                if (!wasJustInitialized && fsm.state is EngineState.Ready) {
                     val startTimePref = prefs.getStartTime()
                     when (startTimePref) {
                         StartTime.RESUME -> {
@@ -1016,11 +1116,11 @@ class UndeadWallpaperService : WallpaperService() {
                             }
                         }
                     }
-                }
 
-                // Always refresh the renderer settings before resuming playback in case
-                // the user edited them in the UI while the wallpaper was hidden.
-                refreshRenderer()
+                    // Always refresh the renderer settings before resuming playback in case
+                    // the user edited them in the UI while the wallpaper was hidden.
+                    refreshRenderer()
+                }
 
                 try {
                     // Tell FSM we are visible
@@ -1028,8 +1128,10 @@ class UndeadWallpaperService : WallpaperService() {
                         processEvent(EngineEvent.VisibilityChanged(isVisible = true, forceRestart = false))
                     }
 
-                    wallpaperPlayer.getPlayerInstance()?.let { playerInstance ->
-                        playbackWatchdog.start(playerInstance, renderer) // Monitor for playback running
+                    if (fsm.state is EngineState.Ready) {
+                        wallpaperPlayer.getPlayerInstance()?.let { playerInstance ->
+                            playbackWatchdog.start(playerInstance, renderer) // Monitor for playback running
+                        }
                     }
                 } catch (e: IllegalStateException) {
                     FileLogger.e(
@@ -1158,6 +1260,18 @@ class UndeadWallpaperService : WallpaperService() {
 
             // Fallback for standard Android APIs 27-30 (which don't support explicit hints)
             return cachedColors ?: super.onComputeColors()
+        }
+
+        private fun isDefaultDisplay(): Boolean {
+            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                val displayId = displayContext?.display?.displayId ?: Display.DEFAULT_DISPLAY
+                if (BuildConfig.DEBUG && displayId != Display.DEFAULT_DISPLAY) {
+                    FileLogger.d(TAG, "isDefaultDisplay: detected displayId=$displayId (non-default)")
+                }
+                displayId == Display.DEFAULT_DISPLAY
+            } else {
+                true
+            }
         }
 
         @Deprecated("Deprecated in Java") // This is needed for older Android versions

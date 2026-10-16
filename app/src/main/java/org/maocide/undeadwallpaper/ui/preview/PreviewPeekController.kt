@@ -1,4 +1,4 @@
-package org.maocide.undeadwallpaper.ui
+package org.maocide.undeadwallpaper.ui.preview
 
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
@@ -18,7 +18,9 @@ import android.view.animation.AccelerateInterpolator
 import android.view.animation.DecelerateInterpolator
 import android.widget.ImageView
 import androidx.core.view.updateLayoutParams
+import org.maocide.undeadwallpaper.data.PreferencesManager
 import org.maocide.undeadwallpaper.model.ScalingMode
+import org.maocide.undeadwallpaper.utils.DisplayGeometryHelper
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
@@ -120,10 +122,16 @@ class PreviewPeekController(
         }
     }
 
-    fun updateDimensions(metrics: DisplayMetrics) {
+    fun updateDimensions(metrics: DisplayMetrics, prefs: PreferencesManager? = null) {
+        val (screenWidth, screenHeight) = if (prefs != null) {
+            DisplayGeometryHelper.getEffectiveScreenDimensions(metrics, prefs)
+        } else {
+            Pair(metrics.widthPixels, metrics.heightPixels)
+        }
+
         val (targetW, targetH) = calculateDimensions(
-            screenWidth = metrics.widthPixels,
-            screenHeight = metrics.heightPixels,
+            screenWidth = screenWidth,
+            screenHeight = screenHeight,
             density = metrics.density
         )
 

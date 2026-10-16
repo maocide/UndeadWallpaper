@@ -70,6 +70,9 @@ class PreferencesManager(private val context: Context, prefsName: String = PREFS
         const val KEY_TOMBSTONE_IS_BROKEN = "tombstone_is_broken"
         const val KEY_TOMBSTONE_MANUAL_TAP_COUNT = "tombstone_manual_tap_count"
 
+        const val KEY_RAW_SCREEN_LONG_SIDE = "raw_screen_long_side"
+        const val KEY_RAW_SCREEN_SHORT_SIDE = "raw_screen_short_side"
+
         // Transient State for ConfigCRC
         private var transientIsUndead = false
     }
@@ -177,8 +180,6 @@ class PreferencesManager(private val context: Context, prefsName: String = PREFS
         val speed = sharedPrefs.getFloat(KEY_SPEED, 1.0f)
         val audioEnabled = sharedPrefs.getBoolean(KEY_VIDEO_AUDIO_ENABLED, false)
         val volume = if (audioEnabled) 1.0f else 0.0f
-        val startTimeOrdinal = sharedPrefs.getInt(KEY_START_TIME, StartTime.RESUME.ordinal)
-        val startTime = StartTime.entries.getOrElse(startTimeOrdinal) { StartTime.RESUME }
 
         val newPlaylistSettings = mutableListOf<VideoSettings>()
         val activeFileName = legacyUri?.let { Uri.parse(it).lastPathSegment }
@@ -207,7 +208,7 @@ class PreferencesManager(private val context: Context, prefsName: String = PREFS
                         newPlaylistSettings.add(VideoSettings(fileName = fileName))
                     }
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // Ignore parsing errors and fall back to single URI if applicable
             }
         }
@@ -243,7 +244,6 @@ class PreferencesManager(private val context: Context, prefsName: String = PREFS
             remove(KEY_BRIGHTNESS)
             remove(KEY_SPEED)
             remove(KEY_VIDEO_AUDIO_ENABLED)
-            remove(KEY_START_TIME)
         }
     }
 
@@ -276,7 +276,7 @@ class PreferencesManager(private val context: Context, prefsName: String = PREFS
             cachedPlaylistSettingsString = jsonString
             cachedPlaylistSettings = decoded
             decoded
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             emptyList()
         }
     }
@@ -486,5 +486,20 @@ class PreferencesManager(private val context: Context, prefsName: String = PREFS
         sharedPrefs.edit { putInt(KEY_TOMBSTONE_MANUAL_TAP_COUNT, tapCount) }
     }
 
+    fun saveRawScreenDimensions(width: Int, height: Int) {
+        if (width <= 0 || height <= 0) return
+        val longSide = maxOf(width, height)
+        val shortSide = minOf(width, height)
+        if (getRawScreenLongSide() != longSide || getRawScreenShortSide() != shortSide) {
+            sharedPrefs.edit {
+                putInt(KEY_RAW_SCREEN_LONG_SIDE, longSide)
+                putInt(KEY_RAW_SCREEN_SHORT_SIDE, shortSide)
+            }
+        }
+    }
+
+    fun getRawScreenLongSide(): Int = sharedPrefs.getInt(KEY_RAW_SCREEN_LONG_SIDE, 0)
+
+    fun getRawScreenShortSide(): Int = sharedPrefs.getInt(KEY_RAW_SCREEN_SHORT_SIDE, 0)
 }
 

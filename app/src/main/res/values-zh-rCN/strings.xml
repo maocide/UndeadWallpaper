@@ -25,7 +25,7 @@
     <string name="license_text"><a href="https://www.gnu.org/licenses/gpl-3.0.en.html">许可证: GNU GPL v3.0</a></string>
 
     <string name="about_header_story">名称背后的故事</string>
-    <string name="about_story_content">这不仅仅是一个关于<b>动态</b>壁纸的双关语。<b>UndeadWallpaper（亡灵壁纸）</b>这个名字带有个人色彩。在经历了漫长的被迫停止编程之后，这个项目是复苏的第一个迹象——那是被埋藏的激情重新浮出水面的时刻。这个应用不仅仅是<b>动态的</b>；它象征着一个创作者死而复生。它是<b>亡灵（undead）</b>，因为有些东西就是太固执，不愿死去。</string>
+    <string name="about_story_content">这不仅仅是一个关于<b>动态</b>壁纸的双关语。<b>UndeadWallpaper（亡灵壁纸）</b>这个名字带有个人色彩。在经历了漫长的被迫停止编程之后，这个项目是复苏的第一个迹象——那是被埋藏的激情重新浮出水面的时刻。这个应用不仅仅是<b>动态的</b>；它象征着一个开发者死而复生。它是<b>亡灵（undead）</b>，因为有些东西就是太固执，不愿死去。</string>
     <string name="about_header_features">它的功能</string>
     <string name="about_feature_loops">• 丝滑循环：将您手机上的任何视频变成无缝、无卡顿的动态壁纸。</string>
     <string name="about_feature_freedom">• 完全自由：无广告，无应用内购买，无任何废话。永远免费。</string>

@@ -48,6 +48,7 @@ class VideoFileManager(
         object SizeLimitExceeded : CopyResult()
         object DimensionsExceeded : CopyResult()
         object CorruptFile : CopyResult()
+        object StaticTissueRejected : CopyResult()
         object Error : CopyResult()
     }
 
@@ -98,52 +99,15 @@ class VideoFileManager(
      * It uses a random UUID for the physical filename, and returns the original display name.
      *
      * @param fileUri The URI of the file to be copied.
-     * @return A CopyResult indicating Success, Error, or SizeLimitExceeded.
+     * @return A CopyResult indicating Success, Error, SizeLimitExceeded, DimensionsExceeded, CorruptFile, or StaticTissueRejected.
      */
     suspend fun createFileFromContentUri(fileUri: Uri): CopyResult {
-        var originalFileName = ""
-
-        // Try to query the display name
-        try {
-            context.contentResolver.query(fileUri, null, null, null, null)?.use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                    if (nameIndex >= 0) {
-                        originalFileName = cursor.getString(nameIndex)
-                    }
-
-                    // Early validation: Check size upfront to avoid streaming massive files to disk
-                    val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
-                    if (sizeIndex >= 0) {
-                        val sizeBytes = cursor.getLong(sizeIndex)
-                        // 524_288_000L = 500 MB
-                        if (sizeBytes > 524_288_000L) {
-                            FileLogger.w(
-                                tag,
-                                "Upfront file size check failed. File is ${sizeBytes / 1_048_576}MB (Max: 500MB)."
-                            )
-                            return CopyResult.SizeLimitExceeded
-                        }
-                    }
-
-                    // Early validation: Check dimensions before streaming file
-                    val isValid = MediaAnalyzer.validateVideoDimensions(context, fileUri)
-                    if (!isValid) {
-                        FileLogger.w(tag, "Upfront dimension check failed.")
-                        return CopyResult.DimensionsExceeded
-                    }
-                }
-            }
-            originalFileName = java.io.File(originalFileName).name
-        } catch (e: Exception) {
-            FileLogger.w(tag, "Could not query file name, generating fallback.", e)
+        val validationFailure = preFlightValidate(fileUri)
+        if (validationFailure != null) {
+            return validationFailure
         }
 
-        // Use UUID for the fallback display name
-        if (originalFileName.isBlank()) {
-            originalFileName = "imported_video_${java.util.UUID.randomUUID()}.mp4"
-        }
-
+        val originalFileName = queryOriginalFileName(fileUri)
         val outputDir = getAppSpecificAlbumStorageDir(context, videosDirectoryName)
         val outputFile = File(outputDir, "video_${java.util.UUID.randomUUID()}.mp4")
 
@@ -171,7 +135,7 @@ class VideoFileManager(
             return CopyResult.Error
         }
 
-        // Pre-Flight Validation Gate
+        // Post-Flight Validation Gate
         val thumbnail = getOrGenerateThumbnail(outputFile)
         if (thumbnail == null) {
             FileLogger.w(tag, "Corrupt or truncated media file rejected.")
@@ -182,6 +146,109 @@ class VideoFileManager(
         }
 
         return CopyResult.Success(outputFile, originalFileName)
+    }
+
+    /**
+     * Executes upfront pre-flight validation on the inbound content URI before storage allocation.
+     * Rejects explicit static media types, static image magic bytes, oversized payloads,
+     * and missing/unplayable video tracks.
+     *
+     * @return A [CopyResult] failure if rejected, or null if validation passes.
+     */
+    private suspend fun preFlightValidate(fileUri: Uri): CopyResult? {
+        // Checkpoint 1: Permissive MIME check. Only reject if explicitly declared non-video (image/* or audio/*).
+        val mimeType = try {
+            context.contentResolver.getType(fileUri)
+        } catch (e: Exception) {
+            FileLogger.w(tag, "Failed to query MIME type for $fileUri", e)
+            null
+        }
+        if (mimeType != null && (mimeType.startsWith("image/") || mimeType.startsWith("audio/"))) {
+            FileLogger.w(tag, "Early MIME check rejected non-video type: $mimeType")
+            return CopyResult.StaticTissueRejected
+        }
+
+        // Checkpoint 2: Magic bytes inspection. Catches static images disguised as .mp4.
+        val isStaticImage = try {
+            context.contentResolver.openInputStream(fileUri)?.use { stream ->
+                val header = ByteArray(16)
+                val bytesRead = stream.read(header)
+                if (bytesRead >= 3) {
+                    MediaAnalyzer.isStaticImageHeader(header.copyOf(bytesRead))
+                } else {
+                    false
+                }
+            } ?: false
+        } catch (e: Exception) {
+            FileLogger.w(tag, "Could not read stream header for magic bytes", e)
+            false
+        }
+        if (isStaticImage) {
+            FileLogger.w(tag, "Early magic byte check rejected static image signature.")
+            return CopyResult.StaticTissueRejected
+        }
+
+        // Checkpoint 3: Upfront file size check to avoid streaming massive files to disk
+        try {
+            context.contentResolver.query(fileUri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+                    if (sizeIndex >= 0) {
+                        val sizeBytes = cursor.getLong(sizeIndex)
+                        // 524_288_000L = 500 MB
+                        if (sizeBytes > 524_288_000L) {
+                            FileLogger.w(
+                                tag,
+                                "Upfront file size check failed. File is ${sizeBytes / 1_048_576}MB (Max: 500MB)."
+                            )
+                            return CopyResult.SizeLimitExceeded
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            FileLogger.w(tag, "Could not query file size upfront", e)
+        }
+
+        // Checkpoint 4: Authoritative media framework track & dimension validation
+        return when (MediaAnalyzer.validateVideoMedia(context, fileUri)) {
+            is MediaAnalyzer.VideoValidationResult.DimensionsExceeded -> {
+                FileLogger.w(tag, "Upfront dimension check failed.")
+                CopyResult.DimensionsExceeded
+            }
+            is MediaAnalyzer.VideoValidationResult.NotAVideo -> {
+                FileLogger.w(tag, "Upfront media validation failed: not a playable video.")
+                CopyResult.StaticTissueRejected
+            }
+            is MediaAnalyzer.VideoValidationResult.Valid -> {
+                null
+            }
+        }
+    }
+
+    /**
+     * Queries the original display name from the content URI, with fallback to UUID.
+     */
+    private fun queryOriginalFileName(fileUri: Uri): String {
+        var originalFileName = ""
+        try {
+            context.contentResolver.query(fileUri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (nameIndex >= 0) {
+                        originalFileName = cursor.getString(nameIndex) ?: ""
+                    }
+                }
+            }
+            originalFileName = File(originalFileName).name
+        } catch (e: Exception) {
+            FileLogger.w(tag, "Could not query file name, generating fallback.", e)
+        }
+
+        if (originalFileName.isBlank()) {
+            originalFileName = "imported_video_${java.util.UUID.randomUUID()}.mp4"
+        }
+        return originalFileName
     }
 
 

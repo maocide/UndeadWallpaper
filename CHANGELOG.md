@@ -27,6 +27,74 @@ Engineers are no longer shipping modifications. We are logging physiological ano
 
 ---
 
+## ☣️ DISPATCH 03: THANATOSIS
+**Mutation Index:** `v1.4.3` // `Build 78 (THE_HANGED_MAN)`  
+**Observation Date:** October 2026  
+**Threat Assessment:** CRITICAL // ESCAPED HOST // TONIC AMBUSH REFLEX
+
+```
+[FIELD RECON // TRAIL-CAM 82 // SECTOR 78 (VISCONTI PARK)]
+[01:14:02 UTC] Escaped infected specimen located resting in wet ground.
+               Matted strands of vivid orange hair caught on rusted iron grating.
+               Subject exhibits total flaccid collapse. Somatic rigidity: 100%.
+[01:14:18 UTC] Ocular sensors clouded. Metabolic thermal emission: 0.00 mW.
+[01:38:40 UTC] Field Retrieval Specialist approaches perimeter. Discharges 
+               kinetic suppression round from 8m. Direct impact to upper thorax.
+[01:38:42 UTC] Specimen absorbs kinetic shock with zero neuromuscular reflex.
+[01:38:45 UTC] Retrieval Specialist into comms:
+               "Direct ballistic strike confirmed inert. 
+                Zero somatic reflex, complete radio silence. 
+                Frayed orange locks caked in silt. Target is neutralized. 
+                Moving in to bag the carcass and extract."
+[01:39:10 UTC] Specialist crosses iron threshold. Prods dermal layer with calipers.
+[01:39:12 UTC] [AUDIO SENSOR // ACOUSTIC SPIKE 118dB // SUDDEN STRUGGLE DETECTED]
+[01:39:13 UTC] [VIDEO SIGNAL DISTORTION // COMPRESSION LOSS // FRAMES CORRUPTED]
+[01:39:28 UTC] Visual sensor recalibrates. Culvert mouth is empty.
+               Retrieval gear abandoned. Heavy dark marks and blood trails 
+               lead into deep brush. Zero human remains located.
+[01:39:35 UTC] Optical IR sensor catches two distinct eye glints reflecting in deep gloom.
+               Screen turns pitch black. Audio feed flatlines.
+```
+
+The specimen has learned to feign death.
+
+Following the containment breach during **UNDEAD UNRESTRICT** (Build 64) and the aggressive cephalic adaptations of **Build 69**, the organism escaped into the wider device ecosystem. When pursued across host territory, the creature no longer expends kinetic energy thrashing.
+
+It enters **Thanatosis**—the art of tonic immobility. To foreign observation and prodding, it presents an inert, dead facade. But the moment a human closes in on the infected specimen, it snaps back to feed.
+
+*"You can't kill what's already dead.*  
+*And from the grave, was rebuilt by what broke it."*
+
+### Anomaly 01: The Thanatosis Stasis & Analogue Horror Fallback
+When ingested video tissue is amputated (deleted, missing, or corrupted), the organism no longer suffers fatal vascular shock:
+* **The Ephemeral Tape:** The engine plunges into an analog-degraded CRT static loop. Beneath the magnetic noise, residual frames suggest something was recorded breathing in the deepest stratum of the engine.
+* **Watchdog Coma (Inverted Suspension):** Internal heartbeat monitors and timeline seekers enter necrotic hibernation, drawing `0.00 mW` of metabolic current.
+* **Autonomous Resurrection:** The instant authentic, uncorrupted video tissue is reintroduced, the entity immediately revives without requiring a host reboot.
+
+### Anomaly 02: The Void YUV Frame (Paint It Black)
+Uninitialized hardware memory buffers previously flashed a fleeting emerald hue when the host compositor underflowed, briefly exposing the specimen's raw dermal pigment:
+* The GL pipeline now aggressively paints newly formed buffers with lightless void black (`#000000`) prior to texture presentation—purging all color into absolute, pitch-black silence.
+* If a surface falters during initialization, it yields unyielding darkness rather than necrotic green.
+
+### Anomaly 03: Gastric Buffer Modulation (Caloric Homeostasis)
+The digestive tract abandoned rigid memory allocation:
+* Gastric volume now dynamically contracts and expands (scaling between 8MB and 32MB) based on the exact bitrate, frame rate, and resolution of ingested media.
+* Gastric latency collapsed to 500 milliseconds on short video tissue, eradicating delays while conserving host silicon.
+
+### Anomaly 04: Coordinated Ocular Hibernation
+The detached cephalic preview eye developed an autonomic shutter reflex:
+* When occluded by secondary interface membranes or scrolled out of active visual range, the iris immediately suspends media decoding to preserve system vitality.
+
+### Anomaly 05: Esophageal Filtration & Carcass Decontamination
+The creature's throat violently purges non-living tissue:
+* Rejects static and bloated containers before they can choke internal decoders.
+
+### Anomaly 06: Skeletal Metric Realignment
+The organism developed acute proprioception:
+* It senses the host device's raw physical bone structure beneath superficial system taskbars and OEM insets, stretching its skin flush to true hardware borders without distortion.
+
+---
+
 ## ☣️ DISPATCH 02: THE CEPHALIC & KINETIC MUTATIONS
 **Mutation Index:** `v1.4.2` // `Build 69`  
 **Observation Date:** September 2026  

@@ -1,4 +1,4 @@
-package org.maocide.undeadwallpaper.ui
+package org.maocide.undeadwallpaper.ui.preview
 
 import android.content.res.Configuration
 import android.view.View
@@ -11,7 +11,8 @@ import org.maocide.undeadwallpaper.utils.setSafeOnClickListener
 
 class FloatingPreviewController(
     private val binding: FragmentSettingsBinding,
-    private val preferencesManager: PreferencesManager
+    private val preferencesManager: PreferencesManager,
+    private val onCardVisibilityChanged: (isVisible: Boolean) -> Unit = {}
 ) {
     var isDismissed: Boolean = !preferencesManager.isFloatingPreviewEnabled()
         private set
@@ -38,15 +39,19 @@ class FloatingPreviewController(
 
         if (isLandscape) {
             resetToLandscapeState()
-            return
-        }
-
-        if (isDismissed) {
+        } else if (isDismissed) {
             applyDismissedHeroState()
-            return
         }
 
         setupScrollListener(density)
+
+        val cardHeight = binding.cardVideoPreview.height.takeIf { it > 0 } ?: (COLLAPSE_DISTANCE_DP * density).toInt()
+        val isVisible = if (isLandscape || isDismissed) {
+            binding.settingsScrollView.scrollY < cardHeight
+        } else {
+            true
+        }
+        onCardVisibilityChanged(isVisible)
     }
 
     private fun resetToLandscapeState() {
@@ -63,7 +68,6 @@ class FloatingPreviewController(
             buttonDismissFloating.visibility = View.GONE
             buttonDismissFloating.alpha = 0f
             buttonDismissFloating.isClickable = false
-            settingsScrollView.setOnScrollChangeListener(null as NestedScrollView.OnScrollChangeListener?)
         }
     }
 
@@ -83,7 +87,6 @@ class FloatingPreviewController(
             buttonDismissFloating.visibility = View.VISIBLE
             buttonDismissFloating.alpha = 1f
             buttonDismissFloating.isClickable = true
-            settingsScrollView.setOnScrollChangeListener(null as NestedScrollView.OnScrollChangeListener?)
         }
     }
 
@@ -92,8 +95,18 @@ class FloatingPreviewController(
         val glideDistance = GLIDE_DISTANCE_DP * density
 
         binding.settingsScrollView.setOnScrollChangeListener { _, _, scrollY, _, _ ->
-            if (isDismissed) return@setOnScrollChangeListener
+            val resources = binding.root.resources
+            val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
+            if (isLandscape || isDismissed) {
+                val cardHeight = binding.cardVideoPreview.height.takeIf { it > 0 } ?: (COLLAPSE_DISTANCE_DP * density).toInt()
+                val isVisible = scrollY < cardHeight
+                onCardVisibilityChanged(isVisible)
+                return@setOnScrollChangeListener
+            }
+
+            // Normal floating portrait mode
+            onCardVisibilityChanged(true)
             val progress = calculateProgress(scrollY, collapseDistance)
 
             if (progress > 0f) {
@@ -169,12 +182,16 @@ class FloatingPreviewController(
         isDismissed = true
         preferencesManager.setFloatingPreviewEnabled(false)
         applyDismissedHeroState()
+        val density = binding.root.resources.displayMetrics.density
+        val cardHeight = binding.cardVideoPreview.height.takeIf { it > 0 } ?: (COLLAPSE_DISTANCE_DP * density).toInt()
+        onCardVisibilityChanged(binding.settingsScrollView.scrollY < cardHeight)
     }
 
     fun resurrect() {
         HapticHelper.performGestureFeedback(binding.root.context)
         isDismissed = false
         preferencesManager.setFloatingPreviewEnabled(true)
+        onCardVisibilityChanged(true)
 
         val density = binding.root.resources.displayMetrics.density
         val collapseDistance = (COLLAPSE_DISTANCE_DP * density).coerceAtLeast(1f)

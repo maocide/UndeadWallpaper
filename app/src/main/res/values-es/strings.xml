@@ -28,7 +28,7 @@
 
     <!-- About Page Strings -->
     <string name="about_header_story">La Historia Detrás del Nombre</string>
-    <string name="about_story_content">Esto no es solo un ingenioso juego de palabras con fondo de pantalla <b>vivo</b> (animado). El nombre <b>UndeadWallpaper</b> es personal. Después de una larga y forzada pausa de la programación, este proyecto fue la primera señal de vida—el momento en que una pasión que estaba enterrada regresó con fuerza a la superficie. Esta aplicación no solo está <b>viva</b>; es el símbolo de un creador que regresa de entre los muertos. Es <b>no muerto</b>, porque algunas cosas son simplemente demasiado tercas para morir.</string>
+    <string name="about_story_content">Esto no es solo un ingenioso juego de palabras con fondo de pantalla <b>vivo</b> (animado). El nombre <b>UndeadWallpaper</b> es personal. Después de una larga y forzada pausa de la programación, este proyecto fue la primera señal de vida—el momento en que una pasión que estaba enterrada regresó con fuerza a la superficie. Esta aplicación no solo está <b>viva</b>; es el símbolo de un desarrollador que regresa de entre los muertos. Es <b>no muerto</b>, porque algunas cosas son simplemente demasiado tercas para morir.</string>
     <string name="about_header_features">Lo que Hace</string>
     <string name="about_feature_loops">• Bucles Perfectos: Convierte cualquier video de tu teléfono en un fondo de pantalla animado, fluido y sin interrupciones.</string>
     <string name="about_feature_freedom">• Libertad Total: Sin anuncios, sin compras dentro de la aplicación, sin tonterías. Nunca.</string>
