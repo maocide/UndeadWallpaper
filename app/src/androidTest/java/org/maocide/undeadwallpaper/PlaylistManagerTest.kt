@@ -64,7 +64,7 @@ class PlaylistManagerTest {
     fun testGaplessChunkingLinear() = runBlocking {
         // v1, v2 have SAME visual settings
         createDummyVideo("v1.mp4", VideoSettings("v1.mp4", scalingMode = ScalingMode.FILL))
-        createDummyVideo("v2.mp4", VideoSettings("v2.mp4", scalingMode = ScalingMode.FILL, volume = 1.0f)) // audio differs, visuals same
+        createDummyVideo("v2.mp4", VideoSettings("v2.mp4", scalingMode = ScalingMode.FILL, displayName = "Different Name")) // metadata differs, visuals same
         
         // v3 has DIFFERENT visual settings
         createDummyVideo("v3.mp4", VideoSettings("v3.mp4", scalingMode = ScalingMode.FIT))

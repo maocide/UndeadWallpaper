@@ -3,4 +3,6 @@
     <dimen name="preview_card_max_width">640dp</dimen>
     <dimen name="settings_card_max_width">640dp</dimen>
     <dimen name="preview_card_corner_radius">24dp</dimen>
+    <dimen name="preview_phone_frame_corner_radius">16dp</dimen>
+    <dimen name="preview_phone_frame_inset">10dp</dimen>
 </resources>

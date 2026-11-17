@@ -73,6 +73,8 @@ class PlaylistController(
             recentFiles,
             currentVideoUriString = currentUri,
             preferencesManager = preferencesManager,
+            videoFileManager = videoFileManager,
+            coroutineScope = coroutineScope,
             onItemClick = { recentFile ->
                 val fileUri = Uri.fromFile(recentFile.file)
                 engineSyncJob?.cancel()
@@ -86,6 +88,8 @@ class PlaylistController(
         )
         binding.recyclerViewRecentFiles.layoutManager = LinearLayoutManager(context)
         binding.recyclerViewRecentFiles.adapter = recentFilesAdapter
+        binding.recyclerViewRecentFiles.setHasFixedSize(true)
+        binding.recyclerViewRecentFiles.isNestedScrollingEnabled = false
 
         val itemTouchHelperCallback = object : ItemTouchHelper.SimpleCallback(
             ItemTouchHelper.UP or ItemTouchHelper.DOWN,
@@ -255,7 +259,9 @@ class PlaylistController(
         }
 
         recentFilesAdapter.notifyDataSetChanged()
-        binding.recyclerViewRecentFiles.scheduleLayoutAnimation()
+        if (recentFiles.size <= 20) {
+            binding.recyclerViewRecentFiles.scheduleLayoutAnimation()
+        }
         updatePaginationUI()
     }
 
@@ -332,8 +338,7 @@ class PlaylistController(
 
     fun setActiveVideoUri(uriString: String?) {
         if (::recentFilesAdapter.isInitialized) {
-            recentFilesAdapter.currentVideoUriString = uriString
-            recentFilesAdapter.notifyDataSetChanged()
+            recentFilesAdapter.setActiveUri(uriString)
         }
     }
 

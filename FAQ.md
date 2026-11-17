@@ -9,19 +9,16 @@
 
 **Q: Can I set a different video for the Lock Screen and the Home Screen?**
 
-**A:** No, and it is a deliberate architectural choice to protect your battery and sanity. Android’s native Live Wallpaper API is fundamentally disconnected. The system intent completely lacks destination flags (it cannot tell the app *where* it is rendering), and setting a new wallpaper from within an app natively unbinds or overrides the other screen.
+**A:** **No.** Android’s native Live Wallpaper API has a fundamental architectural disconnect: while the system picker lets you manually assign services to Home or Lock, an app cannot programmatically target a specific screen or even query which screen a running `WallpaperService` is bound to (a gap that remains unfixed through Android 17).
 
-* **The not so clean Workarounds:** To trick the system, an app has to register two entirely separate background services. Because the app-side intent can't handle both at once, you are forced to leave the app, dive into your system menus, and blindly guess which identical service to assign to which screen.
-* **Resource Starvation:** Managing two separate services means keeping two independent video decoding instances alive in memory while simultaneously tracking two separate playlist queues. This doubles memory requirements, causes battery drain and begs the Android memory manager to assassinate the app in the background.
-* **The Verdict:** It would actually take less effort to maintain two completely separate cloned packages of the app than to hack dual-services into a single clean engine. Until Android introduces a standardized, unified API built specifically for dual-stream live wallpapers, UndeadWallpaper will remain focused on a single, perfectly optimized, lightweight pipeline.
+* **Why Dual-Service Workarounds Fail:** Supporting both from one app requires hardcoding two duplicate `WallpaperService` stubs, alternating video bindings blindly, and dumping users into Android's confusing system picker to guess which service goes where—usually limited to one static clip per screen.
+* **Hardware Decoder Exhaustion:** Running two concurrent video playlists inside one app process/VM collides directly over hardware `MediaCodec` decoders, triggering frame freezes and decoder starvation whenever the OS switches between Lock and Home. *(Two isolated app VMs handle dual hardware decoding cleaner than jamming duplicated services into one package.)* Until Android exposes a unified multi-target Live Wallpaper API, UndeadWallpaper remains focused on one deterministic, decoder-safe pipeline.
 
-**Q: I enabled Home Screen Gestures (Double/Triple Tap), but nothing happens when I tap!**
+**Q: How do Undead Affects work? Why don\'t they trigger on some phones?**
 
-**A:** If your taps are being ignored, one of these three system rules is blocking them from reaching the wallpaper:
+**A:** Undead Affects is a high-performance kinetic physics engine calculated via real-time spring math and vsync Choreographer interpolation. Reactions (Shake, Hop, Bounce) are projected instantaneously through OpenGL matrix transforms at your display's native refresh rate—with synchronized haptics and zero video decoder overhead.
 
-* **The Lock Screen Blockade:** Gestures will *never* work on the lock screen. Android natively blocks live wallpapers from receiving touch inputs on the lock screen for security reasons. This is a hard, unbypassable OS rule.
-* **Greedy Custom Launchers:** If you use a custom launcher (like **Nova**, **Smart Launcher**, **Niagara**, etc.), it is likely stealing your taps. For example, if your launcher has a "Double tap to turn off screen" feature enabled, it intercepts your fingers before the wallpaper ever feels them. You must disable the launcher's gesture in its own settings to let the taps pass through to the horde.
-* **The Preview Screen:** Gestures are intentionally disabled while you are looking at the system's "Apply Wallpaper" preview screen to prevent hardware bugs on certain manufacturer interfaces (like Vivo, Oppo, or Xiaomi). Apply the wallpaper first, then tap your actual Home Screen.
+* **Launcher Touch Limitations:** Live wallpapers can only react to touches if your desktop launcher actively forwards window touch events through to the background wallpaper layer. Standard Android and customizable launchers (such as Nova, Niagara, or Smart Launcher) forward these touches seamlessly. However, certain aggressive proprietary OEM launchers (such as some MIUI/HyperOS, EMUI, or XOS builds) completely swallow all touch inputs at the desktop surface, blocking any live wallpaper from receiving tap events.
 
 **Q: I have a Xiaomi/POCO/Redmi phone. The video applies to my Home Screen, but my Lock Screen is still static.**
 
@@ -50,7 +47,7 @@
 
 * **The Battery Killer:** Playing a GIF forces your phone's CPU to manually decode and draw every single frame continuously. Apps that allow this cause massive, silent battery drain.
 * **The Video Advantage:** Actual video files (`.mp4`, `.mkv`) use native hardware acceleration. Your phone has a dedicated silicon chip just for decoding video, which is incredibly efficient and uses almost zero extra battery (perfect for handheld gaming devices and power users!).
-* **The Fix:** If you have a GIF you love, use a free online converter to change it into an `.mp4` file first. Your battery will thank you.
+* **The Fix:** Convert the GIF into an `.mp4` clip first.
 
 **Q: When I open my app drawer, the background blurs a static image of Zombillie instead of my video. Why?**
 

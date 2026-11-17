@@ -20,9 +20,12 @@ local.properties
 /build
 /app/build
 /app/release/
+/dist/
+build.sh
 
 # IDE files
 .idea/
+.vscode/
 
 # Local configuration
 local.properties

@@ -8,7 +8,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.maocide.undeadwallpaper.model.ScalingMode
 import org.maocide.undeadwallpaper.model.VideoSettings
-import kotlin.math.abs
 
 @RunWith(AndroidJUnit4::class)
 class VideoSettingsTest {
@@ -23,12 +22,12 @@ class VideoSettingsTest {
             zoom = 1.0f,
             rotation = 0.0f,
             brightness = 1.0f,
-            volume = 0.5f // Volume doesn't affect visual transforms!
+            displayName = "Video 1"
         )
 
         val identicalVisuals = baseSettings.copy(
             fileName = "video2.mp4",
-            volume = 1.0f // Different audio, but visual transforms are identical
+            displayName = "Video 2" // Different metadata, but visual transforms are identical
         )
         assertTrue("Settings with only non-visual differences should match", baseSettings.hasSameVisualTransformsAs(identicalVisuals))
 
@@ -43,6 +42,12 @@ class VideoSettingsTest {
         
         val differentBrightness = baseSettings.copy(brightness = 0.5f)
         assertFalse("Different brightness should not match", baseSettings.hasSameVisualTransformsAs(differentBrightness))
+
+        val differentContrast = baseSettings.copy(contrast = 1.2f)
+        assertFalse("Different contrast should not match", baseSettings.hasSameVisualTransformsAs(differentContrast))
+
+        val differentSaturation = baseSettings.copy(saturation = 0.0f)
+        assertFalse("Different saturation should not match", baseSettings.hasSameVisualTransformsAs(differentSaturation))
     }
 
     @Test
@@ -58,18 +63,5 @@ class VideoSettingsTest {
             displayName = null
         )
         assertEquals("video_uuid_123.mp4", settingsWithoutDisplay.getEffectiveDisplayName())
-    }
-
-    @Test
-    fun testGetPerceivedVolume() {
-        // Volume is quadratic (volume^2)
-        val muted = VideoSettings(fileName = "test", volume = 0.0f)
-        assertTrue(abs(0.0f - muted.getPerceivedVolume()) < 0.001f)
-
-        val half = VideoSettings(fileName = "test", volume = 0.5f)
-        assertTrue(abs(0.25f - half.getPerceivedVolume()) < 0.001f)
-
-        val full = VideoSettings(fileName = "test", volume = 1.0f)
-        assertTrue(abs(1.0f - full.getPerceivedVolume()) < 0.001f)
     }
 }

@@ -12,11 +12,8 @@ sealed class EngineState {
     /** ExoPlayer is currently being built or preparing. Prevents redundant initializations. */
     object Initializing : EngineState()
 
-    /** 
-     * Player is prepared and attached to a surface.
-     * @param isManuallyPaused True if the user paused playback via a double/triple tap gesture.
-     */
-    data class Ready(val isManuallyPaused: Boolean = false) : EngineState()
+    /** Player is prepared and attached to a surface. */
+    object Ready : EngineState()
 
     /**
      * The organism enters apparent death (stasis) upon encountering unresolvable media corruption
@@ -43,9 +40,6 @@ sealed class EngineEvent {
      * @param forceRestart True if the wakeup check detected a dead thread/surface and requires a hard reset.
      */
     data class VisibilityChanged(val isVisible: Boolean, val forceRestart: Boolean = false) : EngineEvent()
-
-    /** User double/triple tapped the screen to toggle playback. */
-    object UserTogglePause : EngineEvent()
 
     /** Request to destroy the player (e.g. onSurfaceDestroyed or fatal error). */
     object ReleaseRequested : EngineEvent()
@@ -112,7 +106,7 @@ class EngineFSM(private val context: android.content.Context) {
             is EngineState.Initializing -> {
                 when (event) {
                     is EngineEvent.InitializationComplete -> Pair(
-                        EngineState.Ready(isManuallyPaused = false),
+                        EngineState.Ready,
                         EngineEffect.None
                     )
 
@@ -143,18 +137,8 @@ class EngineFSM(private val context: android.content.Context) {
                         if (event.forceRestart) {
                             Pair(EngineState.Initializing, EngineEffect.StartInitialization(computeLumaScale()))
                         } else {
-                            // If it's visible, and we aren't manually paused, play.
-                            val shouldPlay = event.isVisible && !currentState.isManuallyPaused
-                            Pair(currentState, EngineEffect.ApplyPlayWhenReady(shouldPlay))
+                            Pair(currentState, EngineEffect.ApplyPlayWhenReady(event.isVisible))
                         }
-                    }
-
-                    is EngineEvent.UserTogglePause -> {
-                        val newPauseState = !currentState.isManuallyPaused
-                        Pair(
-                            EngineState.Ready(isManuallyPaused = newPauseState),
-                            EngineEffect.ApplyPlayWhenReady(!newPauseState)
-                        )
                     }
 
                     is EngineEvent.ReleaseRequested -> Pair(EngineState.Releasing, EngineEffect.StartRelease)
@@ -181,11 +165,6 @@ class EngineFSM(private val context: android.content.Context) {
                         } else {
                             Pair(currentState, EngineEffect.ApplyPlayWhenReady(event.isVisible))
                         }
-                    }
-
-                    is EngineEvent.UserTogglePause -> {
-                        // Ignored! The organism plays dead; tactile input is suppressed.
-                        Pair(currentState, EngineEffect.None)
                     }
 
                     is EngineEvent.InitializeRequested -> {

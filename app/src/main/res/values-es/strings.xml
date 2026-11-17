@@ -12,7 +12,6 @@
 
     <!-- UI Strings -->
     <string name="pick_video">Seleccionar Video</string>
-    <string name="setting_audio_enabled">Habilitar Audio</string>
     <string name="playback_mode_setting">Modo de Reproducción</string>
     <string name="recent_files">Lista de reproducción</string>
     <string name="playlist_instructions">Mantén presionado para reordenar. Desliza a la izquierda o derecha para remover.</string>
@@ -32,7 +31,7 @@
     <string name="about_header_features">Lo que Hace</string>
     <string name="about_feature_loops">• Bucles Perfectos: Convierte cualquier video de tu teléfono en un fondo de pantalla animado, fluido y sin interrupciones.</string>
     <string name="about_feature_freedom">• Libertad Total: Sin anuncios, sin compras dentro de la aplicación, sin tonterías. Nunca.</string>
-    <string name="about_feature_control">• Tú Tienes el Control: Soporta opciones de audio y realiza un seguimiento de tus videos recientes para cambios rápidos.</string>
+    <string name="about_feature_control">• Tú Tienes el Control: Realiza un seguimiento de tus videos recientes para cambios rápidos y bucles fluidos.</string>
     <string name="playback_mode_loop">Repetir Uno</string>
     <string name="playback_mode_oneshot">Una Sola Vez</string>
     <string name="playback_mode_loop_all">Repetir Todos</string>
@@ -46,25 +45,17 @@
     <string name="vertical_position">Posición Vertical</string>
     <string name="zoom">Acercar</string>
     <string name="brightness">Brillo</string>
-    <string name="speed">Velocidad</string>
+    <string name="contrast">Contraste</string>
+    <string name="saturation">Saturación</string>
     <string name="reset">Restablecer</string>
+    <string name="reset_all">Restablecer todo</string>
     <string name="rotation">Rotación</string>
-
-    <!-- Home Screen Gestures -->
-    <string name="gesture_controls_header">Gestos en Inicio</string>
-    <string name="double_tap_label">Doble Toque</string>
-    <string name="triple_tap_label">Triple Toque</string>
-    <string name="gesture_action_none">Ninguno</string>
-    <string name="gesture_action_pause_play">Pausa/Reproducir</string>
-    <string name="gesture_action_skip">Saltar</string>
-    <string name="gesture_launcher_warning">Nota: Algunos lanzadores pueden bloquear los gestos del fondo de pantalla.</string>
 
     <!-- Error and Warning Messages -->
     <string name="error_permission_failed">No se pudo obtener el permiso para el archivo seleccionado.</string>
     <string name="warning_4k_video">Advertencia: los videos en 4K pueden causar cierres inesperados o lentitud en algunos dispositivos.</string>
     <string name="error_copy_failed">No se pudo copiar el archivo de video.</string>
     <string name="error_cannot_play_video">No se puede reproducir este archivo de video.</string>
-    <string name="warning_high_speed_stuttering">Las altas velocidades pueden causar interrupciones en videos de alta resolución.</string>
     <string name="error_file_picker_not_available">¡El selector de archivos no está disponible en el sistema!</string>
     <string name="error_could_not_read_video_duration">No se pudo leer la duración del video.</string>
     <string name="warning_random_start_time_delay">Aleatorio puede causar retrasos debido a la búsqueda</string>
@@ -84,8 +75,8 @@
     <string name="importing_video">Infestando nuevos archivos</string>
     <string name="preparing_assets">Despertando a los no muertos</string>
     <string name="positioning_header">Posicionamiento</string>
+    <string name="color_header">Color</string>
     <string name="general_header">General</string>
-    <string name="volume_label">Volumen</string>
     <string name="global_settings_header">Ajustes Globales</string>
     <string name="debug_options_header">Opciones de Depuración</string>
     <string name="debug_logging_description">Habilita el registro de archivos locales para capturar bloqueos graves. Se recomienda dejar esto apagado a menos que experimentes problemas.</string>
@@ -103,8 +94,9 @@
     <string name="breadcrumb_pan">Pan</string>
     <string name="breadcrumb_rotation">Rotación</string>
     <string name="breadcrumb_brightness">Brillo</string>
-    <string name="breadcrumb_speed">Velocidad</string>
-    <string name="breadcrumb_volume">Volumen</string>
+    <string name="breadcrumb_contrast">Contraste</string>
+    <string name="breadcrumb_saturation">Saturación</string>
+    <string name="breadcrumb_colors">Color</string>
     <string name="breadcrumb_more">+%1$d más</string>
 
     <string name="remove_file_title">Remover Video</string>
@@ -146,4 +138,8 @@
     <string name="flip_vertical">Vertical</string>
     <string name="error_file_too_large">El video seleccionado supera el límite de 500 MB.</string>
     <string name="warning_status_bar_oem">Es posible que no todos los launchers lo soporten.</string>
+
+    <!-- Undead Affects -->
+    <string name="undead_affects_description">Reacciones físicas provocadas por el contacto con la superficie de la pantalla de inicio.</string>
+    <string name="undead_affects_haptics_description">Respuesta de vibración al contacto físico.</string>
 </resources>

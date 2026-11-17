@@ -9,8 +9,6 @@ import android.util.TypedValue
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.core.content.ContextCompat
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.doOnLayout
 import androidx.core.view.updateLayoutParams
 import com.google.android.material.bottomsheet.BottomSheetBehavior
@@ -23,8 +21,10 @@ import org.maocide.undeadwallpaper.event.WallpaperEvent
 import org.maocide.undeadwallpaper.event.WallpaperEventBus
 import org.maocide.undeadwallpaper.model.ScalingMode
 import org.maocide.undeadwallpaper.model.VideoSettings
+import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.lifecycle.lifecycleScope
@@ -32,6 +32,8 @@ import org.maocide.undeadwallpaper.R
 import org.maocide.undeadwallpaper.data.VideoFileManager
 import org.maocide.undeadwallpaper.ui.preview.PreviewPeekController
 import org.maocide.undeadwallpaper.utils.DisplayGeometryHelper
+import org.maocide.undeadwallpaper.utils.preventDoubleInput
+import org.maocide.undeadwallpaper.utils.setSafeOnClickListener
 import java.io.File
 
 class VideoSettingsSheet : BottomSheetDialogFragment() {
@@ -43,6 +45,9 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
     private lateinit var metadata: String
     private var isUpdatingUi = false
     private var previewPeekController: PreviewPeekController? = null
+    private var primaryColor: Int = 0
+    private var secondaryColor: Int = 0
+    private val settingsDispatcher = Dispatchers.IO.limitedParallelism(1)
 
     companion object {
         private const val ARG_FILE_NAME = "file_name"
@@ -67,10 +72,14 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
 
     override fun onCreateDialog(savedInstanceState: Bundle?): android.app.Dialog {
         val dialog = super.onCreateDialog(savedInstanceState) as BottomSheetDialog
+        dialog.window?.setHideOverlayWindows(true)
         dialog.setOnShowListener { dialogInterface ->
             val d = dialogInterface as BottomSheetDialog
             val bottomSheet = d.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
             bottomSheet?.let { sheet ->
+                sheet.layoutParams.height = ViewGroup.LayoutParams.MATCH_PARENT
+                sheet.requestLayout()
+
                 val behavior = BottomSheetBehavior.from(sheet)
 
                 // Use 'isFitToContents' to access the public setter
@@ -82,11 +91,14 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
 
                 // Open the sheet directly into our custom 82% state
                 behavior.state = BottomSheetBehavior.STATE_HALF_EXPANDED
-
-
             }
         }
         return dialog
+    }
+
+    override fun onStart() {
+        super.onStart()
+        dialog?.window?.setHideOverlayWindows(true)
     }
 
     override fun onCreateView(
@@ -99,6 +111,14 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        val typedValue = TypedValue()
+        val theme = requireContext().theme
+        theme.resolveAttribute(androidx.appcompat.R.attr.colorPrimary, typedValue, true)
+        primaryColor = ContextCompat.getColor(requireContext(), typedValue.resourceId)
+
+        theme.resolveAttribute(android.R.attr.textColorSecondary, typedValue, true)
+        secondaryColor = ContextCompat.getColor(requireContext(), typedValue.resourceId)
 
         val settings = preferencesManager.getVideoSettings(fileName)
         binding.videoFileName.text = settings.getEffectiveDisplayName()
@@ -197,14 +217,20 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
             zoom = binding.zoomSlider.value,
             positionX = binding.positionXSlider.value,
             positionY = binding.positionYSlider.value,
-            brightness = binding.brightnessSlider.value
+            brightness = binding.brightnessSlider.value,
+            contrast = binding.contrastSlider.value,
+            saturation = binding.saturationSlider.value
         )
     }
 
     private fun syncUiState() {
+        val settings = preferencesManager.getVideoSettings(fileName)
+        syncUiStateWith(settings)
+    }
+
+    private fun syncUiStateWith(settings: VideoSettings) {
         isUpdatingUi = true
         try {
-            val settings = preferencesManager.getVideoSettings(fileName)
             val defaults = VideoSettings(fileName)
 
             binding.chipFlipHorizontal.isChecked = settings.flipHorizontal
@@ -241,11 +267,11 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
             binding.brightnessSlider.setValueSafe(settings.brightness)
             binding.brightnessLabel.markIfModified(binding.brightnessIcon, settings.brightness, defaults.brightness)
 
-            binding.speedSlider.setValueSafe(settings.speed)
-            binding.speedLabel.markIfModified(binding.speedIcon, settings.speed, defaults.speed)
+            binding.contrastSlider.setValueSafe(settings.contrast)
+            binding.contrastLabel.markIfModified(binding.contrastIcon, settings.contrast, defaults.contrast)
 
-            binding.volumeSlider.setValueSafe(settings.volume)
-            binding.volumeLabel.markIfModified(binding.volumeIcon, settings.volume, defaults.volume)
+            binding.saturationSlider.setValueSafe(settings.saturation)
+            binding.saturationLabel.markIfModified(binding.saturationIcon, settings.saturation, defaults.saturation)
 
         } finally {
             isUpdatingUi = false
@@ -254,8 +280,12 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
     }
 
     private fun updateSettings(updater: (VideoSettings) -> VideoSettings) {
-        preferencesManager.updateVideoSettings(fileName, updater)
-        notifySettingsChanged()
+        lifecycleScope.launch(settingsDispatcher) {
+            withContext(NonCancellable) {
+                preferencesManager.updateVideoSettings(fileName, updater)
+                notifySettingsChanged()
+            }
+        }
     }
 
     private fun notifySettingsChanged() {
@@ -273,6 +303,20 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
             onLiveChange: ((Float) -> Unit)? = null,
             saveAction: (Float) -> Unit
         ) {
+            slider.preventDoubleInput()
+            icon.setSafeOnClickListener(debounceMs = 300L) {
+                if (abs(slider.value - defaultVal) > 0.001f) {
+                    isUpdatingUi = true
+                    try {
+                        slider.setValueSafe(defaultVal)
+                        label.markIfModified(icon, defaultVal, defaultVal)
+                    } finally {
+                        isUpdatingUi = false
+                    }
+                    saveAction(defaultVal)
+                    applyPreviewTransform()
+                }
+            }
             slider.addOnChangeListener { _, value, fromUser ->
                 if (fromUser && !isUpdatingUi) {
                     onLiveChange?.invoke(value)
@@ -289,6 +333,38 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
             })
         }
 
+        binding.chipTabPositioning.preventDoubleInput()
+        binding.chipTabColor.preventDoubleInput()
+        binding.settingsTabGroup.setOnCheckedStateChangeListener { _, checkedIds ->
+            if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
+            val isColorTab = checkedIds[0] == binding.chipTabColor.id
+            binding.cardPositioning.visibility = if (isColorTab) View.GONE else View.VISIBLE
+            binding.cardColor.visibility = if (isColorTab) View.VISIBLE else View.GONE
+            binding.settingsScrollView.scrollTo(0, 0)
+        }
+
+        binding.scalingModeFit.preventDoubleInput()
+        binding.scalingModeFill.preventDoubleInput()
+        binding.scalingModeStretch.preventDoubleInput()
+
+        binding.scalingModeIcon.setSafeOnClickListener(debounceMs = 300L) {
+            if (binding.scalingModeGroup.checkedChipId != binding.scalingModeFill.id) {
+                isUpdatingUi = true
+                try {
+                    binding.scalingModeGroup.check(binding.scalingModeFill.id)
+                    binding.scalingModeLabel.markIfModified(
+                        binding.scalingModeIcon,
+                        defaults.scalingMode,
+                        defaults.scalingMode
+                    )
+                } finally {
+                    isUpdatingUi = false
+                }
+                updateSettings { it.copy(scalingMode = defaults.scalingMode) }
+                applyPreviewTransform()
+            }
+        }
+
         binding.scalingModeGroup.setOnCheckedStateChangeListener { _, checkedIds ->
             if (checkedIds.isEmpty() || isUpdatingUi) return@setOnCheckedStateChangeListener
             val newMode = when (checkedIds[0]) {
@@ -301,6 +377,7 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
             applyPreviewTransform()
         }
 
+        binding.chipFlipHorizontal.preventDoubleInput()
         binding.chipFlipHorizontal.setOnCheckedChangeListener { _, isChecked ->
             if (isUpdatingUi) return@setOnCheckedChangeListener
             updateSettings { it.copy(flipHorizontal = isChecked) }
@@ -312,6 +389,7 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
             applyPreviewTransform()
         }
 
+        binding.chipFlipVertical.preventDoubleInput()
         binding.chipFlipVertical.setOnCheckedChangeListener { _, isChecked ->
             if (isUpdatingUi) return@setOnCheckedChangeListener
             updateSettings { it.copy(flipVertical = isChecked) }
@@ -321,6 +399,21 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
                 false
             )
             applyPreviewTransform()
+        }
+
+        binding.mirrorIcon.setSafeOnClickListener(debounceMs = 300L) {
+            if (binding.chipFlipHorizontal.isChecked || binding.chipFlipVertical.isChecked) {
+                isUpdatingUi = true
+                try {
+                    binding.chipFlipHorizontal.isChecked = false
+                    binding.chipFlipVertical.isChecked = false
+                    binding.mirrorLabel.markIfModified(binding.mirrorIcon, current = false, default = false)
+                } finally {
+                    isUpdatingUi = false
+                }
+                updateSettings { it.copy(flipHorizontal = false, flipVertical = false) }
+                applyPreviewTransform()
+            }
         }
 
         setupSafeSlider(
@@ -364,20 +457,24 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
         ) { value -> updateSettings { it.copy(brightness = value) } }
 
         setupSafeSlider(
-            binding.speedSlider,
-            binding.speedLabel,
-            binding.speedIcon,
-            defaults.speed
-        ) { value -> updateSettings { it.copy(speed = value) } }
+            binding.contrastSlider,
+            binding.contrastLabel,
+            binding.contrastIcon,
+            defaults.contrast,
+            onLiveChange = { applyPreviewTransform() }
+        ) { value -> updateSettings { it.copy(contrast = value) } }
 
         setupSafeSlider(
-            binding.volumeSlider,
-            binding.volumeLabel,
-            binding.volumeIcon,
-            defaults.volume
-        ) { value -> updateSettings { it.copy(volume = value) } }
+            binding.saturationSlider,
+            binding.saturationLabel,
+            binding.saturationIcon,
+            defaults.saturation,
+            onLiveChange = { applyPreviewTransform() }
+        ) { value -> updateSettings { it.copy(saturation = value) } }
 
-        binding.buttonResetAdvanced.setOnClickListener {
+        binding.buttonResetAdvanced.setSafeOnClickListener(debounceMs = 250L) {
+            val defaults = VideoSettings(fileName)
+            syncUiStateWith(defaults)
             updateSettings { currentSettings ->
                 VideoSettings(
                     fileName = fileName,
@@ -387,7 +484,6 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
                     displayName = currentSettings.displayName
                 )
             }
-            syncUiState()
         }
     }
 
@@ -421,70 +517,36 @@ class VideoSettingsSheet : BottomSheetDialogFragment() {
         this.value = finalValue
     }
 
-    private fun TextView.markIfModified(icon: ImageView, current: Float, default: Float) {
-        if (current != default) {
-            val typedValue = TypedValue()
-            context.theme.resolveAttribute(androidx.appcompat.R.attr.colorPrimary, typedValue, true)
-            val primaryColor = ContextCompat.getColor(context, typedValue.resourceId)
-            this.setTextColor(primaryColor)
-            this.setTypeface(null, android.graphics.Typeface.BOLD)
+    private fun TextView.applyModifiedState(icon: ImageView, isModified: Boolean) {
+        val targetColor = if (isModified) primaryColor else secondaryColor
+        val targetAlpha = if (isModified) 1.0f else 0.5f
 
-            icon.setColorFilter(primaryColor)
-            icon.alpha = 1.0f
-        } else {
-            val typedValue = TypedValue()
-            context.theme.resolveAttribute(android.R.attr.textColorSecondary, typedValue, true)
-            val secondaryColor = ContextCompat.getColor(context, typedValue.resourceId)
-            this.setTextColor(secondaryColor)
-            this.setTypeface(null, android.graphics.Typeface.NORMAL)
-
-            icon.setColorFilter(secondaryColor)
-            icon.alpha = 0.5f
+        if (icon.isClickable != isModified) {
+            icon.isClickable = isModified
+            icon.setColorFilter(targetColor)
+            icon.alpha = targetAlpha
         }
+
+        if (currentTextColor != targetColor) {
+            setTextColor(targetColor)
+        }
+
+        val isBold = typeface?.isBold == true
+        if (isBold != isModified) {
+            setTypeface(null, if (isModified) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
+        }
+    }
+
+    private fun TextView.markIfModified(icon: ImageView, current: Float, default: Float) {
+        applyModifiedState(icon, abs(current - default) > 0.001f)
     }
 
     private fun TextView.markIfModified(icon: ImageView, current: Boolean, default: Boolean) {
-        if (current != default) {
-            val typedValue = TypedValue()
-            context.theme.resolveAttribute(androidx.appcompat.R.attr.colorPrimary, typedValue, true)
-            val primaryColor = ContextCompat.getColor(context, typedValue.resourceId)
-            this.setTextColor(primaryColor)
-            this.setTypeface(null, android.graphics.Typeface.BOLD)
-
-            icon.setColorFilter(primaryColor)
-            icon.alpha = 1.0f
-        } else {
-            val typedValue = TypedValue()
-            context.theme.resolveAttribute(android.R.attr.textColorSecondary, typedValue, true)
-            val secondaryColor = ContextCompat.getColor(context, typedValue.resourceId)
-            this.setTextColor(secondaryColor)
-            this.setTypeface(null, android.graphics.Typeface.NORMAL)
-
-            icon.setColorFilter(secondaryColor)
-            icon.alpha = 0.5f
-        }
+        applyModifiedState(icon, current != default)
     }
 
     private fun TextView.markIfModified(icon: ImageView, current: ScalingMode, default: ScalingMode) {
-        if (current != default) {
-            val typedValue = TypedValue()
-            context.theme.resolveAttribute(androidx.appcompat.R.attr.colorPrimary, typedValue, true)
-            val primaryColor = ContextCompat.getColor(context, typedValue.resourceId)
-            this.setTextColor(primaryColor)
-            this.setTypeface(null, android.graphics.Typeface.BOLD)
-
-            icon.setColorFilter(primaryColor)
-            icon.alpha = 1.0f
-        } else {
-            val typedValue = TypedValue()
-            context.theme.resolveAttribute(android.R.attr.textColorSecondary, typedValue, true)
-            val secondaryColor = ContextCompat.getColor(context, typedValue.resourceId)
-            this.setTextColor(secondaryColor)
-            this.setTypeface(null, android.graphics.Typeface.NORMAL)
-
-            icon.setColorFilter(secondaryColor)
-            icon.alpha = 0.5f
-        }
+        applyModifiedState(icon, current != default)
     }
 
     override fun onDestroyView() {

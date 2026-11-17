@@ -4,6 +4,7 @@ import org.maocide.undeadwallpaper.model.PlaybackMode
 import org.maocide.undeadwallpaper.model.ScalingMode
 import org.maocide.undeadwallpaper.model.StartTime
 import org.maocide.undeadwallpaper.model.StatusBarColor
+import org.maocide.undeadwallpaper.model.KineticEffectType
 
 import android.content.Context
 import android.content.SharedPreferences
@@ -13,8 +14,6 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import android.net.Uri
-import org.maocide.undeadwallpaper.model.GestureType
-import org.maocide.undeadwallpaper.model.WallpaperAction
 import org.maocide.undeadwallpaper.utils.FileLogger
 import java.io.File
 
@@ -40,7 +39,7 @@ class PreferencesManager(private val context: Context, prefsName: String = PREFS
         private const val TAG = "PreferencesManager"
         private const val PREFS_NAME = "DEFAULT"
         private const val KEY_VIDEO_URI = "video_uri"
-        private const val KEY_VIDEO_AUDIO_ENABLED = "video_audio_enabled"
+        private const val KEY_ANCHOR_VIDEO_URI = "anchor_video_uri"
         private const val KEY_LOGGING_ENABLED = "logging_enabled"
         private const val KEY_PLAYBACK_MODE = "playback_mode"
         private const val KEY_SCALING_MODE = "scaling_mode"
@@ -53,18 +52,18 @@ class PreferencesManager(private val context: Context, prefsName: String = PREFS
         private const val KEY_STATUSBAR_COLOR = "statusbar_color"
 
         private const val KEY_START_TIME = "start_time"
-        private const val KEY_SPEED = "video_speed"
 
         private const val KEY_RECENT_FILES_LIST = "recent_files_list"
         private const val KEY_PLAYLIST_SETTINGS = "playlist_settings"
         private const val KEY_ACTIVE_PAGE = "active_page"
 
-        private const val KEY_ACTION_DOUBLE_TAP = "action_double_tap"
-        private const val KEY_ACTION_TRIPLE_TAP = "action_triple_tap"
-
         private const val KEY_PARALLAX_ENABLED = "parallax_enabled"
         private const val KEY_PARALLAX_STRENGTH = "parallax_strength"
         private const val KEY_FLOATING_PREVIEW_ENABLED = "floating_preview_enabled"
+
+        private const val KEY_KINETIC_EFFECT_TYPE = "kinetic_effect_type"
+        private const val KEY_KINETIC_INTENSITY = "kinetic_intensity"
+        private const val KEY_KINETIC_HAPTICS_ENABLED = "kinetic_haptics_enabled"
 
         const val KEY_TOMBSTONE_LEAN_ANGLE = "tombstone_lean_angle"
         const val KEY_TOMBSTONE_IS_BROKEN = "tombstone_is_broken"
@@ -136,6 +135,7 @@ class PreferencesManager(private val context: Context, prefsName: String = PREFS
         sharedPrefs.edit(commit = true) {
             remove(KEY_PLAYLIST_SETTINGS)
             remove(KEY_VIDEO_URI)
+            remove(KEY_ANCHOR_VIDEO_URI)
             remove(KEY_ACTIVE_PAGE)
             remove(ConfigChecksumHelper.KEY_CONFIG_CRC)
         }
@@ -177,9 +177,6 @@ class PreferencesManager(private val context: Context, prefsName: String = PREFS
         val zoom = sharedPrefs.getFloat(KEY_ZOOM, 1.0f)
         val rotation = sharedPrefs.getFloat(KEY_ROTATION, 0.0f)
         val brightness = sharedPrefs.getFloat(KEY_BRIGHTNESS, 1.0f)
-        val speed = sharedPrefs.getFloat(KEY_SPEED, 1.0f)
-        val audioEnabled = sharedPrefs.getBoolean(KEY_VIDEO_AUDIO_ENABLED, false)
-        val volume = if (audioEnabled) 1.0f else 0.0f
 
         val newPlaylistSettings = mutableListOf<VideoSettings>()
         val activeFileName = legacyUri?.let { Uri.parse(it).lastPathSegment }
@@ -198,9 +195,7 @@ class PreferencesManager(private val context: Context, prefsName: String = PREFS
                                 positionY = positionY,
                                 zoom = zoom,
                                 rotation = rotation,
-                                brightness = brightness,
-                                speed = speed,
-                                volume = volume
+                                brightness = brightness
                             )
                         )
                         activeFileAdded = true
@@ -222,9 +217,7 @@ class PreferencesManager(private val context: Context, prefsName: String = PREFS
                     positionY = positionY,
                     zoom = zoom,
                     rotation = rotation,
-                    brightness = brightness,
-                    speed = speed,
-                    volume = volume
+                    brightness = brightness
                 )
             )
         }
@@ -242,8 +235,8 @@ class PreferencesManager(private val context: Context, prefsName: String = PREFS
             remove(KEY_ZOOM)
             remove(KEY_ROTATION)
             remove(KEY_BRIGHTNESS)
-            remove(KEY_SPEED)
-            remove(KEY_VIDEO_AUDIO_ENABLED)
+            remove("video_speed")
+            remove("video_audio_enabled")
         }
     }
 
@@ -354,6 +347,34 @@ class PreferencesManager(private val context: Context, prefsName: String = PREFS
         return activeUri?.takeIf { it.isNotBlank() && it != "null" }
     }
 
+    /**
+     * Saves the anchor video URI to SharedPreferences.
+     * This represents the user-selected video anchor for Material You dynamic theming.
+     * Unlike [saveActiveVideoUri], this is NOT modified by automatic playlist advancement.
+     */
+    fun saveAnchorVideoUri(uri: String) {
+        if (uri.isBlank() || uri == "null") {
+            FileLogger.w(TAG, "Attempted to save invalid anchor URI string: '$uri', ignoring.")
+            return
+        }
+        sharedPrefs.edit {
+            putString(KEY_ANCHOR_VIDEO_URI, uri)
+        }
+    }
+
+    /**
+     * Retrieves the anchor video URI from SharedPreferences.
+     * If uninitialized or blank, seamlessly falls back to [getActiveVideoUri].
+     */
+    fun getAnchorVideoUri(): String? {
+        val anchorUri = sharedPrefs.getString(KEY_ANCHOR_VIDEO_URI, null)
+        return if (!anchorUri.isNullOrBlank() && anchorUri != "null") {
+            anchorUri
+        } else {
+            getActiveVideoUri()
+        }
+    }
+
 
     /**
      * Gets the current playback mode from SharedPreferences.
@@ -408,28 +429,6 @@ class PreferencesManager(private val context: Context, prefsName: String = PREFS
         return sharedPrefs.getBoolean(KEY_LOGGING_ENABLED, false)
     }
 
-    /**
-     * Gets the action bound to a specific gesture.
-     * Default for ALL gestures is NONE.
-     */
-    fun getActionForGesture(gesture: GestureType): WallpaperAction {
-        val key = when (gesture) {
-            GestureType.DOUBLE_TAP -> KEY_ACTION_DOUBLE_TAP
-            GestureType.TRIPLE_TAP -> KEY_ACTION_TRIPLE_TAP
-        }
-
-        val storedOrdinal = sharedPrefs.getInt(key, WallpaperAction.NONE.ordinal)
-        return WallpaperAction.entries.getOrElse(storedOrdinal) { WallpaperAction.NONE }
-    }
-
-    fun setActionForGesture(gesture: GestureType, action: WallpaperAction) {
-        val key = when (gesture) {
-            GestureType.DOUBLE_TAP -> KEY_ACTION_DOUBLE_TAP
-            GestureType.TRIPLE_TAP -> KEY_ACTION_TRIPLE_TAP
-        }
-        sharedPrefs.edit { putInt(key, action.ordinal) }
-    }
-
     fun setParallaxEnabled(enabled: Boolean) {
         sharedPrefs.edit { putBoolean(KEY_PARALLAX_ENABLED, enabled) }
     }
@@ -452,6 +451,31 @@ class PreferencesManager(private val context: Context, prefsName: String = PREFS
 
     fun isFloatingPreviewEnabled(): Boolean {
         return sharedPrefs.getBoolean(KEY_FLOATING_PREVIEW_ENABLED, true)
+    }
+
+    fun setKineticEffectType(type: KineticEffectType) {
+        sharedPrefs.edit { putString(KEY_KINETIC_EFFECT_TYPE, type.id) }
+    }
+
+    fun getKineticEffectType(): KineticEffectType {
+        val raw = sharedPrefs.getString(KEY_KINETIC_EFFECT_TYPE, KineticEffectType.NONE.id)
+        return KineticEffectType.fromId(raw)
+    }
+
+    fun setKineticIntensity(intensity: Float) {
+        sharedPrefs.edit { putFloat(KEY_KINETIC_INTENSITY, intensity.coerceIn(0.5f, 2.0f)) }
+    }
+
+    fun getKineticIntensity(): Float {
+        return sharedPrefs.getFloat(KEY_KINETIC_INTENSITY, 1.0f).coerceIn(0.5f, 2.0f)
+    }
+
+    fun setKineticHapticsEnabled(enabled: Boolean) {
+        sharedPrefs.edit { putBoolean(KEY_KINETIC_HAPTICS_ENABLED, enabled) }
+    }
+
+    fun isKineticHapticsEnabled(): Boolean {
+        return sharedPrefs.getBoolean(KEY_KINETIC_HAPTICS_ENABLED, false)
     }
 
     fun setUndead(isUndead: Boolean) {
@@ -501,5 +525,11 @@ class PreferencesManager(private val context: Context, prefsName: String = PREFS
     fun getRawScreenLongSide(): Int = sharedPrefs.getInt(KEY_RAW_SCREEN_LONG_SIDE, 0)
 
     fun getRawScreenShortSide(): Int = sharedPrefs.getInt(KEY_RAW_SCREEN_SHORT_SIDE, 0)
+
+    fun getAccordionSeenEpoch(key: String): Int = sharedPrefs.getInt(key, 0)
+
+    fun setAccordionSeenEpoch(key: String, epoch: Int) {
+        sharedPrefs.edit { putInt(key, epoch) }
+    }
 }
 

@@ -25,7 +25,6 @@ import android.os.Handler
 import android.os.Looper
 import android.os.UserManager
 import android.service.wallpaper.WallpaperService
-import android.util.Log
 import android.view.Display
 import android.view.MotionEvent
 
@@ -34,7 +33,6 @@ import android.view.SurfaceHolder
 import androidx.core.content.ContextCompat
 import android.widget.Toast
 import androidx.annotation.OptIn
-import androidx.annotation.RequiresApi
 import androidx.core.net.toUri
 import androidx.media3.common.C
 import androidx.media3.common.C.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
@@ -45,28 +43,24 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.RawResourceDataSource
 import org.maocide.undeadwallpaper.R
-import androidx.media3.exoplayer.DefaultLoadControl
-import androidx.media3.exoplayer.DefaultRenderersFactory
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.SeekParameters
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
-import androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder
-import androidx.media3.exoplayer.upstream.DefaultAllocator
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.maocide.undeadwallpaper.event.WallpaperEvent
 import org.maocide.undeadwallpaper.event.WallpaperEventBus
 import org.maocide.undeadwallpaper.input.WallpaperGestureManager
-import org.maocide.undeadwallpaper.model.GestureType
 import org.maocide.undeadwallpaper.model.VideoSettings
-import org.maocide.undeadwallpaper.model.WallpaperAction
+import org.maocide.undeadwallpaper.kinetic.KineticDeltas
+import org.maocide.undeadwallpaper.kinetic.KineticTransformPipeline
+import org.maocide.undeadwallpaper.model.KineticEffectType
 
 
 import kotlin.math.log
@@ -128,16 +122,18 @@ class UndeadWallpaperService : WallpaperService() {
                 // Type A: Media/container corruption with healthy VPU.
                 // Reset renderer transforms so CRT static loop fills the screen cleanly.
                 renderer?.setThanatosisZeroDecoder(false)
-                renderer?.setScalingMode(ScalingMode.FILL)
-                renderer?.setTransforms(
-                    x = 0f,
-                    y = 0f,
+                renderer?.publishTransforms(
+                    scalingMode = ScalingMode.FILL,
+                    translateX = 0f,
+                    translateY = 0f,
                     zoom = 1.0f,
                     rotation = 0f,
+                    brightness = 0f,
+                    contrast = 1.0f,
+                    saturation = 1.0f,
                     flipHorizontal = false,
                     flipVertical = false
                 )
-                renderer?.setBrightness(0f)
 
                 // Loop raw thanatosis_static.mp4 directly via ExoPlayer without disk allocation.
                 val thanatosisUri = RawResourceDataSource.buildRawResourceUri(R.raw.thanatosis_static)
@@ -172,8 +168,6 @@ class UndeadWallpaperService : WallpaperService() {
 
         private var currentPlaybackMode = PlaybackMode.LOOP
 
-        private var speed: Float = 1f
-
         private var loadedVideoUriString = ""
         private var hasPlaybackCompleted = false
 
@@ -192,12 +186,31 @@ class UndeadWallpaperService : WallpaperService() {
         private var isCurrentlyListeningForTouch = true // Engine onCreate defaults to true
         private val parallaX: Float = 0.5f - (Random.nextFloat() * 0.30f - 0.15f)
 
+        private var surfaceWidth = 0
+        private var surfaceHeight = 0
+        private val currentKineticDeltas = KineticDeltas()
+
+        private val kineticPipeline = KineticTransformPipeline(
+            onDeltasUpdated = { deltas ->
+                currentKineticDeltas.copyFrom(deltas)
+                if (renderer?.isTransitioning() != true) {
+                    refreshRenderer()
+                }
+            },
+            requestRender = {
+                renderer?.requestRender()
+            }
+        )
+
         // Initialize gesture manager
         private val gestureManager = WallpaperGestureManager(
             context = baseContext,
-            prefs = prefs,
-            onActionTriggered = { action ->
-                executeGestureAction(action)
+            isDisplayActive = { isDefaultDisplay() && activeLumaScale > 0.0f },
+            onKineticTouch = { x, y ->
+                val triggered = kineticPipeline.onTouch(x, y, surfaceWidth, surfaceHeight)
+                if (triggered && prefs.isKineticHapticsEnabled()) {
+                    HapticHelper.performKineticImpactFeedback(applicationContext, kineticPipeline.effectType)
+                }
             }
         )
 
@@ -211,14 +224,6 @@ class UndeadWallpaperService : WallpaperService() {
             if (seekPlayerToStart) {
                 wallpaperPlayer.seekToDefaultPositionAsync()
             }
-        }
-
-        /**
-         * Applies VideoSettings that don't require a GL Renderer Update. Volume, speed...
-         * @param settings VideoSettings object from which to apply non-visual settings
-         */
-        private fun applyNonVisualSettings(settings: VideoSettings) {
-            wallpaperPlayer.applyNonVisualSettingsAsync(settings.getPerceivedVolume(), settings.speed)
         }
 
         /**
@@ -236,94 +241,17 @@ class UndeadWallpaperService : WallpaperService() {
         }
 
         private fun updateTouchListeningState() {
-            val doubleTapAction = prefs.getActionForGesture(GestureType.DOUBLE_TAP)
-            val tripleTapAction = prefs.getActionForGesture(GestureType.TRIPLE_TAP)
-
-            // EDGE CASE: If the video is manually paused, but the user just removed
-            // the PLAY_PAUSE action from all gestures, we must unpause it so they don't get stuck
-            val canPause =
-                doubleTapAction == WallpaperAction.PLAY_PAUSE || tripleTapAction == WallpaperAction.PLAY_PAUSE
-
-            val currentState = fsm.state as? EngineState.Ready
-            if (currentState?.isManuallyPaused == true && !canPause) {
-                processEvent(EngineEvent.UserTogglePause)
-                FileLogger.i(TAG, "Play/Pause action unbound. Clearing manual pause state.")
-            }
-
-            val wantsTouchEvents = (doubleTapAction != WallpaperAction.NONE || tripleTapAction != WallpaperAction.NONE)
+            val wantsTouchEvents = kineticPipeline.isEnabled
 
             // ONLY tell the OS to change the touch state if it's different from the current state.
             if (isCurrentlyListeningForTouch != wantsTouchEvents) {
                 // BUGFIX: We MUST update our local state flag BEFORE calling setTouchEventsEnabled.
                 // On some Android devices, setTouchEventsEnabled triggers a synchronous updateSurface()
                 // which instantly fires onVisibilityChanged -> initializePlayer -> updateTouchListeningState.
-                // If we don't update the flag first, we enter an infinite recursion loop .
+                // If we don't update the flag first, we enter an infinite recursion loop.
                 isCurrentlyListeningForTouch = wantsTouchEvents
                 setTouchEventsEnabled(wantsTouchEvents)
                 FileLogger.i(TAG, "Touch events enabled changed to: $wantsTouchEvents")
-            }
-        }
-
-        private var lastActionExecutionTimeMs = 0L
-        private val ACTION_DEBOUNCE_MS = 700L
-
-        private fun executeGestureAction(action: WallpaperAction) {
-            if (action == WallpaperAction.NONE) return
-
-            val now = android.os.SystemClock.uptimeMillis()
-            if (now - lastActionExecutionTimeMs < ACTION_DEBOUNCE_MS) {
-                FileLogger.d(TAG, "Action debounce active. Ignoring gesture.")
-                return
-            }
-            lastActionExecutionTimeMs = now
-
-            when (action) {
-                WallpaperAction.NONE -> return // Already handled above, but needed for exhaustiveness
-                WallpaperAction.SKIP_NEXT -> {
-                    if (fsm.state !is EngineState.Ready) return
-
-                    serviceScope.launch {
-                        val playlistUris = playlistManager.getPlaylistUris()
-                        if (playlistUris.size <= 1) {
-                            FileLogger.d(
-                                TAG,
-                                "Gesture SKIP_NEXT ignored: active page only has ${playlistUris.size} video(s)."
-                            )
-                            return@launch
-                        }
-
-                        // Provide Haptic Feedback for successful gesture
-                        HapticHelper.performGestureFeedback(this@UndeadWallpaperService)
-
-                        // UX Rule: If they skip, they want to see the new video. Unpause it.
-                        val currentState = fsm.state as? EngineState.Ready
-                        if (currentState?.isManuallyPaused == true) {
-                            processEvent(EngineEvent.UserTogglePause)
-                        }
-                        skipNextVideo(isManualSkip = true)
-                    }
-                }
-
-                WallpaperAction.PLAY_PAUSE -> {
-                    if (fsm.state !is EngineState.Ready) return
-
-                    // Provide Haptic Feedback for successful gesture
-                    HapticHelper.performGestureFeedback(this@UndeadWallpaperService)
-
-                    // ONE_SHOT CASE: If they "Play" a finished video, restart it!
-                    if (currentPlaybackMode == PlaybackMode.ONE_SHOT && hasPlaybackCompleted) {
-                        FileLogger.i(TAG, "User triggered Play on a finished ONE_SHOT video. Replaying.")
-                        resetPlaybackTimeline(seekPlayerToStart = true)
-
-                        val currentState = fsm.state as EngineState.Ready
-                        if (currentState.isManuallyPaused) {
-                            processEvent(EngineEvent.UserTogglePause)
-                        }
-                    } else {
-                        // Normal toggle behavior
-                        processEvent(EngineEvent.UserTogglePause)
-                    }
-                }
             }
         }
 
@@ -392,32 +320,20 @@ class UndeadWallpaperService : WallpaperService() {
                     when (event) {
                         is WallpaperEvent.VideoUriChanged -> {
                             FileLogger.i(TAG, "Event received: Video uri changed, full re-initialization requested.")
-                            val currentState = fsm.state as? EngineState.Ready
-                            if (currentState?.isManuallyPaused == true) {
-                                processEvent(EngineEvent.UserTogglePause)
-                            }
                             resetPlaybackTimeline()
                             processEvent(EngineEvent.InitializeRequested) // force Reinit
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                notifyColorsChanged()
-                            }
+                            notifyColorsChanged()
                         }
 
                         is WallpaperEvent.PlaybackModeChanged -> {
                             FileLogger.i(TAG, "Event received: Playback mode change, full re-initialization requested.")
-                            val currentState = fsm.state as? EngineState.Ready
-                            if (currentState?.isManuallyPaused == true) {
-                                processEvent(EngineEvent.UserTogglePause)
-                            }
                             resetPlaybackTimeline()
                             processEvent(EngineEvent.InitializeRequested) // force Reinit
                         }
 
                         is WallpaperEvent.StatusBarColorChanged -> {
                             FileLogger.i(TAG, "Event received: Color changed -> Update just sys colors.")
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                notifyColorsChanged()
-                            }
+                            notifyColorsChanged()
                         }
 
                         is WallpaperEvent.PlaylistReordered -> {
@@ -433,25 +349,21 @@ class UndeadWallpaperService : WallpaperService() {
                                 "Event received: Video settings changed for ${event.fileName}"
                             )
                             if (currentPlaybackMode == PlaybackMode.LOOP_ALL || currentPlaybackMode == PlaybackMode.SHUFFLE) {
-                                val currentState = fsm.state as? EngineState.Ready
-                                if (currentState?.isManuallyPaused == true) {
-                                    processEvent(EngineEvent.UserTogglePause)
-                                }
                                 resetPlaybackTimeline()
                                 processEvent(EngineEvent.InitializeRequested) // force Reinit
                             } else {
                                 val activeFileName = loadedVideoUriString.toUri().lastPathSegment
                                 if (activeFileName == event.fileName) {
-                                    val activeSettings = prefs.getVideoSettings(event.fileName)
                                     refreshRenderer()
-                                    applyNonVisualSettings(activeSettings)
                                     renderer?.requestRender()
                                 }
                             }
                         }
 
-                        is WallpaperEvent.TouchControlsChanged -> {
-                            FileLogger.i(TAG, "Event received: Touch controls changed.")
+                        is WallpaperEvent.KineticSettingsChanged -> {
+                            FileLogger.i(TAG, "Event received: Kinetic settings changed.")
+                            kineticPipeline.effectType = prefs.getKineticEffectType()
+                            kineticPipeline.intensity = prefs.getKineticIntensity()
                             updateTouchListeningState()
                         }
 
@@ -475,19 +387,15 @@ class UndeadWallpaperService : WallpaperService() {
                         "Broadcast received: User Unlocked. Initializing player safely and restoring colors."
                     )
                     processEvent(EngineEvent.InitializeRequested)
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        notifyColorsChanged()
-                    }
+                    notifyColorsChanged()
                 }
             }
         }
 
         /**
-         * Skips current video and moves to next using chunks to buffer video sharing settings
-         * @param isManualSkip when true, means that the user initiated the action and
-         * matrix changes are not applied on call, but applied later on first frame of the new video.
+         * Advances playlist to the next chunk of consecutive videos sharing visual settings.
          */
-        private fun skipNextVideo(isManualSkip: Boolean) {
+        private fun skipNextVideo() {
             if (fsm.state !is EngineState.Ready) return
 
             serviceScope.launch {
@@ -498,39 +406,25 @@ class UndeadWallpaperService : WallpaperService() {
                     return@launch
                 }
 
-                FileLogger.i(TAG, "Transitioning across boundary to: $nextUriString (Manual: $isManualSkip)")
+                FileLogger.i(TAG, "Transitioning across boundary to: $nextUriString")
 
-                // ONE_SHOT / LOOP Reset (These still need a hard re-init to reset their single-video state)
-                if (currentPlaybackMode == PlaybackMode.ONE_SHOT || currentPlaybackMode == PlaybackMode.LOOP) {
-                    loadedVideoUriString = nextUriString
-                    prefs.saveActiveVideoUri(nextUriString)
-
-                    FileLogger.i(TAG, "Single-video mode detected. Performing hard re-initialization for skip.")
-                    resetPlaybackTimeline()
-                    processEvent(EngineEvent.InitializeRequested)
-                    return@launch
-                }
+                // Lock out manual/parallax/kinetic render requests and stop active somatic animations
+                // BEFORE updating loadedVideoUriString so outgoing frames never latch incoming settings
+                renderer?.setIsTransitioning(true)
+                kineticPipeline.reset()
 
                 // Now update the state
                 updateActiveVideoState(nextUriString)
                 resetPlaybackTimeline()
 
-                // Lock out manual/parallax render requests during transition across boundary
-                renderer?.setIsTransitioning(true)
-
                 // ALWAYS Hot-swap via Chunking!
                 bindPlaylistToPlayer(keepCurrentPlayback = false)
 
                 // Stage the new video's matrix transforms BEFORE the first frame arrives
-                if (!isManualSkip) { // Skip if done by user
-                    refreshRenderer()
-                }
-
-                val activeSettings = getSettingsForUri(loadedVideoUriString)
-                applyNonVisualSettings(activeSettings)
+                refreshRenderer()
 
                 wallpaperPlayer.prepareAsync()
-                wallpaperPlayer.setPlayWhenReadyAsync(if (isManualSkip) isVisible else true)
+                wallpaperPlayer.setPlayWhenReadyAsync(true)
             }
         }
 
@@ -540,7 +434,7 @@ class UndeadWallpaperService : WallpaperService() {
             // If we actively decided we don't want touches, ignore any ghost touches
             // the Android OS accidentally forwards to us anyway.
             // Most likely needed too for VIVO and CHINESE phones.
-            if (!isCurrentlyListeningForTouch) return
+            if (!isCurrentlyListeningForTouch || event == null) return
 
             gestureManager.onTouchEvent(event)
         }
@@ -572,18 +466,7 @@ class UndeadWallpaperService : WallpaperService() {
             }
 
             currentScalingMode = activeSettings.scalingMode
-            renderer?.setScalingMode(currentScalingMode)
-            renderer?.setTransforms(
-                x = activeSettings.positionX,
-                y = activeSettings.positionY,
-                zoom = activeSettings.zoom,
-                rotation = activeSettings.rotation,
-                flipHorizontal = activeSettings.flipHorizontal,
-                flipVertical = activeSettings.flipVertical
-            )
-
-            val lumaOffset = -100.0f * (1.0f - effectiveLumaScale)
-            renderer?.setBrightness((activeSettings.brightness * effectiveLumaScale) + lumaOffset)
+            renderer?.publishTransforms(activeSettings, currentKineticDeltas, effectiveLumaScale)
         }
 
         // WallpaperPlayerListener implementations
@@ -679,8 +562,7 @@ class UndeadWallpaperService : WallpaperService() {
                         hasPlaybackCompleted = true
                         wallpaperPlayer.pauseAsync()
                     } else if (currentPlaybackMode == PlaybackMode.LOOP_ALL || currentPlaybackMode == PlaybackMode.SHUFFLE) {
-                        // Same flow as skip, inside the playback mode is handled
-                        skipNextVideo(isManualSkip = false)
+                        skipNextVideo()
                     }
                 }
 
@@ -702,9 +584,6 @@ class UndeadWallpaperService : WallpaperService() {
 
             // Sync GL renderer matrix and uniforms to the incoming chunk item without forcing a draw
             refreshRenderer()
-
-            val activeSettings = getSettingsForUri(loadedVideoUriString)
-            applyNonVisualSettings(activeSettings)
         }
 
         override fun onRenderedFirstFrame() {
@@ -754,16 +633,22 @@ class UndeadWallpaperService : WallpaperService() {
             // Cancel any startup issued, avoid race conditions
             playerSetupJob?.cancel()
 
-            if (wallpaperPlayer.getPlayerInstance() != null) {
+            val hasExistingFrame = wallpaperPlayer.getPlayerInstance() != null
+            if (hasExistingFrame) {
                 releasePlayer()
+                renderer?.setIsTransitioning(true)
             }
 
             // Allow the OS to send MotionEvents to this engine
+            kineticPipeline.reset()
+            kineticPipeline.effectType = prefs.getKineticEffectType()
+            kineticPipeline.intensity = prefs.getKineticIntensity()
             updateTouchListeningState()
 
             // Get a surface
             val holder = surfaceHolder
             if (holder == null) {
+                renderer?.setIsTransitioning(false)
                 FileLogger.w(TAG, "Cannot initialize player: surface is not ready.")
                 return
             }
@@ -779,14 +664,13 @@ class UndeadWallpaperService : WallpaperService() {
             loadedVideoUriString = mediaUri?.toString() ?: ""
 
             if (mediaUri == null) {
+                renderer?.setIsTransitioning(false)
                 FileLogger.e(TAG, "Media URI is null, cannot play video.")
                 return
             }
 
             val fileName = mediaUri.lastPathSegment ?: ""
             val activeSettings = prefs.getVideoSettings(fileName)
-            val initialVolume = activeSettings.getPerceivedVolume()
-            speed = activeSettings.speed
 
             FileLogger.i(TAG, "Initializing ExoPlayer...")
             val isPreview = this.isPreview
@@ -809,8 +693,11 @@ class UndeadWallpaperService : WallpaperService() {
                     playlist = playlistSettings
                 )
 
-                wallpaperPlayer.initializeAsync(null, initialVolume, speed, currentPlaybackMode, bufferConfig).join()
-                if (wallpaperPlayer.getPlayerInstance() == null) return@launch
+                wallpaperPlayer.initializeAsync(null, currentPlaybackMode, bufferConfig).join()
+                if (wallpaperPlayer.getPlayerInstance() == null) {
+                    renderer?.setIsTransitioning(false)
+                    return@launch
+                }
 
                 // Call the helper to load playlist
                 bindPlaylistToPlayer(keepCurrentPlayback = false)
@@ -832,6 +719,9 @@ class UndeadWallpaperService : WallpaperService() {
                         }
 
                     } catch (e: Exception) {
+                        if (e is CancellationException) {
+                            ensureActive()
+                        }
                         FileLogger.e(TAG, "GL Renderer failed to provide surface, falling back to default surface", e)
                         useFallbackSurface = true
                         releaseRenderer()
@@ -843,11 +733,15 @@ class UndeadWallpaperService : WallpaperService() {
                 }
 
                 // If this job was cancelled, video switch or anything, STOP.
-                if (!isActive) return@launch
+                if (!isActive) {
+                    renderer?.setIsTransitioning(false)
+                    return@launch
+                }
 
                 // Check if player is alive, surface is valid, surface is ready.
                 if (fsm.state !is EngineState.Initializing || surfaceHolder == null || surfaceHolder?.surface == null || !surfaceHolder?.surface?.isValid!!) {
                     FileLogger.w(TAG, "Engine destroyed or surface invalid before player setup completed. Aborting.")
+                    renderer?.setIsTransitioning(false)
                     return@launch
                 }
 
@@ -865,11 +759,14 @@ class UndeadWallpaperService : WallpaperService() {
                         processEvent(EngineEvent.VisibilityChanged(isVisible))
 
                     } else {
+                        renderer?.setIsTransitioning(false)
                         FileLogger.e(
                             TAG,
                             "Surface became invalid before player setup finished. Aborting setVideoSurface."
                         )
                     }
+                } else {
+                    renderer?.setIsTransitioning(false)
                 }
             }
         }
@@ -980,9 +877,7 @@ class UndeadWallpaperService : WallpaperService() {
                 FileLogger.i(TAG, "Using fallback surface, skipping GL Renderer creation")
             }
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                notifyColorsChanged()
-            }
+            notifyColorsChanged()
 
             processEvent(EngineEvent.InitializeRequested)
         }
@@ -991,6 +886,8 @@ class UndeadWallpaperService : WallpaperService() {
             super.onSurfaceChanged(holder, format, width, height)
             FileLogger.i(TAG, "onSurfaceChanged: New dimensions ${width}x${height}")
 
+            surfaceWidth = width
+            surfaceHeight = height
             prefs.saveRawScreenDimensions(width, height)
 
             this.surfaceHolder = holder
@@ -1024,6 +921,7 @@ class UndeadWallpaperService : WallpaperService() {
         override fun onDestroy() {
             super.onDestroy()
             FileLogger.i(TAG, "Engine onDestroy")
+            kineticPipeline.reset()
             playbackWatchdog.stop() // Kill the playback watchdog
             processEvent(EngineEvent.ReleaseRequested)
 
@@ -1058,6 +956,7 @@ class UndeadWallpaperService : WallpaperService() {
 
             if (visible) {
                 renderer?.setIsPreview(this.isPreview)
+                notifyColorsChanged()
                 val currentUriOnDisk = getMediaUri().toString()
                 val isSurfaceDead = surfaceHolder?.surface?.isValid != true
                 var wasJustInitialized = false
@@ -1144,6 +1043,7 @@ class UndeadWallpaperService : WallpaperService() {
             } else {
                 playbackWatchdog.stop()
                 gestureManager.destroy()
+                kineticPipeline.reset()
                 if (isPreview) {
                     FileLogger.i(TAG, "Preview hidden. Releasing player to save decoders.")
                     processEvent(EngineEvent.ReleaseRequested)
@@ -1186,11 +1086,22 @@ class UndeadWallpaperService : WallpaperService() {
 
 
         private fun getCachedColorsForActiveVideo(): WallpaperColors? {
-            val activeUriString = prefs.getActiveVideoUri() ?: return null
-            val activeUri = activeUriString.toUri()
-            val fileName = activeUri.lastPathSegment ?: return null
+            val anchorUriString = prefs.getAnchorVideoUri()
+            val activeUriString = prefs.getActiveVideoUri()
 
-            val settings = prefs.getVideoSettings(fileName)
+            val primarySettings = anchorUriString?.let { uriStr ->
+                uriStr.toUri().lastPathSegment?.let { prefs.getVideoSettings(it) }
+            }
+            val fallbackSettings = activeUriString?.let { uriStr ->
+                uriStr.toUri().lastPathSegment?.let { prefs.getVideoSettings(it) }
+            }
+
+            val settings = if (primarySettings?.primaryColor != null) {
+                primarySettings
+            } else {
+                fallbackSettings
+            } ?: return null
+
             val primaryColorInt = settings.primaryColor ?: return null
             val secondaryColorInt = settings.secondaryColor
             val tertiaryColorInt = settings.tertiaryColor
@@ -1200,13 +1111,12 @@ class UndeadWallpaperService : WallpaperService() {
             val secondaryColor = secondaryColorInt?.let { Color.valueOf(it) }
             val tertiaryColor = tertiaryColorInt?.let { Color.valueOf(it) }
 
-            FileLogger.i(javaClass.simpleName, "Cached colors: $primaryColor, $secondaryColor, $tertiaryColor")
+            FileLogger.i(
+                javaClass.simpleName,
+                "Cached colors (source=${settings.fileName}): $primaryColor, $secondaryColor, $tertiaryColor"
+            )
 
-            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                WallpaperColors(primaryColor, secondaryColor, tertiaryColor, colorHints)
-            } else {
-                WallpaperColors(primaryColor, secondaryColor, tertiaryColor)
-            }
+            return WallpaperColors(primaryColor, secondaryColor, tertiaryColor, colorHints)
         }
 
         override fun onComputeColors(): WallpaperColors? {
@@ -1229,20 +1139,15 @@ class UndeadWallpaperService : WallpaperService() {
             if (isSamsung) {
                 val baseColor = if (isLightText) Color.BLACK else Color.WHITE
                 val colorObj = Color.valueOf(baseColor)
-
-                return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    val hints = if (!isLightText) WallpaperColors.HINT_SUPPORTS_DARK_TEXT else 0
-                    // TRICK: Pass identical colors to prevent Samsung from mixing
-                    WallpaperColors(colorObj, colorObj, colorObj, hints)
-                } else {
-                    WallpaperColors(colorObj, colorObj, colorObj)
-                }
+                val hints = if (!isLightText) WallpaperColors.HINT_SUPPORTS_DARK_TEXT else 0
+                // TRICK: Pass identical colors to prevent Samsung from mixing
+                return WallpaperColors(colorObj, colorObj, colorObj, hints)
             }
 
             // STANDARD MODERN ANDROID (API 31+)
             // Keep the beautiful real colors for Material You, but forcibly inject or
             // remove the Dark Text hint based on the user's setting.
-            if (cachedColors != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (cachedColors != null) {
                 var hints = cachedColors.colorHints
                 hints = if (!isLightText) {
                     hints or WallpaperColors.HINT_SUPPORTS_DARK_TEXT // Force Black Icons
@@ -1258,20 +1163,15 @@ class UndeadWallpaperService : WallpaperService() {
                 )
             }
 
-            // Fallback for standard Android APIs 27-30 (which don't support explicit hints)
-            return cachedColors ?: super.onComputeColors()
+            return super.onComputeColors()
         }
 
         private fun isDefaultDisplay(): Boolean {
-            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                val displayId = displayContext?.display?.displayId ?: Display.DEFAULT_DISPLAY
-                if (BuildConfig.DEBUG && displayId != Display.DEFAULT_DISPLAY) {
-                    FileLogger.d(TAG, "isDefaultDisplay: detected displayId=$displayId (non-default)")
-                }
-                displayId == Display.DEFAULT_DISPLAY
-            } else {
-                true
+            val displayId = displayContext?.display?.displayId ?: Display.DEFAULT_DISPLAY
+            if (BuildConfig.DEBUG && displayId != Display.DEFAULT_DISPLAY) {
+                FileLogger.d(TAG, "isDefaultDisplay: detected displayId=$displayId (non-default)")
             }
+            return displayId == Display.DEFAULT_DISPLAY
         }
 
         @Deprecated("Deprecated in Java") // This is needed for older Android versions

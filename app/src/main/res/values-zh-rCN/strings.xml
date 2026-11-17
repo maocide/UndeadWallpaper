@@ -10,7 +10,6 @@
     <string name="previous">返回</string>
 
     <string name="pick_video">选择视频</string>
-    <string name="setting_audio_enabled">启用音频</string>
     <string name="playback_mode_setting">播放模式</string>
     <string name="recent_files">播放列表</string>
     <string name="playlist_instructions">长按以重新排序。向左或向右滑动以移除。</string>
@@ -29,7 +28,7 @@
     <string name="about_header_features">它的功能</string>
     <string name="about_feature_loops">• 丝滑循环：将您手机上的任何视频变成无缝、无卡顿的动态壁纸。</string>
     <string name="about_feature_freedom">• 完全自由：无广告，无应用内购买，无任何废话。永远免费。</string>
-    <string name="about_feature_control">• 一切尽在掌握：支持音频切换，并记录您最近使用的视频以便快速切换。</string>
+    <string name="about_feature_control">• 一切尽在掌握：记录您最近使用的视频，以便快速切换和无缝循环。</string>
     
     <string name="playback_mode_loop">单曲循环</string>
     <string name="playback_mode_oneshot">播放一次</string>
@@ -44,23 +43,16 @@
     <string name="vertical_position">垂直位置</string>
     <string name="zoom">缩放</string>
     <string name="brightness">亮度</string>
-    <string name="speed">速度</string>
+    <string name="contrast">对比度</string>
+    <string name="saturation">饱和度</string>
     <string name="reset">重置</string>
+    <string name="reset_all">全部重置</string>
     <string name="rotation">旋转</string>
-
-    <string name="gesture_controls_header">主屏幕手势</string>
-    <string name="double_tap_label">双击</string>
-    <string name="triple_tap_label">三击</string>
-    <string name="gesture_action_none">无</string>
-    <string name="gesture_action_pause_play">暂停/播放</string>
-    <string name="gesture_action_skip">跳过</string>
-    <string name="gesture_launcher_warning">注意：某些桌面应用可能会阻止壁纸手势。</string>
 
     <string name="error_permission_failed">无法获取所选文件的权限。</string>
     <string name="warning_4k_video">警告：4K视频可能会在某些设备上导致崩溃或卡顿。</string>
     <string name="error_copy_failed">复制视频文件失败。</string>
     <string name="error_cannot_play_video">无法播放此视频文件。</string>
-    <string name="warning_high_speed_stuttering">在播放高分辨率视频时，高速度可能会导致卡顿。</string>
     <string name="error_file_picker_not_available">系统中没有可用的文件选择器！</string>
     <string name="error_could_not_read_video_duration">无法读取视频时长。</string>
     <string name="warning_random_start_time_delay">随机由于跳转可能会导致延迟</string>
@@ -78,8 +70,8 @@
     <string name="importing_video">正在侵蚀新文件</string>
     <string name="preparing_assets">正在唤醒亡灵</string>
     <string name="positioning_header">定位</string>
+    <string name="color_header">色彩</string>
     <string name="general_header">常规</string>
-    <string name="volume_label">音量</string>
     <string name="global_settings_header">全局设置</string>
     <string name="debug_options_header">调试选项</string>
     <string name="debug_logging_description">启用本地文件记录以捕获严重崩溃。除非遇到问题，否则建议关闭此功能。</string>
@@ -96,8 +88,9 @@
     <string name="breadcrumb_pan">平移</string>
     <string name="breadcrumb_rotation">旋转</string>
     <string name="breadcrumb_brightness">亮度</string>
-    <string name="breadcrumb_speed">速度</string>
-    <string name="breadcrumb_volume">音量</string>
+    <string name="breadcrumb_contrast">对比度</string>
+    <string name="breadcrumb_saturation">饱和度</string>
+    <string name="breadcrumb_colors">色彩</string>
     <string name="breadcrumb_more">+还有 %1$d 项</string>
 
     <string name="remove_file_title">移除视频</string>
@@ -136,4 +129,8 @@
     <string name="flip_vertical">垂直</string>
     <string name="error_file_too_large">所选视频超过了 500 MB 的限制。</string>
     <string name="warning_status_bar_oem">可能不受所有启动器的支持。</string>
+
+    <!-- Undead Affects -->
+    <string name="undead_affects_description">接触主屏幕表面时触发的物理反应。</string>
+    <string name="undead_affects_haptics_description">物理接触时的震动响应。</string>
 </resources>

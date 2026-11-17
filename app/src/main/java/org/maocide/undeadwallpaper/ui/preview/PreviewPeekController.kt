@@ -8,6 +8,7 @@ import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Matrix
 import android.graphics.drawable.BitmapDrawable
+import android.os.Build
 import android.util.DisplayMetrics
 import android.util.TypedValue
 import android.view.HapticFeedbackConstants
@@ -18,8 +19,12 @@ import android.view.animation.AccelerateInterpolator
 import android.view.animation.DecelerateInterpolator
 import android.widget.ImageView
 import androidx.core.view.updateLayoutParams
+import org.maocide.undeadwallpaper.BuildConfig
 import org.maocide.undeadwallpaper.data.PreferencesManager
+import org.maocide.undeadwallpaper.model.RenderTransforms
 import org.maocide.undeadwallpaper.model.ScalingMode
+import org.maocide.undeadwallpaper.render.RenderGeometryCalculator
+import org.maocide.undeadwallpaper.render.RenderShaders
 import org.maocide.undeadwallpaper.utils.DisplayGeometryHelper
 import kotlin.math.abs
 import kotlin.math.cos
@@ -67,7 +72,9 @@ class PreviewPeekController(
         val zoom: Float,
         val positionX: Float,
         val positionY: Float,
-        val brightness: Float
+        val brightness: Float,
+        val contrast: Float,
+        val saturation: Float
     )
 
     @SuppressLint("ClickableViewAccessibility")
@@ -76,7 +83,18 @@ class PreviewPeekController(
         overlayContainer.alpha = 0f
         parallaxBadge?.visibility = if (isParallaxEnabled) View.VISIBLE else View.GONE
 
+        previewContainer.filterTouchesWhenObscured = true
         previewContainer.setOnTouchListener { v, event ->
+            val flags = event.flags
+            if ((flags and MotionEvent.FLAG_WINDOW_IS_OBSCURED) != 0 ||
+                (flags and MotionEvent.FLAG_WINDOW_IS_PARTIALLY_OBSCURED) != 0
+            ) {
+                return@setOnTouchListener true
+            }
+            if (!BuildConfig.DEBUG && event.device?.isVirtual == true) {
+                return@setOnTouchListener true
+            }
+
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     v.parent?.requestDisallowInterceptTouchEvent(true)
@@ -160,7 +178,9 @@ class PreviewPeekController(
         zoom: Float,
         positionX: Float,
         positionY: Float,
-        brightness: Float
+        brightness: Float,
+        contrast: Float,
+        saturation: Float
     ) {
         val params = TransformParams(
             flipHorizontal = flipHorizontal,
@@ -170,7 +190,9 @@ class PreviewPeekController(
             zoom = zoom,
             positionX = positionX,
             positionY = positionY,
-            brightness = brightness
+            brightness = brightness,
+            contrast = contrast,
+            saturation = saturation
         )
         lastBitmap = bmp
         lastParams = params
@@ -216,7 +238,7 @@ class PreviewPeekController(
             positionY = params.positionY
         )
         targetView.imageMatrix = matrix
-        applyBrightnessFilter(targetView, params.brightness)
+        applyColorFilter(targetView, params.brightness, params.contrast, params.saturation)
     }
 
     fun showPeek() {
@@ -334,17 +356,7 @@ class PreviewPeekController(
             viewW: Float,
             viewH: Float,
             rotationDeg: Float
-        ): Pair<Float, Float> {
-            if (bmpW <= 0f || bmpH <= 0f || viewW <= 0f || viewH <= 0f) return Pair(1f, 1f)
-            val angleRad = Math.toRadians(rotationDeg.toDouble())
-            val sinVal = abs(sin(angleRad)).toFloat()
-            val cosVal = abs(cos(angleRad)).toFloat()
-            val rotW = (bmpW * cosVal) + (bmpH * sinVal)
-            val rotH = (bmpW * sinVal) + (bmpH * cosVal)
-            val scaleRatioX = viewW / rotW
-            val scaleRatioY = viewH / rotH
-            return Pair(scaleRatioX, scaleRatioY)
-        }
+        ): Pair<Float, Float> = RenderGeometryCalculator.calculateScaleRatios(bmpW, bmpH, viewW, viewH, rotationDeg)
 
         /**
          * Calculates global scale factors for scaling modes and zoom.
@@ -354,33 +366,7 @@ class PreviewPeekController(
             scaleRatioX: Float,
             scaleRatioY: Float,
             zoom: Float
-        ): Pair<Float, Float> {
-            var globalScaleX: Float
-            var globalScaleY: Float
-
-            when (scalingMode) {
-                ScalingMode.STRETCH -> {
-                    globalScaleX = scaleRatioX
-                    globalScaleY = scaleRatioY
-                }
-
-                ScalingMode.FILL -> {
-                    val maxScale = max(scaleRatioX, scaleRatioY)
-                    globalScaleX = maxScale
-                    globalScaleY = maxScale
-                }
-
-                ScalingMode.FIT -> {
-                    val minScale = min(scaleRatioX, scaleRatioY)
-                    globalScaleX = minScale
-                    globalScaleY = minScale
-                }
-            }
-
-            globalScaleX *= zoom
-            globalScaleY *= zoom
-            return Pair(globalScaleX, globalScaleY)
-        }
+        ): Pair<Float, Float> = RenderGeometryCalculator.calculateEffectiveScale(scalingMode, scaleRatioX, scaleRatioY, zoom)
 
         /**
          * Calculates canvas translation offsets matching GL NDC coordinate conventions.
@@ -390,17 +376,13 @@ class PreviewPeekController(
             positionY: Float,
             viewW: Float,
             viewH: Float
-        ): Pair<Float, Float> {
-            val transX = positionX * (viewW / 2f)
-            val transY = -positionY * (viewH / 2f)
-            return Pair(transX, transY)
-        }
+        ): Pair<Float, Float> = RenderGeometryCalculator.calculateTranslation(positionX, positionY, viewW, viewH, 0f)
 
         // ============================================================================
         // FORENSIC GEOMETRY CONTRACT:
         // 2D Canvas equivalent of GLVideoRenderer.updateMatrix().
         // Translates OpenGL NDC center-origin math into Android View pixel matrix space.
-        // If modifying projection or aspect math in GLVideoRenderer, keep both in sync!
+        // Delegated directly to RenderGeometryCalculator.computeCanvasMatrix().
         // ============================================================================
         /**
          * Pure 2D canvas transformation matrix equivalent of GLVideoRenderer.updateMatrix().
@@ -418,53 +400,31 @@ class PreviewPeekController(
             positionX: Float,
             positionY: Float
         ): Matrix {
-            val matrix = Matrix()
-            if (bmpW <= 0f || bmpH <= 0f || viewW <= 0f || viewH <= 0f) return matrix
-
-            // Center bitmap pivot at (0, 0)
-            matrix.postTranslate(-bmpW / 2f, -bmpH / 2f)
-
-            // Apply Flips
-            val flipScaleX = if (flipHorizontal) -1f else 1f
-            val flipScaleY = if (flipVertical) -1f else 1f
-            matrix.postScale(flipScaleX, flipScaleY)
-
-            // Apply Rotation
-            matrix.postRotate(rotation)
-
-            // Calculate Scales
-            val (scaleRatioX, scaleRatioY) = calculateScaleRatios(bmpW, bmpH, viewW, viewH, rotation)
-            val (globalScaleX, globalScaleY) = calculateEffectiveScale(scalingMode, scaleRatioX, scaleRatioY, zoom)
-            matrix.postScale(globalScaleX, globalScaleY)
-
-            // Translation (GL Y is Up, Canvas Y is Down -> negate positionY)
-            val (transX, transY) = calculateTranslation(positionX, positionY, viewW, viewH)
-            matrix.postTranslate(transX, transY)
-
-            // Translate to View Center
-            matrix.postTranslate(viewW / 2f, viewH / 2f)
-
-            return matrix
+            val transforms = RenderTransforms(
+                scalingMode = scalingMode,
+                translateX = positionX,
+                translateY = positionY,
+                zoom = zoom,
+                rotation = rotation,
+                flipHorizontal = flipHorizontal,
+                flipVertical = flipVertical
+            )
+            return RenderGeometryCalculator.computeCanvasMatrix(
+                bmpWidth = bmpW,
+                bmpHeight = bmpH,
+                viewWidth = viewW,
+                viewHeight = viewH,
+                transforms = transforms,
+                hardwareCalibrationOffset = 0f
+            )
         }
 
         /**
-         * Brightness filter matching GL Fragment shader: color.rgb + (uBrightness - 1.0) * 0.5
+         * Color grading filter matching GL Fragment shader.
+         * Delegated directly to RenderShaders.createColorFilter().
          */
-        fun applyBrightnessFilter(imageView: ImageView, brightness: Float) {
-            if (abs(brightness - 1.0f) > 0.001f) {
-                val offset = (brightness - 1.0f) * 0.5f * 255f
-                val cm = ColorMatrix(
-                    floatArrayOf(
-                        1f, 0f, 0f, 0f, offset,
-                        0f, 1f, 0f, 0f, offset,
-                        0f, 0f, 1f, 0f, offset,
-                        0f, 0f, 0f, 1f, 0f
-                    )
-                )
-                imageView.colorFilter = ColorMatrixColorFilter(cm)
-            } else {
-                imageView.colorFilter = null
-            }
+        fun applyColorFilter(imageView: ImageView, brightness: Float, contrast: Float, saturation: Float) {
+            imageView.colorFilter = RenderShaders.createColorFilter(brightness, contrast, saturation)
         }
     }
 }

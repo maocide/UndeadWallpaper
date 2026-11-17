@@ -81,6 +81,8 @@ class VideoSettingsTest {
         val flippedH = base.copy(flipHorizontal = true)
         val flippedV = base.copy(flipVertical = true)
         val dimmed = base.copy(brightness = 0.8f)
+        val contrasted = base.copy(contrast = 1.25f)
+        val desaturated = base.copy(saturation = 0.0f)
         val fitMode = base.copy(scalingMode = ScalingMode.FIT)
 
         assertFalse(base.hasSameVisualTransformsAs(zoomed))
@@ -90,6 +92,8 @@ class VideoSettingsTest {
         assertFalse(base.hasSameVisualTransformsAs(flippedH))
         assertFalse(base.hasSameVisualTransformsAs(flippedV))
         assertFalse(base.hasSameVisualTransformsAs(dimmed))
+        assertFalse(base.hasSameVisualTransformsAs(contrasted))
+        assertFalse(base.hasSameVisualTransformsAs(desaturated))
         assertFalse(base.hasSameVisualTransformsAs(fitMode))
     }
 }

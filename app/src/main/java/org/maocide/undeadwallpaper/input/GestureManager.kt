@@ -1,54 +1,41 @@
 package org.maocide.undeadwallpaper.input
 
 import android.content.Context
-import android.os.Handler
-import android.os.Looper
 import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.ViewConfiguration
-import org.maocide.undeadwallpaper.data.PreferencesManager
-import org.maocide.undeadwallpaper.model.GestureType
-import org.maocide.undeadwallpaper.model.WallpaperAction
+import org.maocide.undeadwallpaper.BuildConfig
 import org.maocide.undeadwallpaper.utils.FileLogger
 import kotlin.math.hypot
 
 class WallpaperGestureManager(
     context: Context,
-    private val prefs: PreferencesManager,
-    private val onActionTriggered: (WallpaperAction) -> Unit
+    private val isDisplayActive: () -> Boolean,
+    private val onKineticTouch: (x: Float, y: Float) -> Unit
 ) {
     private val TAG = javaClass.simpleName
-    private var tapCount = 0
     private var lastTapUpTimeMs = 0L
     private var downTimeMs = 0L
     private var downX = 0f
     private var downY = 0f
 
-    private val TAP_TIMEOUT_MS = 300L
-    private val handler = Handler(Looper.getMainLooper())
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
-
-    private val tapResolutionRunnable = Runnable {
-        if (tapCount == 2) {
-            FileLogger.i(TAG, "Confirmed DOUBLE TAP")
-            // Get and trigger action
-            val action = prefs.getActionForGesture(GestureType.DOUBLE_TAP)
-            onActionTriggered(action)
-        }
-        resetTapState()
-    }
 
     fun onTouchEvent(event: MotionEvent?) {
         if (event == null) return
 
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                // Ignore uncalibrated or detached digitizer events
+                val device = event.device
+                if ((device != null && device.isVirtual) || !isDisplayActive()) {
+                    resetTapState()
+                    return
+                }
+
                 downTimeMs = SystemClock.uptimeMillis()
                 downX = event.x
                 downY = event.y
-
-                // Cancel any pending resolution because a new tap arrived!
-                handler.removeCallbacks(tapResolutionRunnable)
             }
 
             MotionEvent.ACTION_MOVE -> {
@@ -65,13 +52,23 @@ class WallpaperGestureManager(
             MotionEvent.ACTION_UP -> {
                 if (downTimeMs == 0L) return // Spurious UP without DOWN
 
+                val device = event.device
+                if ((device != null && device.isVirtual) || !isDisplayActive()) {
+                    resetTapState()
+                    return
+                }
+
                 val upTimeMs = SystemClock.uptimeMillis()
                 val duration = upTimeMs - downTimeMs
+                val tapX = downX
+                val tapY = downY
                 downTimeMs = 0L // Reset for next tap
 
                 // 1. Digitizer Sampling Filter: Suppress sub-5ms controller transients and jitter
                 if (duration <= 5L) {
-                    FileLogger.d(TAG, "Transient digitizer pulse (${duration}ms), ignoring.")
+                    if (BuildConfig.DEBUG) {
+                        FileLogger.d(TAG, "Transient digitizer pulse (${duration}ms), ignoring.")
+                    }
                     resetTapState()
                     return
                 } else if (duration > 400L) {
@@ -80,49 +77,37 @@ class WallpaperGestureManager(
                     return
                 } else if (duration < 10L) {
                     // Glancing brush / jitter on high refresh screens, drop silently
-                    FileLogger.d(TAG, "Glancing brush detected (${duration}ms). Dropping tap.")
+                    if (BuildConfig.DEBUG) {
+                        FileLogger.d(TAG, "Glancing brush detected (${duration}ms). Dropping tap.")
+                    }
                     resetTapState()
                     return
                 }
 
                 // Check distance again on UP just in case
-                val dx = event.x - downX
-                val dy = event.y - downY
+                val dx = event.x - tapX
+                val dy = event.y - tapY
                 if (hypot(dx.toDouble(), dy.toDouble()) > touchSlop) {
                     resetTapState()
                     return
                 }
 
-                // 2. Multi-tap cadence debounce: Ignore micro-bounces below physical threshold
-                if (tapCount > 0) {
+                // 2. Cadence debounce: Ignore micro-bounces below physical threshold
+                if (lastTapUpTimeMs > 0L) {
                     val gap = upTimeMs - lastTapUpTimeMs
                     if (gap < 80L) {
-                        FileLogger.d(TAG, "Rapid digitizer debounce (gap: ${gap}ms), ignoring bounce.")
+                        if (BuildConfig.DEBUG) {
+                            FileLogger.d(TAG, "Rapid digitizer debounce (gap: ${gap}ms), ignoring bounce.")
+                        }
                         resetTapState()
                         return
-                    } else if (gap > TAP_TIMEOUT_MS) {
-                        // Too much time passed since last tap, start over
-                        tapCount = 0
                     }
                 }
 
-                tapCount++
                 lastTapUpTimeMs = upTimeMs
 
-                if (tapCount == 3) {
-                    // TRIPLE TAP DETECTED! Execute immediately.
-                    FileLogger.i(TAG, "Confirmed TRIPLE TAP")
-
-                    // Reset immediately so a 4th rapid tap doesn't trigger anything weird
-                    resetTapState()
-
-                    // Get and trigger action
-                    val action = prefs.getActionForGesture(GestureType.TRIPLE_TAP)
-                    onActionTriggered(action)
-                } else {
-                    // Tap 1 or 2. Wait to see if another tap comes.
-                    handler.postDelayed(tapResolutionRunnable, TAP_TIMEOUT_MS)
-                }
+                // Confirmed intentional physical tap! Fire kinetic somatic reflex
+                onKineticTouch(tapX, tapY)
             }
 
             MotionEvent.ACTION_CANCEL -> {
@@ -132,12 +117,10 @@ class WallpaperGestureManager(
     }
 
     fun destroy() {
-        handler.removeCallbacks(tapResolutionRunnable)
         resetTapState()
     }
 
     private fun resetTapState() {
-        tapCount = 0
         lastTapUpTimeMs = 0L
         downTimeMs = 0L
     }

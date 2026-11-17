@@ -4,6 +4,8 @@ import org.maocide.undeadwallpaper.databinding.FragmentAboutBinding
 
 import org.maocide.undeadwallpaper.data.PreferencesManager
 import org.maocide.undeadwallpaper.utils.FileLogger
+import org.maocide.undeadwallpaper.utils.preventDoubleInput
+import org.maocide.undeadwallpaper.utils.setSafeOnClickListener
 
 import android.content.Intent
 import android.os.Bundle
@@ -55,6 +57,7 @@ class AboutFragment : Fragment() {
         updateLogButtonsState()
 
         // Handle Switch Toggle
+        binding.switchEnableLogging.preventDoubleInput()
         binding.switchEnableLogging.setOnCheckedChangeListener { _, isChecked ->
             preferencesManager.saveLoggingEnabled(isChecked)
             FileLogger.setLoggingEnabled(isChecked)
@@ -69,7 +72,7 @@ class AboutFragment : Fragment() {
         }
 
         // Handle Share Button
-        binding.buttonShareLog.setOnClickListener {
+        binding.buttonShareLog.setSafeOnClickListener {
             val logFile = FileLogger.getLogFile()
             if (logFile != null && logFile.exists() && logFile.length() > 0) {
 
@@ -101,7 +104,7 @@ class AboutFragment : Fragment() {
         }
 
         // Handle Clear Button
-        binding.buttonClearLog.setOnClickListener {
+        binding.buttonClearLog.setSafeOnClickListener {
             FileLogger.clearLog()
             Toast.makeText(context, "Log file cleared", Toast.LENGTH_SHORT).show()
             updateLogButtonsState()

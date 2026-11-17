@@ -16,11 +16,13 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.provider.OpenableColumns
+import kotlinx.coroutines.CancellationException
 import org.maocide.undeadwallpaper.utils.FileLogger
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Semaphore
@@ -84,9 +86,10 @@ class VideoFileManager(
 
             outputFile
         } catch (e: Exception) {
+            if (e is CancellationException) {
+                currentCoroutineContext().ensureActive()
+            }
             if (BuildConfig.DEBUG) {
-                FileLogger.e(tag, "Failed to copy default resource", e)
-            } else {
                 FileLogger.e(tag, "Failed to copy default resource", e)
             }
             null
@@ -216,10 +219,12 @@ class VideoFileManager(
                 FileLogger.w(tag, "Upfront dimension check failed.")
                 CopyResult.DimensionsExceeded
             }
+
             is MediaAnalyzer.VideoValidationResult.NotAVideo -> {
                 FileLogger.w(tag, "Upfront media validation failed: not a playable video.")
                 CopyResult.StaticTissueRejected
             }
+
             is MediaAnalyzer.VideoValidationResult.Valid -> {
                 null
             }
@@ -232,14 +237,15 @@ class VideoFileManager(
     private fun queryOriginalFileName(fileUri: Uri): String {
         var originalFileName = ""
         try {
-            context.contentResolver.query(fileUri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                    if (nameIndex >= 0) {
-                        originalFileName = cursor.getString(nameIndex) ?: ""
+            context.contentResolver.query(fileUri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+                ?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                        if (nameIndex >= 0) {
+                            originalFileName = cursor.getString(nameIndex) ?: ""
+                        }
                     }
                 }
-            }
             originalFileName = File(originalFileName).name
         } catch (e: Exception) {
             FileLogger.w(tag, "Could not query file name, generating fallback.", e)
@@ -381,6 +387,7 @@ class VideoFileManager(
                         if (BuildConfig.DEFAULT_ASSET_SIZE > 0 && file.length() != BuildConfig.DEFAULT_ASSET_SIZE) {
                             FileLogger.e(tag, "File is corrupted, deleting video ${file.name}")
                             file.delete()
+                            evictCachedThumbnail(file.name)
                             continue
                         }
                     }
@@ -390,6 +397,7 @@ class VideoFileManager(
                     val newFileName = "video_${java.util.UUID.randomUUID()}.mp4"
                     val newFile = java.io.File(videosDir, newFileName)
                     if (file.renameTo(newFile)) {
+                        evictCachedThumbnail(originalName)
                         updatedSettings.add(
                             setting.copy(
                                 fileName = newFileName,
@@ -398,10 +406,14 @@ class VideoFileManager(
                             )
                         )
 
-                        // Keep the active video in sync
+                        // Keep the active and anchor video in sync
                         val activeUri = preferencesManager.getActiveVideoUri()
                         if (activeUri != null && android.net.Uri.parse(activeUri).lastPathSegment == originalName) {
                             preferencesManager.saveActiveVideoUri(android.net.Uri.fromFile(newFile).toString())
+                        }
+                        val anchorUri = preferencesManager.getAnchorVideoUri()
+                        if (anchorUri != null && android.net.Uri.parse(anchorUri).lastPathSegment == originalName) {
+                            preferencesManager.saveAnchorVideoUri(android.net.Uri.fromFile(newFile).toString())
                         }
                     } else {
                         updatedSettings.add(setting.copy(expectedFileSize = file.length(), displayName = originalName))
@@ -410,6 +422,7 @@ class VideoFileManager(
                     // Inconsistency found
                     FileLogger.e(tag, "File is corrupted, deleting video ${file.name}")
                     file.delete()
+                    evictCachedThumbnail(file.name)
                     settingsChanged = true
                     // Do not add to updatedSettings so it gets removed from the playlist
                 } else {
@@ -423,7 +436,7 @@ class VideoFileManager(
     }
 
     /**
-     * Reconciles physical files with persisted settings, securely deleting unindexed "orphaned" 
+     * Reconciles physical files with persisted settings, securely deleting unindexed "orphaned"
      * physical files and purging settings that point to missing physical files.
      *
      * @param physicalFiles The array of currently existing physical video files.
@@ -453,6 +466,7 @@ class VideoFileManager(
                 }
                 FileLogger.w(tag, "Deleting unindexed/injected physical file: ${file.name}")
                 file.delete()
+                evictCachedThumbnail(file.name)
             }
             cleanPhysicalFiles = physicalFiles.filter { it.name in persistedFileNames }.toTypedArray()
         }
@@ -481,6 +495,7 @@ class VideoFileManager(
                 }
                 if (thumb.isFile && !thumb.name.startsWith(".") && thumb.name !in expectedThumbnailNames) {
                     if (thumb.delete()) {
+                        evictCachedThumbnail("${thumb.nameWithoutExtension}.mp4")
                         prunedCount++
                         FileLogger.w(tag, "Deleting orphaned thumbnail: ${thumb.name}")
                     }
@@ -498,6 +513,34 @@ class VideoFileManager(
         private const val ORPHAN_GRACE_PERIOD_MS = 60_000L
         private const val MAX_THUMBNAIL_PRUNES_PER_PASS = 50
         private const val THUMBNAIL_GC_TIME_BUDGET_MS = 15L
+        private const val THUMBNAIL_CACHE_MAX_SIZE_KB = 16 * 1024 // 16 MB (~32-40 512x512 RGB_565 bitmaps)
+
+        private val thumbnailCache = object : android.util.LruCache<String, Bitmap>(THUMBNAIL_CACHE_MAX_SIZE_KB) {
+            override fun sizeOf(key: String, value: Bitmap): Int {
+                return (value.byteCount / 1024).coerceAtLeast(1)
+            }
+        }
+    }
+
+    /**
+     * Performs an O(1) non-blocking lookup in the in-memory thumbnail LruCache.
+     */
+    fun getCachedThumbnail(fileName: String): Bitmap? {
+        val cached = thumbnailCache.get(fileName)
+        if (cached != null && !cached.isRecycled) {
+            return cached
+        }
+        if (cached != null && cached.isRecycled) {
+            thumbnailCache.remove(fileName)
+        }
+        return null
+    }
+
+    /**
+     * Evicts a thumbnail from the in-memory LruCache.
+     */
+    fun evictCachedThumbnail(fileName: String) {
+        thumbnailCache.remove(fileName)
     }
 
     /**
@@ -528,23 +571,29 @@ class VideoFileManager(
                                 .ensureActive() // Allow cancellation before heavy processing
 
                             val currentSettings = preferencesManager.getVideoSettings(fileName)
-                            val thumbnail = getOrGenerateThumbnail(file)
-
-                            // Extract WallpaperColors if needed
-                            if (thumbnail != null) {
-                                if (currentSettings.primaryColor == null) {
-                                    val colors = MediaAnalyzer.extractWallpaperColors(thumbnail)
+                            val thumbnail = if (currentSettings.primaryColor == null) {
+                                // Only decode/generate upfront if WallpaperColors haven't been extracted yet
+                                val generated = getOrGenerateThumbnail(file)
+                                if (generated != null) {
+                                    thumbnailCache.put(file.name, generated)
+                                    val colors = MediaAnalyzer.extractWallpaperColors(generated)
                                     if (colors != null) {
-                                        preferencesManager.updateVideoSettings(fileName) { settings ->
-                                            settings.copy(
-                                                primaryColor = colors.primaryColor,
-                                                secondaryColor = colors.secondaryColor,
-                                                tertiaryColor = colors.tertiaryColor,
-                                                colorHints = colors.colorHints
-                                            )
+                                        synchronized(preferencesManager) {
+                                            preferencesManager.updateVideoSettings(fileName) { settings ->
+                                                settings.copy(
+                                                    primaryColor = colors.primaryColor,
+                                                    secondaryColor = colors.secondaryColor,
+                                                    tertiaryColor = colors.tertiaryColor,
+                                                    colorHints = colors.colorHints
+                                                )
+                                            }
                                         }
                                     }
                                 }
+                                generated
+                            } else {
+                                // Already indexed: return cached bitmap if warm in memory, otherwise lazy-load on scroll
+                                getCachedThumbnail(file.name)
                             }
 
                             var durationMs = currentSettings.durationMs
@@ -576,6 +625,9 @@ class VideoFileManager(
                                         }
                                     }
                                 } catch (e: Exception) {
+                                    if (e is CancellationException) {
+                                        ensureActive()
+                                    }
                                     FileLogger.e(tag, "Error extracting metadata", e)
                                 }
                             }
@@ -590,6 +642,9 @@ class VideoFileManager(
                                 fps = fps ?: 0
                             )
                         } catch (e: Exception) {
+                            if (e is CancellationException) {
+                                ensureActive()
+                            }
                             FileLogger.e(tag, "Error loading thumbnail", e)
                             RecentFile(file, null, sizeBytes = file.length())
                         }
@@ -628,6 +683,45 @@ class VideoFileManager(
                 // Ignore release exceptions
             }
         }
+    }
+
+    /**
+     * Memory-cached wrapper strictly for UI list lazy-loading.
+     * Decodes downsampled thumbnails (128x128 RGB_565) suitable for 64dp list items,
+     * conserving memory and maximizing scroll performance.
+     * Does not alter the uncached ingestion validation gate inside [getOrGenerateThumbnail].
+     */
+    fun getOrLoadThumbnailCached(videoFile: File, reqWidth: Int = 128, reqHeight: Int = 128): Bitmap? {
+        getCachedThumbnail(videoFile.name)?.let { return it }
+
+        val thumbnailsDir = getAppSpecificAlbumStorageDir(context, "thumbnails")
+        val thumbnailFile = File(thumbnailsDir, "${videoFile.nameWithoutExtension}.jpg")
+
+        if (thumbnailFile.exists()) {
+            val boundsOptions = android.graphics.BitmapFactory.Options().apply {
+                inJustDecodeBounds = true
+            }
+            android.graphics.BitmapFactory.decodeFile(thumbnailFile.absolutePath, boundsOptions)
+            val sampleSize = calculateInSampleSize(boundsOptions, reqWidth, reqHeight)
+            val decodeOptions = android.graphics.BitmapFactory.Options().apply {
+                inSampleSize = sampleSize
+                inPreferredConfig = Bitmap.Config.RGB_565
+            }
+            val decoded = android.graphics.BitmapFactory.decodeFile(thumbnailFile.absolutePath, decodeOptions)
+            if (decoded != null) {
+                thumbnailCache.put(videoFile.name, decoded)
+                return decoded
+            }
+        }
+
+        val fullBitmap = getOrGenerateThumbnail(videoFile) ?: return null
+        val scaled = if (fullBitmap.width > reqWidth || fullBitmap.height > reqHeight) {
+            Bitmap.createScaledBitmap(fullBitmap, reqWidth, reqHeight, true)
+        } else {
+            fullBitmap
+        }
+        thumbnailCache.put(videoFile.name, scaled)
+        return scaled
     }
 
     /**
@@ -671,6 +765,7 @@ class VideoFileManager(
      * @return True if the physical video file was deleted, false otherwise.
      */
     fun deleteVideoAndThumbnail(videoFile: File): Boolean {
+        evictCachedThumbnail(videoFile.name)
         val thumbnailsDir = getAppSpecificAlbumStorageDir(context, "thumbnails")
         val thumbnailFile = File(thumbnailsDir, "${videoFile.nameWithoutExtension}.jpg")
         if (thumbnailFile.exists()) {

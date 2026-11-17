@@ -11,7 +11,6 @@
 
     <!-- UI Strings -->
     <string name="pick_video">Escolher Vídeo</string>
-    <string name="setting_audio_enabled">Habilitar Áudio</string>
     <string name="playback_mode_setting">Modo de Reprodução</string>
     <string name="recent_files">Playlist</string>
     <string name="playlist_instructions">Toque longo para reordenar. Deslize para a esquerda ou direita para remover.</string>
@@ -23,7 +22,6 @@
 
     <!-- SharedPreferences Keys. These are not meant for translation. -->
     <string name="video_uri" translatable="false">video_uri</string>
-    <string name="video_audio_enabled" translatable="false">video_audio_enabled</string>
     <string name="playback_mode" translatable="false">playback_mode</string>
     <string name="video_zoom_level" translatable="false">video_zoom_level</string>
     <string name="video_start_ms" translatable="false">video_start_ms</string>
@@ -40,7 +38,7 @@
     <string name="about_header_features">O Que Ele Faz</string>
     <string name="about_feature_loops">• Loops Suaves: Transforma qualquer vídeo do seu telefone em um wallpaper vivo contínuo e sem travamentos.</string>
     <string name="about_feature_freedom">• Liberdade Total: Sem anúncios, sem compras no app, sem frescura. Nunca.</string>
-    <string name="about_feature_control">• Você Está no Controle: Suporta alternância de áudio e rastreia seus vídeos recentes para trocas rápidas.</string>
+    <string name="about_feature_control">• Você Está no Controle: Rastreia seus vídeos recentes para trocas rápidas e loops contínuos.</string>
     <string name="playback_mode_loop">Repetir</string>
     <string name="playback_mode_oneshot">Uma Vez</string>
     <string name="playback_mode_loop_all">Repetir Todos</string>
@@ -54,25 +52,17 @@
     <string name="vertical_position">Posição Vertical</string>
     <string name="zoom">Zoom</string>
     <string name="brightness">Brilho</string>
-    <string name="speed">Velocidade</string>
+    <string name="contrast">Contraste</string>
+    <string name="saturation">Saturação</string>
     <string name="reset">Redefinir</string>
+    <string name="reset_all">Redefinir tudo</string>
     <string name="rotation">Rotação</string>
-
-    <!-- Home Screen Gestures -->
-    <string name="gesture_controls_header">Gestos na Inicial</string>
-    <string name="double_tap_label">Toque Duplo</string>
-    <string name="triple_tap_label">Toque Triplo</string>
-    <string name="gesture_action_none">Nenhum</string>
-    <string name="gesture_action_pause_play">Pausar/Reproduzir</string>
-    <string name="gesture_action_skip">Pular</string>
-    <string name="gesture_launcher_warning">Nota: Alguns launchers podem bloquear os gestos do wallpaper.</string>
 
     <!-- Error and Warning Messages -->
     <string name="error_permission_failed">Falha ao obter permissão para o arquivo selecionado.</string>
     <string name="warning_4k_video">Aviso: vídeos 4K podem travar ou causar atrasos em alguns dispositivos.</string>
     <string name="error_copy_failed">Falha ao copiar o arquivo de vídeo.</string>
     <string name="error_cannot_play_video">Não é possível reproduzir este arquivo de vídeo.</string>
-    <string name="warning_high_speed_stuttering">Velocidades altas podem causar travamentos em vídeos de alta resolução.</string>
     <string name="error_file_picker_not_available">O seletor de arquivos não está disponível no sistema!</string>
     <string name="error_could_not_read_video_duration">Não foi possível ler a duração do vídeo.</string>
     <string name="warning_random_start_time_delay">O modo aleatório pode causar atrasos devido à busca no vídeo</string>
@@ -92,8 +82,8 @@
     <string name="importing_video">Infestando novos arquivos</string>
     <string name="preparing_assets">Despertando os mortos-vivos</string>
     <string name="positioning_header">Posicionamento</string>
+    <string name="color_header">Cor</string>
     <string name="general_header">Geral</string>
-    <string name="volume_label">Volume</string>
     <string name="global_settings_header">Configurações Globais</string>
     <string name="debug_options_header">Opções de Depuração</string>
     <string name="debug_logging_description">Habilite o registro em arquivo local para capturar crashes complexos. É recomendado deixar isso desativado a menos que você esteja enfrentando problemas.</string>
@@ -111,8 +101,9 @@
     <string name="breadcrumb_pan">Pan</string>
     <string name="breadcrumb_rotation">Rotação</string>
     <string name="breadcrumb_brightness">Brilho</string>
-    <string name="breadcrumb_speed">Velocidade</string>
-    <string name="breadcrumb_volume">Volume</string>
+    <string name="breadcrumb_contrast">Contraste</string>
+    <string name="breadcrumb_saturation">Saturação</string>
+    <string name="breadcrumb_colors">Cor</string>
     <string name="breadcrumb_more">+%1$d mais</string>
 
     <string name="remove_file_title">Remover Vídeo</string>
@@ -154,4 +145,8 @@
     <string name="flip_vertical">Vertical</string>
     <string name="error_file_too_large">O vídeo selecionado excede o limite de 500 MB.</string>
     <string name="warning_status_bar_oem">Pode não ser suportado por todos os launchers.</string>
+
+    <!-- Undead Affects -->
+    <string name="undead_affects_description">Reações físicas acionadas pelo contato com a superfície da tela inicial.</string>
+    <string name="undead_affects_haptics_description">Resposta de vibração ao contato físico.</string>
 </resources>

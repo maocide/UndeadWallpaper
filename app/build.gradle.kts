@@ -10,10 +10,10 @@ android {
 
     defaultConfig {
         applicationId = "org.maocide.undeadwallpaper"
-        minSdk = 28
+        minSdk = 31
         targetSdk = 36
-        versionCode = 78
-        versionName = "1.4.3"
+        versionCode = 82
+        versionName = "1.4.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
