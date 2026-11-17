@@ -10,7 +10,7 @@ sealed interface WallpaperEvent {
     data object PlaybackModeChanged : WallpaperEvent
     data object PlaylistReordered : WallpaperEvent
     data class VideoSettingsChanged(val fileName: String) : WallpaperEvent
-    data object TouchControlsChanged : WallpaperEvent
     data object ParallaxChanged : WallpaperEvent
+    data object KineticSettingsChanged : WallpaperEvent
     data object StatusBarColorChanged : WallpaperEvent
 }

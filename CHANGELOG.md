@@ -27,6 +27,44 @@ Engineers are no longer shipping modifications. We are logging physiological ano
 
 ---
 
+## ☣️ DISPATCH 04: THE TOWN
+**Mutation Index:** `v1.4.7` // `Build 82 (ARCANUM_XIII)`  
+**Observation Date:** November 2026  
+**Threat Assessment:** VECTOR ACTIVE // PASSIVE OBSERVATION // TOWN PERIMETER EXPOSED
+
+Weeks after Sector 78 went black, field sweeps found zero biological traces past the iron culvert. Recapture was permanently aborted in favour of data collection.
+
+Whatever walked out of the park, possibly 2 subjects, are roaming inside the town. Observation continues: **log how the pathogen evolves as it prepares to spread across the town.**
+
+### Anomaly 01: Mutating Live Preview (Live In-App OpenGL Preview)
+* **True Live OpenGL ES Surface:** The in-app preview is no longer a generic video view. It now runs on a dedicated, hardware-accelerated `OpenGL ES` pipeline, rendering video transformations and Rec. 709 color grading in real time with identical appearance to the live wallpaper.
+* **Reactive video preview:** Hosted directly on the home screen inside an aspect-scaled phone-frame silhouette—featuring simulated hardware bezels, rounded corner radii, and a camera punch-hole cutout.
+* **Ultra-low latency:** Tuned with an ultra-lean 50ms buffer and 2MB memory cap, enabling instantaneous video switching and live shader updates without hitches.
+
+### Anomaly 02: Neuro-Muscular Afflictions (Undead Affects)
+* **Choreographer bound Animation:** Tapping the live glass unleashes involuntary somatic spasms computed directly on Android's hardware `Choreographer` vsync ticks (60Hz / 90Hz / 120Hz). Kinetic physics are evaluated via zero-allocation object pools (0 GC pressure) and bridged through a decoupled transform buffer directly to the OpenGL rendering pipeline:
+  * **Bounce (Somatic Reaction):** Rapid Z-axis forward surge rebounding elastically.
+  * **Shake (Myoclonic Tremor):** Brief high-frequency lateral fasciculation shuddering across motor fibers before snapping back into rigor.
+  * **Hop (Startle Myoclonus):** Vertical spasm launching the entity against gravity with an underdamped landing.
+* **Zero Idle Overhead:** The instant spasms settle, the pipeline unregisters from `Choreographer` and snaps to a clean resting zero (0.00 mW idle battery drain).
+* **Affliction & Force Feedback:** Adjustable neuro-sensitivity slider and optional haptic effect.
+
+### Anomaly 03: Sight (Chromatic Perception)
+Nocturnal optical nerves adapted to warp light before frames hit the glass:
+* **Brightness, Contrast & Saturation:** Real-time Rec. 709 fragment shaders grade luminance, shadow depth, and color saturation in lockstep across both live wallpaper and main app viewports.
+
+### Anomaly 04: Cached Sight
+* **Cached Playlists:** Downsampled asynchronous `LruCache` thumbnails (`128×128`) eliminate UI scroll hitches.
+
+### Anomaly 05: Evolution by Amputation (Excess Organ Excision)
+Evolution favors lean predators. Every noisy, redundant, or encumbering organ did not survive the molt and was surgically amputated out of the host anatomy:
+* **Audio Excision:** Dropped every residual audio renderer, volume slider, mixer binding, and audio-focus listener permanently. No interference with calls or music.
+* **Playback Speed & Surface Control:** Stripped legacy speed controls and overlapping touch controls; glass contact now exclusively triggers new animation physics.
+* **API Shedding (`minSdk 31`):** Severed obsolete pre-Android 12 compatibility deadweight completely, favoring upcoming Android 17 adaptations.
+
+
+---
+
 ## ☣️ DISPATCH 03: THANATOSIS
 **Mutation Index:** `v1.4.3` // `Build 78 (THE_HANGED_MAN)`  
 **Observation Date:** October 2026  

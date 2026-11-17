@@ -9,18 +9,11 @@
     android:clipToOutline="true"
     tools:context=".ui.VideoSettingsSheet">
 
-    <org.maocide.undeadwallpaper.ui.GestureSafeScrollView
-        android:id="@+id/settings_scroll_view"
+    <LinearLayout
+        android:id="@+id/sheet_main_layout"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:clipToPadding="false">
-
-    <LinearLayout
-        android:id="@+id/settings_content_layout"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingBottom="24dp">
+        android:orientation="vertical">
 
         <com.google.android.material.bottomsheet.BottomSheetDragHandleView
             android:id="@+id/drag_handle"
@@ -32,7 +25,7 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:paddingHorizontal="16dp"
-            android:paddingBottom="16dp">
+            android:paddingBottom="12dp">
 
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/preview_frame_container"
@@ -111,22 +104,64 @@
                     android:layout_height="36dp"
                     android:layout_marginTop="4dp"
                     android:layout_marginStart="0dp"
-                    android:text="@string/reset"
+                    android:text="@string/reset_all"
                     app:icon="@android:drawable/ic_menu_revert"
                     app:iconSize="16dp" />
 
             </LinearLayout>
         </LinearLayout>
 
-        <com.google.android.material.card.MaterialCardView
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/settings_tab_group"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginHorizontal="16dp"
-            android:layout_marginBottom="16dp"
-            app:cardCornerRadius="16dp"
-            app:strokeWidth="0dp"
-            app:cardElevation="2dp"
-            app:cardBackgroundColor="?attr/colorSurface">
+            android:paddingHorizontal="16dp"
+            android:paddingBottom="8dp"
+            app:selectionRequired="true"
+            app:singleSelection="true"
+            app:chipSpacingHorizontal="8dp">
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chip_tab_positioning"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true"
+                android:text="@string/positioning_header" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chip_tab_color"
+                style="@style/Widget.MaterialComponents.Chip.Choice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/color_header" />
+        </com.google.android.material.chip.ChipGroup>
+
+        <org.maocide.undeadwallpaper.ui.GestureSafeScrollView
+            android:id="@+id/settings_scroll_view"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fillViewport="true"
+            android:clipToPadding="false">
+
+            <LinearLayout
+                android:id="@+id/settings_content_layout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingBottom="24dp">
+
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/card_positioning"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="16dp"
+                    android:layout_marginBottom="16dp"
+                    app:cardCornerRadius="16dp"
+                    app:strokeWidth="0dp"
+                    app:cardElevation="2dp"
+                    app:cardBackgroundColor="?attr/colorSurface">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -195,6 +230,7 @@
                         android:layout_marginStart="16dp"
                         android:src="@drawable/ic_fit_screen"
                         android:contentDescription="@null"
+                        android:background="?attr/selectableItemBackgroundBorderless"
                         android:alpha="0.5"
                         app:tint="?android:attr/textColorSecondary" />
                 </LinearLayout>
@@ -231,6 +267,7 @@
                         android:layout_marginStart="16dp"
                         android:src="@drawable/ic_zoom_in"
                         android:contentDescription="@null"
+                        android:background="?attr/selectableItemBackgroundBorderless"
                         android:alpha="0.5"
                         app:tint="?android:attr/textColorSecondary" />
                 </LinearLayout>
@@ -267,6 +304,7 @@
                         android:layout_marginStart="16dp"
                         android:src="@drawable/ic_swap_horiz"
                         android:contentDescription="@null"
+                        android:background="?attr/selectableItemBackgroundBorderless"
                         android:alpha="0.5"
                         app:tint="?android:attr/textColorSecondary" />
                 </LinearLayout>
@@ -303,6 +341,7 @@
                         android:layout_marginStart="16dp"
                         android:src="@drawable/ic_swap_vert"
                         android:contentDescription="@null"
+                        android:background="?attr/selectableItemBackgroundBorderless"
                         android:alpha="0.5"
                         app:tint="?android:attr/textColorSecondary" />
                 </LinearLayout>
@@ -339,6 +378,7 @@
                         android:layout_marginStart="16dp"
                         android:src="@drawable/ic_rotate_right"
                         android:contentDescription="@null"
+                        android:background="?attr/selectableItemBackgroundBorderless"
                         android:alpha="0.5"
                         app:tint="?android:attr/textColorSecondary" />
                 </LinearLayout>
@@ -388,6 +428,7 @@
                         android:layout_marginStart="16dp"
                         android:src="@drawable/ic_flip"
                         android:contentDescription="@null"
+                        android:background="?attr/selectableItemBackgroundBorderless"
                         android:alpha="0.5"
                         app:tint="?android:attr/textColorSecondary" />
                 </LinearLayout>
@@ -396,9 +437,12 @@
         </com.google.android.material.card.MaterialCardView>
 
         <com.google.android.material.card.MaterialCardView
+            android:id="@+id/card_color"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginHorizontal="16dp"
+            android:visibility="gone"
+            tools:visibility="visible"
             app:cardCornerRadius="16dp"
             app:strokeWidth="0dp"
             app:cardElevation="2dp"
@@ -414,82 +458,11 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/general_header"
+                    android:text="@string/color_header"
                     android:textAppearance="?attr/textAppearanceTitleMedium"
                     android:textStyle="bold"
                     android:textColor="?attr/colorPrimary"
                     android:layout_marginBottom="8dp"/>
-                <TextView
-                    android:id="@+id/volume_label"
-                    android:text="@string/volume_label"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:textColor="?android:attr/textColorSecondary" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
-                    <com.google.android.material.slider.Slider
-                        android:id="@+id/volume_slider"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:valueFrom="0.0"
-                        android:valueTo="1.0"
-                        android:value="0.0"
-                        android:stepSize="0.1"
-                        app:tickVisible="false" app:trackStopIndicatorSize="0dp" />
-
-                    <ImageView
-                        android:id="@+id/volume_icon"
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:layout_marginStart="16dp"
-                        android:src="@drawable/ic_volume_up"
-                        android:contentDescription="@null"
-                        android:alpha="0.5"
-                        app:tint="?android:attr/textColorSecondary" />
-                </LinearLayout>
-
-                <TextView
-                    android:id="@+id/speed_label"
-                    android:text="@string/speed"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:textColor="?android:attr/textColorSecondary" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
-                    <com.google.android.material.slider.Slider
-                        android:id="@+id/speed_slider"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:valueFrom="0.2"
-                        android:valueTo="2.0"
-                        android:value="1.0"
-                        android:stepSize="0.1"
-                        app:tickVisible="false" app:trackStopIndicatorSize="0dp" />
-
-                    <ImageView
-                        android:id="@+id/speed_icon"
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:layout_marginStart="16dp"
-                        android:src="@drawable/ic_speed"
-                        android:contentDescription="@null"
-                        android:alpha="0.5"
-                        app:tint="?android:attr/textColorSecondary" />
-                </LinearLayout>
 
                 <TextView
                     android:id="@+id/brightness_label"
@@ -523,6 +496,81 @@
                         android:layout_marginStart="16dp"
                         android:src="@drawable/ic_light_mode"
                         android:contentDescription="@null"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:alpha="0.5"
+                        app:tint="?android:attr/textColorSecondary" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/contrast_label"
+                    android:text="@string/contrast"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textColor="?android:attr/textColorSecondary" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <com.google.android.material.slider.Slider
+                        android:id="@+id/contrast_slider"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:valueFrom="0.5"
+                        android:valueTo="1.5"
+                        android:value="1.0"
+                        android:stepSize="0.05"
+                        app:tickVisible="false" app:trackStopIndicatorSize="0dp" />
+
+                    <ImageView
+                        android:id="@+id/contrast_icon"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_marginStart="16dp"
+                        android:src="@drawable/ic_contrast"
+                        android:contentDescription="@null"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:alpha="0.5"
+                        app:tint="?android:attr/textColorSecondary" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/saturation_label"
+                    android:text="@string/saturation"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textColor="?android:attr/textColorSecondary" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <com.google.android.material.slider.Slider
+                        android:id="@+id/saturation_slider"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:valueFrom="0.0"
+                        android:valueTo="2.0"
+                        android:value="1.0"
+                        android:stepSize="0.05"
+                        app:tickVisible="false" app:trackStopIndicatorSize="0dp" />
+
+                    <ImageView
+                        android:id="@+id/saturation_icon"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_marginStart="16dp"
+                        android:src="@drawable/ic_saturation"
+                        android:contentDescription="@null"
+                        android:background="?attr/selectableItemBackgroundBorderless"
                         android:alpha="0.5"
                         app:tint="?android:attr/textColorSecondary" />
                 </LinearLayout>
@@ -532,8 +580,9 @@
         </com.google.android.material.card.MaterialCardView>
 
 
+            </LinearLayout>
+        </org.maocide.undeadwallpaper.ui.GestureSafeScrollView>
     </LinearLayout>
-    </org.maocide.undeadwallpaper.ui.GestureSafeScrollView>
 
     <FrameLayout
         android:id="@+id/peek_overlay_container"

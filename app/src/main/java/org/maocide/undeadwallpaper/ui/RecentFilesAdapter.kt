@@ -6,6 +6,7 @@ import org.maocide.undeadwallpaper.model.RecentFile
 import org.maocide.undeadwallpaper.model.VideoSettings
 import org.maocide.undeadwallpaper.model.ScalingMode
 import org.maocide.undeadwallpaper.data.PreferencesManager
+import org.maocide.undeadwallpaper.data.VideoFileManager
 import org.maocide.undeadwallpaper.utils.setSafeOnClickListener
 
 import android.graphics.Bitmap
@@ -19,6 +20,14 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Collections
 
@@ -26,9 +35,13 @@ class RecentFilesAdapter(
     private val recentFiles: MutableList<RecentFile>,
     var currentVideoUriString: String?,
     private val preferencesManager: PreferencesManager,
+    private val videoFileManager: VideoFileManager,
+    private val coroutineScope: CoroutineScope,
     private val onItemClick: (RecentFile) -> Unit,
     private val onSettingsClick: (RecentFile) -> Unit
 ) : RecyclerView.Adapter<RecentFilesAdapter.ViewHolder>() {
+
+    private val decodeSemaphore = Semaphore(4)
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val view = LayoutInflater.from(parent.context)
@@ -41,12 +54,30 @@ class RecentFilesAdapter(
         holder.bind(recentFile)
     }
 
+    override fun onViewRecycled(holder: ViewHolder) {
+        super.onViewRecycled(holder)
+        holder.cancelThumbnailLoad()
+    }
+
     override fun getItemCount(): Int = recentFiles.size
 
     fun updateData(newFiles: List<RecentFile>) {
         recentFiles.clear()
         recentFiles.addAll(newFiles)
         notifyDataSetChanged()
+    }
+
+    fun setActiveUri(newUriString: String?) {
+        val oldUriString = currentVideoUriString
+        if (oldUriString == newUriString) return
+        currentVideoUriString = newUriString
+
+        val oldIndex = recentFiles.indexOfFirst { Uri.fromFile(it.file).toString() == oldUriString }
+        val newIndex = recentFiles.indexOfFirst { Uri.fromFile(it.file).toString() == newUriString }
+
+        if (oldIndex != -1) notifyItemChanged(oldIndex)
+        if (newIndex != -1) notifyItemChanged(newIndex)
+        if (oldIndex == -1 && newIndex == -1) notifyDataSetChanged()
     }
 
     fun onItemMove(fromPosition: Int, toPosition: Int) {
@@ -88,6 +119,9 @@ class RecentFilesAdapter(
         private val breadcrumbContainer: View = itemView.findViewById(R.id.breadcrumb_container)
         private val breadcrumbText: TextView = itemView.findViewById(R.id.breadcrumb_text)
 
+        private var boundFile: File? = null
+        private var thumbnailJob: Job? = null
+
         init {
             itemView.setSafeOnClickListener(debounceMs = 300L) {
                 val position = bindingAdapterPosition
@@ -105,12 +139,32 @@ class RecentFilesAdapter(
         }
 
         fun bind(recentFile: RecentFile) {
+            cancelThumbnailLoad()
+            boundFile = recentFile.file
+
             val settings = preferencesManager.getVideoSettings(recentFile.file.name)
             fileName.text = settings.getEffectiveDisplayName()
-            if (recentFile.thumbnail != null) {
-                thumbnail.setImageBitmap(recentFile.thumbnail)
+
+            val cachedBitmap = recentFile.thumbnail ?: videoFileManager.getCachedThumbnail(recentFile.file.name)
+            if (cachedBitmap != null && !cachedBitmap.isRecycled) {
+                thumbnail.setImageBitmap(cachedBitmap)
             } else {
                 thumbnail.setImageDrawable(null) // clear if recycled
+                val targetFile = recentFile.file
+                thumbnailJob = coroutineScope.launch(Dispatchers.IO) {
+                    decodeSemaphore.withPermit {
+                        ensureActive()
+                        val decoded = videoFileManager.getOrLoadThumbnailCached(targetFile)
+                        ensureActive()
+                        if (decoded != null) {
+                            withContext(Dispatchers.Main) {
+                                if (boundFile == targetFile) {
+                                    thumbnail.setImageBitmap(decoded)
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             val itemUriString = Uri.fromFile(recentFile.file).toString()
@@ -137,6 +191,11 @@ class RecentFilesAdapter(
                 breadcrumbContainer.visibility = View.VISIBLE
                 breadcrumbText.text = breadcrumbString
             }
+        }
+
+        fun cancelThumbnailLoad() {
+            thumbnailJob?.cancel()
+            thumbnailJob = null
         }
     }
 }

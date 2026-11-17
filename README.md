@@ -31,21 +31,21 @@ It spends its un-life down in Android's lowest, darkest and most forgotten subst
 
 **The Interface**
 * **Material Zombie Theme:** Material 3 architecture. Custom dark theme, accordion menus, and tonal layouts.
-* **Floating Preview Monitor:** The preview card detaches on scroll, keeping the live feed and video picker docked during dashboard navigation. Banished with the skull; resurrected via the tombstone.
+* **Floating Preview Phone:** The preview card detaches on scroll, showing the live preview of the wallpaper running on a simulated device, keeping the live feed and video picker docked during dashboard navigation. Banished with the skull; resurrected via the tombstone.
 * **Dynamic UI Extraction:** The engine extracts dominant color palettes from active media to theme the Android OS environment.
-* **Tactile Response:** Haptic feedback integration. Custom double/triple tap gestures execute skip or pause commands directly from the home screen.
+* **Undead Affects (Physics Engine):** High-performance kinetic simulation running directly on the launcher glass. Tapping the surface triggers physical reactions (Shake, Hop, Bounce) calibrated by the Affliction intensity modifier and backed by synchronized Force Feedback haptics—driven by vsync Choreographer interpolation and hardware-projected via OpenGL matrix transforms with zero decoder stalls.
 
 **The Guts**
-* **Custom Graphics Pipeline:** Dedicated OpenGL + ExoPlayer backend. Hardware-accelerated transforms, positioning, and gapless loop transitions.
+* **Custom Graphics Pipeline:** Dedicated OpenGL + ExoPlayer backend. Hardware-accelerated transforms, positioning, and gapless loop transitions. Dedicated GPU fragment shaders compute luminance, contrast, and saturation in real time across both live wallpaper and in-app viewports.
 * **Agnostic Ingestion:** The engine is content-agnostic, not limited to sketchy anime loops. It renders the media you provide—from recorded drone footage to family pet videos to fully licensed anime loops. All file types are treated equally by the renderer.
 * **Isolated Local Storage:** File I/O executes asynchronously via scoped isolated storage.
 * **Video Parallax:** The engine intercepts launcher events, shifting perspective proportionally to the aspect ratio during scroll.
 
 **Ultimate Control**
 * **Live Matrix Calibration:** The Video Settings Sheet projects transforms onto a device-aspect thumbnail with maximum *performance*. Long-press engages the Lightbox Peek to frame the video against your hardware frame.
-* **Per-Video Overrides:** Access the Video Settings Sheet to manipulate zoom, offset, rotation, playback speed, mirroring, brightness and volume for individual files.
+* **Per-Video Overrides:** Access the Video Settings Sheet to manipulate zoom, offset, rotation, mirroring, and color correction for individual files.
 * **Playlists Slots:** Paginated dashboard for playlist management. Loop All or Shuffle execution.
-* **Smart Start States:** Define engine behavior on visibility acquired. Resume playback, jump to a random frame, or execute a one-shot cinematic intro that freezes on the final frame.
+* **Smart Start States:** Define engine behavior on visibility acquired. Resume playback, or execute a one-shot cinematic intro that freezes on the final frame.
 * **Licensing & Privacy:** Zero ads. Zero microtransactions. Zero network permissions. Public source code.
 
 ## Deployment
@@ -66,7 +66,7 @@ Certain Android ROMs aggressively terminate background decoders. The built-in Al
 
 | Preview |  Content | Specification & Origin | Status | Price |
 | :---: | :--- | :--- | :--- | :--- |
-| <img src="assets/merch_apk_thumb.png" width="150"> | **[UWU v1.4.2 (｡• ω •｡) UNDEAD WALLPAPER UNRESTRICTED](https://github.com/maocide/UndeadWallpaper/releases/latest/)** | Native engine APK. Fits on 5 High-Density 3.5" floppy disks (spanning archive, 1.44 MB each). **DLC NOT included**. | `[AVAILABLE]` | 0.00 FOS$ |
+| <img src="assets/merch_apk_thumb.png" width="150"> | **[UWU v1.4.7 (｡• ω •｡) UNDEAD WALLPAPER UNRESTRICTED](https://github.com/maocide/UndeadWallpaper/releases/latest/)** | Native engine APK. Fits on 5 High-Density 3.5" floppy disks (spanning archive, 1.44 MB each). **DLC NOT included**. | `[AVAILABLE]` | 0.00 FOS$ |
 | <img src="assets/undead_unrestrict_shirt_thumb.png" width="150"> | **[UNDEAD // UNRESTRICT OFFICIAL T-SHIRT](DIY_MERCH.md)** | High-DPI PNG FOSS Apparel. 0.0 BLOAT. GPLv3 Silk-Screening deployment guide available. | `[DIY ONLY // PHYSICAL SEIZED]` | 0.00 FOS$ |
 | <img src="assets/sybil_dlc_thumb.png" width="150"> | **SYBIL WAIFU // DLC LIVE WALLPAPER** | Artisanal generative loop. Executed via handcrafted ComfyUI node pipeline and encoded natively via PixelChopper.<br>**Format Specs:** 1080p MP4.<br>**Lore:** Interactive oracle imported from **[BACKLOG REAPER](https://github.com/maocide/BacklogReaper)**.<br>**Notice:** Pending centralized platform age-verification clearance. | `[RESTRICTED // PENDING AGE CLASSIFICATION]` | 0.00 FOS$ |
 | <img src="assets/abby_dlc_thumb.gif" width="150"> | **QA TESTER ABBY // DLC LIVE WALLPAPER** | Artisanal generative loop. Executed via handcrafted ComfyUI node pipeline and encoded natively via PixelChopper.<br>**Format Specs:** 1080p MP4. Engine pre-optimized. | `[TBA // INTERNAL TEST TRACK ONLY]` | 0.00 FOS$ |

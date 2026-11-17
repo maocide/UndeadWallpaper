@@ -131,11 +131,6 @@ class WallpaperPlayer(
         player?.repeatMode = mode
     }
 
-    fun applyNonVisualSettingsAsync(volume: Float, speed: Float) = playbackScope.launch {
-        player?.volume = volume
-        player?.setPlaybackSpeed(speed)
-    }
-
     fun getPlayerInstance(): androidx.media3.common.Player? {
         return player
     }
@@ -147,8 +142,6 @@ class WallpaperPlayer(
     @OptIn(UnstableApi::class)
     fun initialize(
         surface: Surface?,
-        initialVolume: Float,
-        speed: Float,
         playbackMode: PlaybackMode,
         bufferConfig: BufferConfig = BufferConfig.DEFAULT
     ) {
@@ -183,18 +176,12 @@ class WallpaperPlayer(
             .setSeekParameters(SeekParameters.NEXT_SYNC)
             .build()
             .apply {
-                if (initialVolume <= 0.0f) {
-                    trackSelectionParameters = trackSelectionParameters.buildUpon()
-                        .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, true)
-                        .build()
-                } else {
-                    trackSelectionParameters = trackSelectionParameters.buildUpon()
-                        .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false)
-                        .build()
-                }
+                // Audio is permanently disabled by design: Pure visual engine for 0% battery waste
+                trackSelectionParameters = trackSelectionParameters.buildUpon()
+                    .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, true)
+                    .build()
 
-                volume = initialVolume
-                setPlaybackSpeed(speed)
+                volume = 0.0f
 
                 when (playbackMode) {
                     PlaybackMode.LOOP -> {
@@ -309,12 +296,10 @@ class WallpaperPlayer(
 
     fun initializeAsync(
         surface: Surface?,
-        initialVolume: Float,
-        speed: Float,
         playbackMode: PlaybackMode,
         bufferConfig: BufferConfig = BufferConfig.DEFAULT
     ) = playbackScope.launch {
-        initialize(surface, initialVolume, speed, playbackMode, bufferConfig)
+        initialize(surface, playbackMode, bufferConfig)
     }
 
     fun releaseAsync() = playbackScope.launch {

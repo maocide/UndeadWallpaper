@@ -58,9 +58,7 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            window.setHideOverlayWindows(true)
-        }
+        window.setHideOverlayWindows(true)
 
         setSupportActionBar(binding.toolbar)
 
@@ -83,6 +81,7 @@ class MainActivity : AppCompatActivity() {
 
                 if (videoUri != null) {
                     preferencesManager.saveActiveVideoUri(videoUri.toString())
+                    preferencesManager.saveAnchorVideoUri(videoUri.toString())
                     WallpaperEventBus.emit(WallpaperEvent.VideoUriChanged)
 
                     if (tombstoneController.isBroken) {
@@ -121,12 +120,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkDisplayConfinement() {
-        val currentDisplayId = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            display?.displayId ?: Display.DEFAULT_DISPLAY
-        } else {
-            @Suppress("DEPRECATION")
-            windowManager.defaultDisplay.displayId
-        }
+        val currentDisplayId = display?.displayId ?: Display.DEFAULT_DISPLAY
 
         if (currentDisplayId != Display.DEFAULT_DISPLAY) {
             binding.fabSetWallpaper.isEnabled = false
@@ -149,12 +143,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun launchWallpaperPicker() {
-        val currentDisplayId = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            display?.displayId ?: Display.DEFAULT_DISPLAY
-        } else {
-            @Suppress("DEPRECATION")
-            windowManager.defaultDisplay.displayId
-        }
+        val currentDisplayId = display?.displayId ?: Display.DEFAULT_DISPLAY
 
         if (currentDisplayId != Display.DEFAULT_DISPLAY) {
             Toast.makeText(

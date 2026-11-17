@@ -11,7 +11,6 @@
 
     <!-- UI Strings -->
     <string name="pick_video">ビデオを選択</string>
-    <string name="setting_audio_enabled">オーディオを有効にする</string>
     <string name="playback_mode_setting">再生モード</string>
     <string name="recent_files">プレイリスト</string>
     <string name="playlist_instructions">長押しで順序変更、左右にスワイプで外す</string>
@@ -30,7 +29,7 @@
     <string name="about_header_features">機能</string>
     <string name="about_feature_loops">• スムーズなループ再生：お使いの携帯電話のどんなビデオも、シームレスで途切れないライブ壁紙に変えます。</string>
     <string name="about_feature_freedom">• 完全な自由：広告なし、アプリ内購入なし、くだらないもの一切なし。永久に。</string>
-    <string name="about_feature_control">• あなたがコントロール：オーディオのオン/オフをサポートし、最近使用したビデオを記録して素早く切り替えられます。</string>
+    <string name="about_feature_control">• あなたがコントロール：最近使用したビデオを記録し、素早い切り替えとシームレスなループを実現します。</string>
     <string name="playback_mode_loop">単体ループ</string>
     <string name="playback_mode_oneshot">ワンショット</string>
     <string name="playback_mode_loop_all">全ループ</string>
@@ -44,25 +43,17 @@
     <string name="vertical_position">垂直位置</string>
     <string name="zoom">ズーム</string>
     <string name="brightness">明るさ</string>
-    <string name="speed">速度</string>
+    <string name="contrast">コントラスト</string>
+    <string name="saturation">彩度</string>
     <string name="reset">リセット</string>
+    <string name="reset_all">すべてリセット</string>
     <string name="rotation">回転</string>
-
-    <!-- Home Screen Gestures -->
-    <string name="gesture_controls_header">ホーム画面のジェスチャ</string>
-    <string name="double_tap_label">ダブルタップ</string>
-    <string name="triple_tap_label">トリプルタップ</string>
-    <string name="gesture_action_none">なし</string>
-    <string name="gesture_action_pause_play">一時停止/再生</string>
-    <string name="gesture_action_skip">スキップ</string>
-    <string name="gesture_launcher_warning">注: 一部のランチャーでは壁紙のジェスチャがブロックされることがあります。</string>
 
     <!-- Error and Warning Messages -->
     <string name="error_permission_failed">選択したファイルの権限を取得できませんでした。</string>
     <string name="warning_4k_video">警告: 4K動画は一部のデバイスでクラッシュまたは遅延する可能性があります。</string>
     <string name="error_copy_failed">ビデオファイルのコピーに失敗しました。</string>
     <string name="error_cannot_play_video">このビデオファイルは再生できません。</string>
-    <string name="warning_high_speed_stuttering">高速再生は高解像度動画でカクつきを引き起こす可能性があります。</string>
     <string name="error_file_picker_not_available">ファイルピッカーがシステムで利用できません。</string>
     <string name="error_could_not_read_video_duration">動画の長さを読み取れませんでした。</string>
     <string name="warning_random_start_time_delay">ランダムはシークによる遅延を引き起こす可能性があります</string>
@@ -83,8 +74,8 @@
     <string name="importing_video">新しいファイルに侵食中</string>
     <string name="preparing_assets">アンデッドを覚醒中</string>
     <string name="positioning_header">配置</string>
+    <string name="color_header">カラー</string>
     <string name="general_header">一般</string>
-    <string name="volume_label">音量</string>
     <string name="global_settings_header">グローバル設定</string>
     <string name="debug_options_header">デバッグオプション</string>
     <string name="debug_logging_description">ハードクラッシュをキャッチするためにローカルファイルのログ記録を有効にします。問題が発生していない限り、これはオフにしておくことをお勧めします。</string>
@@ -102,8 +93,9 @@
     <string name="breadcrumb_pan">パン</string>
     <string name="breadcrumb_rotation">回転</string>
     <string name="breadcrumb_brightness">明るさ</string>
-    <string name="breadcrumb_speed">速度</string>
-    <string name="breadcrumb_volume">音量</string>
+    <string name="breadcrumb_contrast">コントラスト</string>
+    <string name="breadcrumb_saturation">彩度</string>
+    <string name="breadcrumb_colors">カラー</string>
     <string name="breadcrumb_more">他 +%1$d</string>
 
     <string name="remove_file_title">動画を外す</string>
@@ -144,4 +136,8 @@
     <string name="flip_vertical">垂直</string>
     <string name="error_file_too_large">選択した動画が500 MBの制限を超えています。</string>
     <string name="warning_status_bar_oem">一部のランチャーではサポートされていない場合があります。</string>
+
+    <!-- Undead Affects -->
+    <string name="undead_affects_description">ホーム画面の表面への接触によって引き起こされる物理反応。</string>
+    <string name="undead_affects_haptics_description">物理接触時の振動レスポンス。</string>
 </resources>

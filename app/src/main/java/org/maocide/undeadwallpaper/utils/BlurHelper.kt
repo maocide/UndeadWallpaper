@@ -3,7 +3,6 @@ package org.maocide.undeadwallpaper.utils
 import android.graphics.Bitmap
 import android.graphics.RenderEffect
 import android.graphics.Shader
-import android.os.Build
 import android.widget.ImageView
 
 /**
@@ -46,7 +45,7 @@ object BlurHelper {
 
     /**
      * Prepares and applies the blurred bitmap to the specified [ImageView].
-     * On Android 12+ (API 31+), applies hardware [RenderEffect.createBlurEffect].
+     * Applies hardware [RenderEffect.createBlurEffect] (API 31+ baseline).
      */
     fun applyBlurToImageView(
         imageView: ImageView,
@@ -56,23 +55,19 @@ object BlurHelper {
     ) {
         if (bitmap == null) {
             imageView.setImageDrawable(null)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                imageView.setRenderEffect(null)
-            }
+            imageView.setRenderEffect(null)
             return
         }
 
         try {
             val blurBitmap = prepareBlurBitmap(bitmap, maxDimension)
             imageView.setImageBitmap(blurBitmap)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                val blurEffect = RenderEffect.createBlurEffect(
-                    blurRadius,
-                    blurRadius,
-                    Shader.TileMode.CLAMP
-                )
-                imageView.setRenderEffect(blurEffect)
-            }
+            val blurEffect = RenderEffect.createBlurEffect(
+                blurRadius,
+                blurRadius,
+                Shader.TileMode.CLAMP
+            )
+            imageView.setRenderEffect(blurEffect)
         } catch (t: Throwable) {
             FileLogger.e(TAG, "Error applying blur effect to ImageView", t)
         }

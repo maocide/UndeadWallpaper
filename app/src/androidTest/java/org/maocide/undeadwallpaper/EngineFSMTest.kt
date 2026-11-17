@@ -28,7 +28,7 @@ class EngineFSMTest {
         
         // Complete init
         val effect2 = fsm.transition(EngineEvent.InitializationComplete)
-        assertEquals(EngineState.Ready(isManuallyPaused = false), fsm.state)
+        assertEquals(EngineState.Ready, fsm.state)
         assertTrue(effect2 is EngineEffect.None)
     }
 
@@ -42,45 +42,15 @@ class EngineFSMTest {
         
         // Screen off
         val effect1 = fsm.transition(EngineEvent.VisibilityChanged(isVisible = false))
-        assertEquals(EngineState.Ready(isManuallyPaused = false), fsm.state)
+        assertEquals(EngineState.Ready, fsm.state)
         assertTrue(effect1 is EngineEffect.ApplyPlayWhenReady)
         assertEquals(false, (effect1 as EngineEffect.ApplyPlayWhenReady).play)
         
         // Screen on
         val effect2 = fsm.transition(EngineEvent.VisibilityChanged(isVisible = true))
-        assertEquals(EngineState.Ready(isManuallyPaused = false), fsm.state)
+        assertEquals(EngineState.Ready, fsm.state)
         assertTrue(effect2 is EngineEffect.ApplyPlayWhenReady)
         assertEquals(true, (effect2 as EngineEffect.ApplyPlayWhenReady).play)
-    }
-
-    @Test
-    fun testUserManualPauseOverridesVisibility() {
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val fsm = EngineFSM(context)
-        
-        fsm.transition(EngineEvent.InitializeRequested)
-        fsm.transition(EngineEvent.InitializationComplete)
-        
-        // User double taps to pause
-        val effect1 = fsm.transition(EngineEvent.UserTogglePause)
-        assertEquals(EngineState.Ready(isManuallyPaused = true), fsm.state)
-        assertTrue(effect1 is EngineEffect.ApplyPlayWhenReady)
-        assertEquals(false, (effect1 as EngineEffect.ApplyPlayWhenReady).play)
-        
-        // Screen turns off, then back on
-        fsm.transition(EngineEvent.VisibilityChanged(isVisible = false))
-        val effect2 = fsm.transition(EngineEvent.VisibilityChanged(isVisible = true))
-        
-        // The engine should remember it is manually paused, and NOT resume playing!
-        assertEquals(EngineState.Ready(isManuallyPaused = true), fsm.state)
-        assertTrue(effect2 is EngineEffect.ApplyPlayWhenReady)
-        assertEquals(false, (effect2 as EngineEffect.ApplyPlayWhenReady).play)
-        
-        // User double taps again to unpause
-        val effect3 = fsm.transition(EngineEvent.UserTogglePause)
-        assertEquals(EngineState.Ready(isManuallyPaused = false), fsm.state)
-        assertTrue(effect3 is EngineEffect.ApplyPlayWhenReady)
-        assertEquals(true, (effect3 as EngineEffect.ApplyPlayWhenReady).play)
     }
 
     @Test
@@ -120,11 +90,6 @@ class EngineFSMTest {
         assertEquals(EngineState.Thanatosis("Container malformed", isZeroDecoder = false), fsm.state)
         assertTrue(effect1 is EngineEffect.StartThanatosis)
 
-        // Tactile taps are ignored (plays dead)
-        val effect2 = fsm.transition(EngineEvent.UserTogglePause)
-        assertEquals(EngineState.Thanatosis("Container malformed", isZeroDecoder = false), fsm.state)
-        assertTrue(effect2 is EngineEffect.None)
-
         // Visibility throttles playback
         val effect3 = fsm.transition(EngineEvent.VisibilityChanged(isVisible = false))
         assertEquals(EngineEffect.ApplyPlayWhenReady(false), effect3)
@@ -138,7 +103,7 @@ class EngineFSMTest {
         assertTrue(effect5 is EngineEffect.StartInitialization)
 
         fsm.transition(EngineEvent.InitializationComplete)
-        assertEquals(EngineState.Ready(isManuallyPaused = false), fsm.state)
+        assertEquals(EngineState.Ready, fsm.state)
     }
 }
 

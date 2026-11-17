@@ -37,24 +37,8 @@ class EngineFSMTest {
     fun initializationComplete_fromInitializing_transitionsToReady() {
         fsm.transition(EngineEvent.InitializeRequested)
         val effect = fsm.transition(EngineEvent.InitializationComplete)
-        assertEquals(EngineState.Ready(isManuallyPaused = false), fsm.state)
+        assertEquals(EngineState.Ready, fsm.state)
         assertEquals(EngineEffect.None, effect)
-    }
-
-    @Test
-    fun userTogglePause_inReadyState_togglesPause() {
-        fsm.transition(EngineEvent.InitializeRequested)
-        fsm.transition(EngineEvent.InitializationComplete)
-
-        // First tap: pauses
-        val effect1 = fsm.transition(EngineEvent.UserTogglePause)
-        assertEquals(EngineState.Ready(isManuallyPaused = true), fsm.state)
-        assertEquals(EngineEffect.ApplyPlayWhenReady(false), effect1)
-
-        // Second tap: resumes
-        val effect2 = fsm.transition(EngineEvent.UserTogglePause)
-        assertEquals(EngineState.Ready(isManuallyPaused = false), fsm.state)
-        assertEquals(EngineEffect.ApplyPlayWhenReady(true), effect2)
     }
 
     @Test
@@ -80,17 +64,6 @@ class EngineFSMTest {
         val thanatosisEffect = effect as EngineEffect.StartThanatosis
         assertEquals("Hardware VPU Starvation", thanatosisEffect.cause)
         assertEquals(true, thanatosisEffect.isZeroDecoder)
-    }
-
-    @Test
-    fun thanatosis_ignoresUserTogglePause_playsDead() {
-        fsm.transition(EngineEvent.EnterThanatosis("Fatal media error", isZeroDecoder = false))
-        assertEquals(EngineState.Thanatosis("Fatal media error", isZeroDecoder = false), fsm.state)
-
-        // User tries double/triple tap: organism ignores tactile stimuli
-        val effect = fsm.transition(EngineEvent.UserTogglePause)
-        assertEquals(EngineState.Thanatosis("Fatal media error", isZeroDecoder = false), fsm.state)
-        assertEquals(EngineEffect.None, effect)
     }
 
     @Test
@@ -149,7 +122,7 @@ class EngineFSMTest {
 
         // Resurrected to Ready
         fsm.transition(EngineEvent.InitializationComplete)
-        assertEquals(EngineState.Ready(isManuallyPaused = false), fsm.state)
+        assertEquals(EngineState.Ready, fsm.state)
     }
 
     @Test

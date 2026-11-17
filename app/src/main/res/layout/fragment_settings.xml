@@ -41,6 +41,8 @@
                     android:layout_width="0dp"
                     android:layout_height="0dp"
                     app:layout_constraintDimensionRatio="16:9"
+                    android:clipChildren="false"
+                    android:clipToPadding="false"
                     android:descendantFocusability="blocksDescendants"
                     app:layout_constraintTop_toTopOf="parent"
                     app:layout_constraintStart_toStartOf="parent"
@@ -58,13 +60,33 @@
                         android:layout_height="match_parent"
                         android:background="#66000000" />
 
-                    <androidx.media3.ui.PlayerView
-                        android:id="@+id/video_preview"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/preview_frame_container"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
                         android:layout_gravity="center"
-                        app:use_controller="false"
-                        app:surface_type="texture_view" />
+                        android:clipToOutline="true"
+                        app:cardBackgroundColor="@android:color/black"
+                        app:cardCornerRadius="@dimen/preview_phone_frame_corner_radius"
+                        app:strokeWidth="1.5dp"
+                        app:strokeColor="?attr/colorOutline"
+                        app:cardElevation="6dp">
+
+                        <TextureView
+                            android:id="@+id/video_preview"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent" />
+
+                        <View
+                            android:id="@+id/preview_camera_hole"
+                            android:layout_width="6dp"
+                            android:layout_height="6dp"
+                            android:layout_gravity="top|center_horizontal"
+                            android:layout_marginTop="6dp"
+                            android:background="@drawable/bg_camera_punch_hole"
+                            android:importantForAccessibility="no" />
+
+                    </com.google.android.material.card.MaterialCardView>
 
                 </FrameLayout>
 
@@ -75,7 +97,7 @@
                     android:layout_marginTop="10dp"
                     android:layout_marginEnd="10dp"
                     app:cardCornerRadius="20dp"
-                    app:cardElevation="0dp"
+                    app:cardElevation="8dp"
                     app:strokeWidth="0dp"
                     app:cardBackgroundColor="#D9141E18"
                     android:clickable="true"
@@ -101,18 +123,29 @@
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/button_pick_video"
                     style="@style/Widget.Material3.Button.ElevatedButton"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:layout_marginEnd="14dp"
+                    android:layout_marginBottom="12dp"
+                    android:padding="0dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:insetLeft="0dp"
+                    android:insetRight="0dp"
+                    android:alpha="0.85"
+                    android:elevation="8dp"
+                    app:cornerRadius="22dp"
+                    app:icon="@drawable/ic_load_in"
+                    app:iconGravity="textStart"
+                    app:iconPadding="0dp"
+                    app:iconSize="22dp"
+                    app:iconTint="?attr/colorPrimary"
                     app:strokeWidth="1dp"
                     app:strokeColor="?attr/colorPrimary"
-                    android:alpha="0.85"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="16dp"
-                    android:text="@string/pick_video"
-                    app:cornerRadius="24dp"
-                    app:icon="@drawable/ic_load_in"
+                    android:contentDescription="@string/pick_video"
+                    android:tooltipText="@string/pick_video"
                     app:layout_constraintBottom_toBottomOf="@id/video_preview_container"
-                    app:layout_constraintEnd_toEndOf="@id/video_preview_container"
-                    app:layout_constraintStart_toStartOf="@id/video_preview_container" />
+                    app:layout_constraintEnd_toEndOf="@id/video_preview_container" />
             </androidx.constraintlayout.widget.ConstraintLayout>
 
         </com.google.android.material.card.MaterialCardView>
@@ -417,6 +450,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="48dp"
                     android:layout_marginTop="8dp"
+                    android:clipChildren="false"
                     android:background="?attr/selectableItemBackground"
                     android:clickable="true"
                     android:focusable="true">
@@ -429,12 +463,32 @@
                         android:src="@drawable/ic_expand_more"
                         app:tint="?attr/colorPrimary"
                         android:importantForAccessibility="no" />
+
+                    <TextView
+                        android:id="@+id/badge_new_global_settings"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="end|center_vertical"
+                        android:layout_marginEnd="20dp"
+                        android:background="@drawable/bg_new_stamp"
+                        android:paddingStart="6dp"
+                        android:paddingEnd="6dp"
+                        android:paddingTop="1dp"
+                        android:paddingBottom="1dp"
+                        android:text="@string/badge_new_stamp"
+                        android:textSize="10sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.08"
+                        android:textColor="?attr/colorPrimary"
+                        android:visibility="gone"
+                        android:importantForAccessibility="no" />
                 </FrameLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
+        <!-- Undead Affects Card -->
         <com.google.android.material.card.MaterialCardView
-            android:id="@+id/card_touch_controls"
+            android:id="@+id/card_undead_affects"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
@@ -442,6 +496,7 @@
             app:cardCornerRadius="24dp"
             app:strokeWidth="0dp"
             app:cardElevation="8dp"
+            app:cardBackgroundColor="?attr/colorSurface"
             app:layout_constraintTop_toBottomOf="@id/card_settings"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent">
@@ -449,38 +504,59 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical">
+                android:orientation="vertical"
+                android:clipChildren="false">
 
                 <LinearLayout
-                    android:id="@+id/header_touch_controls"
+                    android:id="@+id/header_undead_affects"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
+                    android:gravity="center_vertical"
                     android:padding="16dp"
+                    android:clipChildren="false"
                     android:background="?attr/selectableItemBackground"
                     android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical">
+                    android:focusable="true">
 
                     <ImageView
                         android:layout_width="24dp"
                         android:layout_height="24dp"
-                        android:src="@drawable/ic_touch_app"
+                        android:src="@drawable/ic_undead_hand"
                         app:tint="?attr/colorPrimary"
                         android:layout_marginEnd="8dp"
-                        android:contentDescription="@string/gesture_controls_header" />
+                        android:importantForAccessibility="no"
+                        android:contentDescription="@string/undead_affects_icon_description" />
 
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="@string/gesture_controls_header"
+                        android:text="@string/undead_affects_card_title"
                         android:textAppearance="?attr/textAppearanceTitleMedium"
                         android:textStyle="bold"
                         android:textColor="?attr/colorPrimary" />
 
+                    <TextView
+                        android:id="@+id/badge_new_undead_affects"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="10dp"
+                        android:background="@drawable/bg_new_stamp"
+                        android:paddingStart="6dp"
+                        android:paddingEnd="6dp"
+                        android:paddingTop="1dp"
+                        android:paddingBottom="1dp"
+                        android:text="@string/badge_new_stamp"
+                        android:textSize="10sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.08"
+                        android:textColor="?attr/colorPrimary"
+                        android:visibility="gone"
+                        android:importantForAccessibility="no" />
+
                     <ImageView
-                        android:id="@+id/icon_touch_chevron"
+                        android:id="@+id/icon_undead_affects_chevron"
                         android:layout_width="24dp"
                         android:layout_height="24dp"
                         android:src="@drawable/ic_expand_more"
@@ -489,7 +565,7 @@
                 </LinearLayout>
 
                 <LinearLayout
-                    android:id="@+id/content_touch_controls"
+                    android:id="@+id/content_undead_affects"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
@@ -498,93 +574,106 @@
                     android:paddingEnd="16dp"
                     android:paddingBottom="16dp">
 
-                <!-- Double Tap -->
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    android:text="@string/double_tap_label" />
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/undead_affects_description"
+                        android:textAppearance="?attr/textAppearanceCaption"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:layout_marginBottom="12dp" />
 
-                <com.google.android.material.chip.ChipGroup
-                    android:id="@+id/double_tap_group"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    app:singleSelection="true"
-                    app:selectionRequired="true"
-                    app:chipSpacingHorizontal="8dp">
-
-                    <com.google.android.material.chip.Chip
-                        android:id="@+id/double_tap_none"
-                        style="@style/Widget.MaterialComponents.Chip.Choice"
+                    <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:checked="true"
-                        android:text="@string/gesture_action_none" />
+                        android:text="@string/undead_affects_type_label"
+                        android:textAppearance="?attr/textAppearanceBodyMedium" />
 
-                    <com.google.android.material.chip.Chip
-                        android:id="@+id/double_tap_pause"
-                        style="@style/Widget.MaterialComponents.Chip.Choice"
-                        android:layout_width="wrap_content"
+                    <com.google.android.material.chip.ChipGroup
+                        android:id="@+id/chip_group_kinetic_effect"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="@string/gesture_action_pause_play" />
+                        android:layout_marginTop="4dp"
+                        app:singleSelection="true"
+                        app:selectionRequired="true"
+                        app:chipSpacingHorizontal="8dp">
 
-                    <com.google.android.material.chip.Chip
-                        android:id="@+id/double_tap_skip"
-                        style="@style/Widget.MaterialComponents.Chip.Choice"
-                        android:layout_width="wrap_content"
+                        <com.google.android.material.chip.Chip
+                            android:id="@+id/chip_kinetic_none"
+                            style="@style/Widget.MaterialComponents.Chip.Choice"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="true"
+                            android:text="@string/undead_affect_none" />
+
+                        <com.google.android.material.chip.Chip
+                            android:id="@+id/chip_kinetic_bounce"
+                            style="@style/Widget.MaterialComponents.Chip.Choice"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/undead_affect_bounce" />
+
+                        <com.google.android.material.chip.Chip
+                            android:id="@+id/chip_kinetic_jolt"
+                            style="@style/Widget.MaterialComponents.Chip.Choice"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/undead_affect_jolt" />
+
+                        <com.google.android.material.chip.Chip
+                            android:id="@+id/chip_kinetic_hop"
+                            style="@style/Widget.MaterialComponents.Chip.Choice"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/undead_affect_hop" />
+
+
+                    </com.google.android.material.chip.ChipGroup>
+
+                    <LinearLayout
+                        android:id="@+id/layout_kinetic_sub_settings"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="@string/gesture_action_skip" />
+                        android:orientation="vertical"
+                        android:layout_marginTop="12dp"
+                        android:visibility="gone">
 
-                </com.google.android.material.chip.ChipGroup>
+                        <TextView
+                            android:id="@+id/label_kinetic_strength"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/undead_affects_strength_label"
+                            android:textAppearance="?attr/textAppearanceBodyMedium" />
 
-                <!-- Triple Tap -->
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    android:text="@string/triple_tap_label" />
+                        <com.google.android.material.slider.Slider
+                            android:id="@+id/slider_kinetic_strength"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:valueFrom="0.5"
+                            android:valueTo="2.0"
+                            android:value="1.0"
+                            android:stepSize="0.1" />
 
-                <com.google.android.material.chip.ChipGroup
-                    android:id="@+id/triple_tap_group"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    app:singleSelection="true"
-                    app:selectionRequired="true"
-                    app:chipSpacingHorizontal="8dp">
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/switch_kinetic_haptics"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="@string/undead_affects_haptics_label"
+                            android:textAppearance="?attr/textAppearanceBodyLarge" />
 
-                    <com.google.android.material.chip.Chip
-                        android:id="@+id/triple_tap_none"
-                        style="@style/Widget.MaterialComponents.Chip.Choice"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:checked="true"
-                        android:text="@string/gesture_action_none" />
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/undead_affects_haptics_description"
+                            android:textAppearance="?attr/textAppearanceCaption"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
 
-                    <com.google.android.material.chip.Chip
-                        android:id="@+id/triple_tap_pause"
-                        style="@style/Widget.MaterialComponents.Chip.Choice"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/gesture_action_pause_play" />
-
-                    <com.google.android.material.chip.Chip
-                        android:id="@+id/triple_tap_skip"
-                        style="@style/Widget.MaterialComponents.Chip.Choice"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/gesture_action_skip" />
-
-                </com.google.android.material.chip.ChipGroup>
+                    </LinearLayout>
 
                 </LinearLayout>
 
             </LinearLayout>
-
-
         </com.google.android.material.card.MaterialCardView>
-
 
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/card_parallax"
@@ -596,14 +685,15 @@
             app:strokeWidth="0dp"
             app:cardElevation="8dp"
             app:cardBackgroundColor="?attr/colorSurface"
-            app:layout_constraintTop_toBottomOf="@id/card_touch_controls"
+            app:layout_constraintTop_toBottomOf="@id/card_undead_affects"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical">
+                android:orientation="vertical"
+                android:clipChildren="false">
 
                 <LinearLayout
                     android:id="@+id/header_parallax"
@@ -612,6 +702,7 @@
                     android:orientation="horizontal"
                     android:gravity="center_vertical"
                     android:padding="16dp"
+                    android:clipChildren="false"
                     android:background="?attr/selectableItemBackground"
                     android:clickable="true"
                     android:focusable="true">
@@ -632,6 +723,24 @@
                         android:textAppearance="?attr/textAppearanceTitleMedium"
                         android:textStyle="bold"
                         android:textColor="?attr/colorPrimary" />
+
+                    <TextView
+                        android:id="@+id/badge_new_parallax"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="10dp"
+                        android:background="@drawable/bg_new_stamp"
+                        android:paddingStart="6dp"
+                        android:paddingEnd="6dp"
+                        android:paddingTop="1dp"
+                        android:paddingBottom="1dp"
+                        android:text="@string/badge_new_stamp"
+                        android:textSize="10sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.08"
+                        android:textColor="?attr/colorPrimary"
+                        android:visibility="gone"
+                        android:importantForAccessibility="no" />
 
                     <ImageView
                         android:id="@+id/icon_parallax_chevron"

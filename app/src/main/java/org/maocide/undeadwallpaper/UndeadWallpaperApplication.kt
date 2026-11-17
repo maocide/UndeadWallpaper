@@ -6,9 +6,11 @@ import org.maocide.undeadwallpaper.utils.FileLogger
 import android.app.Application
 import android.util.Log
 import androidx.appcompat.app.AppCompatDelegate
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import org.maocide.undeadwallpaper.data.VideoFileManager
 
@@ -37,6 +39,9 @@ class UndeadWallpaperApplication : Application() {
             try {
                 VideoFileManager(this@UndeadWallpaperApplication).performStartupMaintenance()
             } catch (e: Exception) {
+                if (e is CancellationException) {
+                    ensureActive()
+                }
                 FileLogger.e("UndeadWallpaperApplication", "Startup maintenance failed", e)
             }
         }

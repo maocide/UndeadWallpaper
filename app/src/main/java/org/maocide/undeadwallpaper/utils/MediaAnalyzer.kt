@@ -394,8 +394,6 @@ object MediaAnalyzer {
      * This method safely downscales the thumbnail first for performance.
      */
     fun extractWallpaperColors(thumbnail: Bitmap): WallpaperColorsData? {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1) return null
-
         return try {
             // Downscale for performance
             val scaledThumb = Bitmap.createScaledBitmap(thumbnail, 112, 112, true)

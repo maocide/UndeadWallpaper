@@ -11,7 +11,6 @@
 
     <!-- UI Strings -->
     <string name="pick_video">Pick Video</string>
-    <string name="setting_audio_enabled">Enable Audio</string>
     <string name="playback_mode_setting">Playback Mode</string>
     <string name="recent_files">Playlist</string>
     <string name="playlist_instructions">Long-press to reorder. Swipe left or right to remove.</string>
@@ -26,7 +25,6 @@
 
     <!-- SharedPreferences Keys. These are not meant for translation. -->
     <string name="video_uri" translatable="false">video_uri</string>
-    <string name="video_audio_enabled" translatable="false">video_audio_enabled</string>
     <string name="playback_mode" translatable="false">playback_mode</string>
     <string name="video_zoom_level" translatable="false">video_zoom_level</string>
     <string name="video_start_ms" translatable="false">video_start_ms</string>
@@ -45,7 +43,7 @@
     <string name="about_header_features">What it Does</string>
     <string name="about_feature_loops">• Silky-Smooth Loops: Turns any video on your phone into a seamless, stutter-free live wallpaper.</string>
     <string name="about_feature_freedom">• Total Freedom: No ads, no in-app purchases, no bullshit. Ever.</string>
-    <string name="about_feature_control">• You\'re in Control: Supports audio toggles and keeps track of your recent videos for quick swaps.</string>
+    <string name="about_feature_control">• You\'re in Control: Keeps track of your recent videos for quick swaps and seamless loops.</string>
     <string name="playback_mode_loop">Loop One</string>
     <string name="playback_mode_oneshot">One Shot</string>
     <string name="playback_mode_loop_all">Loop All</string>
@@ -59,28 +57,20 @@
     <string name="vertical_position">Vertical Position</string>
     <string name="zoom">Zoom</string>
     <string name="brightness">Brightness</string>
-    <string name="speed">Speed</string>
+    <string name="contrast">Contrast</string>
+    <string name="saturation">Saturation</string>
     <string name="reset">Reset</string>
+    <string name="reset_all">Reset All</string>
     <string name="rotation">Rotation</string>
     <string name="mirror_video">Mirror Video</string>
     <string name="flip_horizontal">Horizontal</string>
     <string name="flip_vertical">Vertical</string>
-
-    <!-- Home Screen Gestures -->
-    <string name="gesture_controls_header">Home Screen Gestures</string>
-    <string name="double_tap_label">Double Tap</string>
-    <string name="triple_tap_label">Triple Tap</string>
-    <string name="gesture_action_none">None</string>
-    <string name="gesture_action_pause_play">Pause/Play</string>
-    <string name="gesture_action_skip">Skip</string>
-    <string name="gesture_launcher_warning">Note: Some launchers may block wallpaper gestures.</string>
 
     <!-- Error and Warning Messages -->
     <string name="error_permission_failed">Failed to get permission for the selected file.</string>
     <string name="warning_4k_video">Warning: 4K videos may crash or lag on some devices.</string>
     <string name="error_copy_failed">Failed to copy video file.</string>
     <string name="error_cannot_play_video">Cannot play this video file.</string>
-    <string name="warning_high_speed_stuttering">High speeds may cause stuttering on high-res videos.</string>
     <string name="error_file_picker_not_available">File picker not available in the system!</string>
     <string name="error_could_not_read_video_duration">Could not read video duration.</string>
     <string name="warning_random_start_time_delay">Random might cause delay due to seek</string>
@@ -100,15 +90,15 @@
     <string name="importing_video">Infesting new files</string>
     <string name="preparing_assets">Awakening the undead</string>
     <string name="positioning_header">Positioning</string>
+    <string name="color_header">Color</string>
     <string name="general_header">General</string>
-    <string name="volume_label">Volume</string>
     <string name="global_settings_header">Global Settings</string>
     <string name="debug_options_header">Debug Options</string>
     <string name="debug_logging_description">Enable local file logging to catch hard crashes. It is recommended to leave this off unless you are experiencing issues.</string>
     <string name="debug_enable_logging">Enable Local File Logging</string>
     <string name="debug_clear_log">Clear Log</string>
     <string name="debug_share_log">Share Log</string>
-    <string name="breadcrumb_placeholder" translatable="false">Vol, Pan, Speed</string>
+    <string name="breadcrumb_placeholder" translatable="false">Zoom, Pan, Rot</string>
 
     <!-- Start Time Settings -->
     <string name="start_time_label">On Visible</string>
@@ -120,8 +110,9 @@
     <string name="breadcrumb_pan">Pan</string>
     <string name="breadcrumb_rotation">Rotation</string>
     <string name="breadcrumb_brightness">Brightness</string>
-    <string name="breadcrumb_speed">Speed</string>
-    <string name="breadcrumb_volume">Volume</string>
+    <string name="breadcrumb_contrast">Contrast</string>
+    <string name="breadcrumb_saturation">Saturation</string>
+    <string name="breadcrumb_colors">Color</string>
     <string name="breadcrumb_more">+%1$d more</string>
 
     <string name="remove_file_title">Remove Video</string>
@@ -159,4 +150,18 @@
 
     <string name="error_file_too_large">Selected video exceeds the 500 MB limit.</string>
     <string name="warning_status_bar_oem">May not be supported by all launchers.</string>
+
+    <!-- Undead Affects -->
+    <string name="badge_new_stamp" translatable="false">NEW!</string>
+    <string name="undead_affects_icon_description" translatable="false">Undead Affects</string>
+    <string name="undead_affects_card_title" translatable="false">Undead Affects</string>
+    <string name="undead_affects_description">Physical reactions triggered by making contact with the home surface.</string>
+    <string name="undead_affects_type_label" translatable="false">Touch Reflex</string>
+    <string name="undead_affect_none" translatable="false">None</string>
+    <string name="undead_affect_jolt" translatable="false">Shake</string>
+    <string name="undead_affect_hop" translatable="false">Hop</string>
+    <string name="undead_affect_bounce" translatable="false">Bounce</string>
+    <string name="undead_affects_strength_label" translatable="false">Affliction</string>
+    <string name="undead_affects_haptics_label" translatable="false">Force Feedback</string>
+    <string name="undead_affects_haptics_description">Vibration response upon physical contact.</string>
 </resources>

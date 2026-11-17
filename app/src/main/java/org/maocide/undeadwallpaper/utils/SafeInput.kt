@@ -32,14 +32,10 @@ fun View.setSafeOnClickListener(
         val activity = v.context as? Activity
 
         // Obscuration Check: Drop immediately if fully or partially obscured
-        if ((flags and MotionEvent.FLAG_WINDOW_IS_OBSCURED) != 0) {
+        if ((flags and MotionEvent.FLAG_WINDOW_IS_OBSCURED) != 0 ||
+            (flags and MotionEvent.FLAG_WINDOW_IS_PARTIALLY_OBSCURED) != 0
+        ) {
             return@setOnTouchListener true
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            if ((flags and MotionEvent.FLAG_WINDOW_IS_PARTIALLY_OBSCURED) != 0) {
-                return@setOnTouchListener true
-            }
         }
 
         // Hardware device check: Drop invalid hardware device touch injection in release builds
@@ -112,14 +108,10 @@ fun View.preventDoubleInput(minTapDurationMs: Long = 10L) {
         val activity = v.context as? Activity
 
         // Obscuration Check: Drop immediately if fully or partially obscured (anti-tapjacking)
-        if ((flags and MotionEvent.FLAG_WINDOW_IS_OBSCURED) != 0) {
+        if ((flags and MotionEvent.FLAG_WINDOW_IS_OBSCURED) != 0 ||
+            (flags and MotionEvent.FLAG_WINDOW_IS_PARTIALLY_OBSCURED) != 0
+        ) {
             return@setOnTouchListener true
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            if ((flags and MotionEvent.FLAG_WINDOW_IS_PARTIALLY_OBSCURED) != 0) {
-                return@setOnTouchListener true
-            }
         }
 
         // Hardware device check: Drop virtual device touch injection in release builds

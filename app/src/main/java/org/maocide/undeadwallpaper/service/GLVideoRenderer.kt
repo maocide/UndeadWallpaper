@@ -1,7 +1,13 @@
 package org.maocide.undeadwallpaper.service
 
 import org.maocide.undeadwallpaper.model.ScalingMode
+import org.maocide.undeadwallpaper.model.RenderTransforms
+import org.maocide.undeadwallpaper.model.VideoSettings
+import org.maocide.undeadwallpaper.kinetic.KineticDeltas
+import org.maocide.undeadwallpaper.render.RenderGeometryCalculator
+import org.maocide.undeadwallpaper.render.RenderShaders
 import org.maocide.undeadwallpaper.utils.FileLogger
+import java.util.concurrent.atomic.AtomicReference
 
 import android.content.Context
 import android.os.Build
@@ -61,7 +67,9 @@ class GLVideoRenderer(private val context: Context, private val onGlContextLost:
     private var videoSurfaceDeferred = CompletableDeferred<Surface?>()
     private var textureId: Int = 0
 
+    @Volatile
     private var videoWidth = 0
+    @Volatile
     private var videoHeight = 0
     private val mvpMatrix = FloatArray(16)
     private val stMatrix = FloatArray(16)
@@ -93,9 +101,6 @@ class GLVideoRenderer(private val context: Context, private val onGlContextLost:
     private val projectionMatrix = FloatArray(16)
     private val viewMatrix = FloatArray(16)
 
-    // Parallax offset variables.
-    @Volatile
-    private var parallaxTranslateX = 0.0f
 
     // Transition lockout to prevent stale frames from rendering with pending matrix updates
     @Volatile
@@ -118,36 +123,14 @@ class GLVideoRenderer(private val context: Context, private val onGlContextLost:
         }
     }
 
-    private val vertexShaderCode = """
-        attribute vec4 aPosition;
-        attribute vec4 aTextureCoord;
-        uniform mat4 uMVPMatrix;
-        uniform mat4 uSTMatrix;
-        varying vec2 vTextureCoord;
-        void main() {
-          gl_Position = uMVPMatrix * aPosition;
-          vTextureCoord = (uSTMatrix * aTextureCoord).xy;
-        }
-    """
-
-    private val fragmentShaderCode = """
-        #extension GL_OES_EGL_image_external : require
-        precision mediump float;
-        varying vec2 vTextureCoord;
-        uniform samplerExternalOES sTexture;
-        uniform float uBrightness;
-        void main() {
-          vec4 color = texture2D(sTexture, vTextureCoord);
-          gl_FragColor = vec4(color.rgb + (uBrightness - 1.0) * 0.5, color.a);
-        }
-    """
-
     private var programId = 0
     private var maPositionHandle = 0
     private var maTextureHandle = 0
     private var muMVPMatrixHandle = 0
     private var muSTMatrixHandle = 0
     private var muBrightnessHandle = 0
+    private var muContrastHandle = 0
+    private var muSaturationHandle = 0
 
     private val triangleVerticesData = floatArrayOf(
         -1.0f, -1.0f, 0f, 0f, 0f,
@@ -157,15 +140,16 @@ class GLVideoRenderer(private val context: Context, private val onGlContextLost:
     )
     private var triangleVertices: FloatBuffer
 
-    // User Transform Variables
-    private var currentScalingMode: ScalingMode = ScalingMode.FILL
-    private var userTranslateX = 0f
-    private var userTranslateY = 0f
-    private var userZoom = 1.0f
-    private var userRotation = 0f
-    private var userBrightness = 1.0f
-    private var userFlipHorizontal = false
-    private var userFlipVertical = false
+    // Triple-Buffer Mailbox for thread-safe lock-free transform handoff (0 GC allocations)
+    // Producer state & write buffer (Service / Main thread only)
+    private val producerState = RenderTransforms()
+    private var writeBuffer = RenderTransforms()
+    private val sharedMailbox = AtomicReference(RenderTransforms())
+
+    // Consumer state (GL Render thread only)
+    private var readBuffer = RenderTransforms()
+    @Volatile
+    private var hasNewTransforms = false
 
     @Volatile
     private var surfaceDrawTimestamp: Long = 0L
@@ -184,11 +168,70 @@ class GLVideoRenderer(private val context: Context, private val onGlContextLost:
         return surfaceDrawTimestamp
     }
 
+    /**
+     * Publishes a consolidated transform snapshot atomically into the Triple-Buffer Mailbox.
+     * Operates lock-free on the Producer thread with 0 heap allocations.
+     */
+    fun publishTransforms(
+        scalingMode: ScalingMode,
+        translateX: Float,
+        translateY: Float,
+        zoom: Float,
+        rotation: Float,
+        brightness: Float,
+        contrast: Float,
+        saturation: Float,
+        flipHorizontal: Boolean,
+        flipVertical: Boolean,
+        parallaxX: Float = producerState.parallaxX
+    ) {
+        producerState.set(
+            scalingMode = scalingMode,
+            translateX = translateX,
+            translateY = translateY,
+            zoom = zoom,
+            rotation = rotation,
+            brightness = brightness,
+            contrast = contrast,
+            saturation = saturation,
+            flipHorizontal = flipHorizontal,
+            flipVertical = flipVertical,
+            parallaxX = parallaxX
+        )
+        writeBuffer.copyFrom(producerState)
+        writeBuffer = sharedMailbox.getAndSet(writeBuffer)
+        hasNewTransforms = true
+    }
+
+    /**
+     * Publishes a synthesized transform snapshot combining base video settings, physical
+     * kinetic offsets, and display luma scaling atomically into the Triple-Buffer Mailbox.
+     * Operates lock-free on the Producer thread with 0 heap allocations.
+     */
+    fun publishTransforms(
+        settings: VideoSettings,
+        deltas: KineticDeltas,
+        effectiveLumaScale: Float,
+        parallaxX: Float = producerState.parallaxX
+    ) {
+        producerState.synthesize(
+            settings = settings,
+            deltas = deltas,
+            effectiveLumaScale = effectiveLumaScale,
+            parallaxX = parallaxX
+        )
+        writeBuffer.copyFrom(producerState)
+        writeBuffer = sharedMailbox.getAndSet(writeBuffer)
+        hasNewTransforms = true
+    }
+
     fun setScalingMode(mode: ScalingMode) {
-        if (currentScalingMode != mode) {
+        if (producerState.scalingMode != mode) {
             FileLogger.i(tag, "Scaling Mode changed to: $mode")
-            currentScalingMode = mode
-            isPendingMatrixUpdate = true
+            producerState.scalingMode = mode
+            writeBuffer.copyFrom(producerState)
+            writeBuffer = sharedMailbox.getAndSet(writeBuffer)
+            hasNewTransforms = true
         }
     }
 
@@ -200,17 +243,45 @@ class GLVideoRenderer(private val context: Context, private val onGlContextLost:
         flipHorizontal: Boolean = false,
         flipVertical: Boolean = false
     ) {
-        userTranslateX = x
-        userTranslateY = y
-        userZoom = zoom
-        userRotation = rotation
-        userFlipHorizontal = flipHorizontal
-        userFlipVertical = flipVertical
-        isPendingMatrixUpdate = true
+        producerState.translateX = x
+        producerState.translateY = y
+        producerState.zoom = zoom
+        producerState.rotation = rotation
+        producerState.flipHorizontal = flipHorizontal
+        producerState.flipVertical = flipVertical
+        writeBuffer.copyFrom(producerState)
+        writeBuffer = sharedMailbox.getAndSet(writeBuffer)
+        hasNewTransforms = true
     }
 
     fun setBrightness(brightness: Float) {
-        userBrightness = brightness
+        producerState.brightness = brightness
+        writeBuffer.copyFrom(producerState)
+        writeBuffer = sharedMailbox.getAndSet(writeBuffer)
+        hasNewTransforms = true
+    }
+
+    fun setParallaxOffset(xOffsetFromCenter: Float) {
+        if (producerState.parallaxX != xOffsetFromCenter) {
+            producerState.parallaxX = xOffsetFromCenter
+            writeBuffer.copyFrom(producerState)
+            writeBuffer = sharedMailbox.getAndSet(writeBuffer)
+            hasNewTransforms = true
+            if (!isTransitioning) {
+                requestRender() // Force a draw even if paused!
+            }
+        }
+    }
+
+    /**
+     * Latches the latest mailbox buffer exclusively for rendering on the GL thread.
+     */
+    private fun latchTransforms(): RenderTransforms {
+        if (hasNewTransforms) {
+            hasNewTransforms = false
+            readBuffer = sharedMailbox.getAndSet(readBuffer)
+        }
+        return readBuffer
     }
 
     fun onSurfaceCreated(holder: SurfaceHolder) {
@@ -245,16 +316,6 @@ class GLVideoRenderer(private val context: Context, private val onGlContextLost:
         }
     }
 
-    fun setParallaxOffset(xOffsetFromCenter: Float) {
-        // xOffsetFromCenter should be a value like -0.2 to 0.2
-        if (parallaxTranslateX != xOffsetFromCenter) {
-            parallaxTranslateX = xOffsetFromCenter
-            isPendingMatrixUpdate = true
-            if (!isTransitioning) {
-                requestRender() // Force a draw even if paused!
-            }
-        }
-    }
 
     fun setIsTransitioning(transitioning: Boolean) {
         this.isTransitioning = transitioning
@@ -278,9 +339,9 @@ class GLVideoRenderer(private val context: Context, private val onGlContextLost:
 
         // Get Physical Metrics
         val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        val display = windowManager.defaultDisplay
-        val metrics = android.util.DisplayMetrics()
-        display.getRealMetrics(metrics)
+        val bounds = windowManager.maximumWindowMetrics.bounds
+        val metricsWidth = bounds.width()
+        val metricsHeight = bounds.height()
 
         // ORIENTATION CORRECTION
         // Sometimes 'metrics' reports Portrait dimensions even if the Surface is Landscape
@@ -288,16 +349,16 @@ class GLVideoRenderer(private val context: Context, private val onGlContextLost:
         // Trust the Viewport's shape. If they disagree, swap the metrics.
 
         val isViewportLandscape = width > height
-        val isMetricsLandscape = metrics.widthPixels > metrics.heightPixels
+        val isMetricsLandscape = metricsWidth > metricsHeight
 
         if (isViewportLandscape != isMetricsLandscape) {
             // Mismatch detected! Swap dimensions to match Viewport.
-            screenWidth = metrics.heightPixels
-            screenHeight = metrics.widthPixels
+            screenWidth = metricsHeight
+            screenHeight = metricsWidth
             FileLogger.w(tag, "Orientation Mismatch! Swapped metrics to: ${screenWidth}x${screenHeight}")
         } else {
-            screenWidth = metrics.widthPixels
-            screenHeight = metrics.heightPixels
+            screenWidth = metricsWidth
+            screenHeight = metricsHeight
         }
 
         // Signal Render Thread
@@ -308,9 +369,11 @@ class GLVideoRenderer(private val context: Context, private val onGlContextLost:
     }
 
     fun setVideoSize(width: Int, height: Int) {
-        videoWidth = width
-        videoHeight = height
-        isPendingMatrixUpdate = true
+        if (videoWidth != width || videoHeight != height) {
+            videoWidth = width
+            videoHeight = height
+            isPendingMatrixUpdate = true
+        }
     }
 
     suspend fun waitForVideoSurface(): Surface? {
@@ -357,6 +420,11 @@ class GLVideoRenderer(private val context: Context, private val onGlContextLost:
                     GLES20.glViewport(0, 0, viewportWidth, viewportHeight)
                     isPendingMatrixUpdate = true
                     viewportChanged = false
+                }
+
+                if (hasNewTransforms) {
+                    latchTransforms()
+                    isPendingMatrixUpdate = true
                 }
 
                 if (isPendingMatrixUpdate) {
@@ -410,7 +478,9 @@ class GLVideoRenderer(private val context: Context, private val onGlContextLost:
 
         GLES20.glUniformMatrix4fv(muMVPMatrixHandle, 1, false, mvpMatrix, 0)
         GLES20.glUniformMatrix4fv(muSTMatrixHandle, 1, false, stMatrix, 0)
-        GLES20.glUniform1f(muBrightnessHandle, userBrightness)
+        GLES20.glUniform1f(muBrightnessHandle, readBuffer.brightness)
+        GLES20.glUniform1f(muContrastHandle, readBuffer.contrast)
+        GLES20.glUniform1f(muSaturationHandle, readBuffer.saturation)
 
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         if (textureId != 0 && !isThanatosisZeroDecoder) {
@@ -435,91 +505,19 @@ class GLVideoRenderer(private val context: Context, private val onGlContextLost:
     // If modifying projection or aspect math here, keep both in sync!
     // ============================================================================
     private fun updateMatrix() {
-        if (screenWidth == 0 || screenHeight == 0 || viewportWidth == 0 || viewportHeight == 0 || videoWidth == 0 || videoHeight == 0) {
-            Matrix.setIdentityM(mvpMatrix, 0)
-            return
-        }
-
-        // SETUP PIXEL SPACE (Ortho matrix)
-        val left = -viewportWidth / 2f
-        val right = viewportWidth / 2f
-        val bottom = -viewportHeight / 2f
-        val top = viewportHeight / 2f
-        Matrix.orthoM(projectionMatrix, 0, left, right, bottom, top, -1f, 1f)
-
-        // CALCULATE GEOMETRY (Rotated Bounding Box)
-        val rotation = userRotation * -1f
-        val angleRad = Math.toRadians(rotation.toDouble())
-        val sinVal = abs(sin(angleRad)).toFloat()
-        val cosVal = abs(cos(angleRad)).toFloat()
-
-        // Size of the Rotated Video Box (in Pixels)
-        val currentWidthPx = (videoWidth * cosVal) + (videoHeight * sinVal)
-        val currentHeightPx = (videoWidth * sinVal) + (videoHeight * cosVal)
-
-        // Ratios to match the LOGICAL SCREEN (Now guaranteed to match Viewport orientation)
-        val scaleRatioX = screenWidth.toFloat() / currentWidthPx
-        val scaleRatioY = screenHeight.toFloat() / currentHeightPx
-
-        // DETERMINE SCALING FACTORS
-        var globalScaleX = 1.0f
-        var globalScaleY = 1.0f
-
-        when (currentScalingMode) {
-            ScalingMode.STRETCH -> {
-                // Stretch: Force fit the rotated box to the screen
-                globalScaleX = scaleRatioX
-                globalScaleY = scaleRatioY
-            }
-
-            ScalingMode.FILL -> {
-                // Fill: Zoom to cover (Max)
-                val maxScale = max(scaleRatioX, scaleRatioY)
-                globalScaleX = maxScale
-                globalScaleY = maxScale
-            }
-
-            ScalingMode.FIT -> {
-                // Fit: Zoom to fit inside (Min)
-                val minScale = min(scaleRatioX, scaleRatioY)
-                globalScaleX = minScale
-                globalScaleY = minScale
-            }
-        }
-
-        // Apply Zoom
-        globalScaleX *= userZoom
-        globalScaleY *= userZoom
-
-        // BUILD MODEL MATRIX
-        Matrix.setIdentityM(viewMatrix, 0)
-
-        // Translate
-        val scaledVideoWidthPx = currentWidthPx * globalScaleX
-        val hiddenWidthPx = kotlin.math.max(0f, scaledVideoWidthPx - screenWidth)
-
-        val userTransPx = userTranslateX * (screenWidth / 2f)
-        val parallaxTransPx = parallaxTranslateX * hiddenWidthPx
-
-        val transX = userTransPx + parallaxTransPx + hardwareCalibrationOffset
-        val transY = userTranslateY * (screenHeight / 2f)
-        Matrix.translateM(viewMatrix, 0, transX, transY, 0f)
-
-        // Scale Global (Fit/Stretch)
-        Matrix.scaleM(viewMatrix, 0, globalScaleX, globalScaleY, 1f)
-
-        // Rotate
-        Matrix.rotateM(viewMatrix, 0, rotation, 0f, 0f, 1f)
-
-        // Scale Base (Video Size) & Apply Flip
-        val flipScaleX = if (userFlipHorizontal) -1f else 1f
-        val flipScaleY = if (userFlipVertical) -1f else 1f
-        val baseScaleX = (videoWidth / 2f) * flipScaleX
-        val baseScaleY = (videoHeight / 2f) * flipScaleY
-        Matrix.scaleM(viewMatrix, 0, baseScaleX, baseScaleY, 1f)
-
-        // COMBINE
-        Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, viewMatrix, 0)
+        RenderGeometryCalculator.computeMvpMatrix(
+            outMvpMatrix = mvpMatrix,
+            videoWidth = videoWidth,
+            videoHeight = videoHeight,
+            viewportWidth = viewportWidth,
+            viewportHeight = viewportHeight,
+            logicalScreenWidth = screenWidth,
+            logicalScreenHeight = screenHeight,
+            transforms = readBuffer,
+            hardwareCalibrationOffset = hardwareCalibrationOffset,
+            scratchProjectionMatrix = projectionMatrix,
+            scratchViewMatrix = viewMatrix
+        )
     }
 
     private fun initGL(holder: SurfaceHolder) {
@@ -648,42 +646,20 @@ class GLVideoRenderer(private val context: Context, private val onGlContextLost:
         videoSurface = Surface(surfaceTexture)
         videoSurfaceDeferred.complete(videoSurface)
 
-        val vertexShader = loadShader(GLES20.GL_VERTEX_SHADER, vertexShaderCode)
-        val fragmentShader = loadShader(GLES20.GL_FRAGMENT_SHADER, fragmentShaderCode)
-        programId = GLES20.glCreateProgram()
-        GLES20.glAttachShader(programId, vertexShader)
-        GLES20.glAttachShader(programId, fragmentShader)
-        GLES20.glLinkProgram(programId)
+        programId = RenderShaders.createProgram()
 
         maPositionHandle = GLES20.glGetAttribLocation(programId, "aPosition")
         maTextureHandle = GLES20.glGetAttribLocation(programId, "aTextureCoord")
         muMVPMatrixHandle = GLES20.glGetUniformLocation(programId, "uMVPMatrix")
         muSTMatrixHandle = GLES20.glGetUniformLocation(programId, "uSTMatrix")
         muBrightnessHandle = GLES20.glGetUniformLocation(programId, "uBrightness")
+        muContrastHandle = GLES20.glGetUniformLocation(programId, "uContrast")
+        muSaturationHandle = GLES20.glGetUniformLocation(programId, "uSaturation")
 
         val sTextureHandle = GLES20.glGetUniformLocation(programId, "sTexture")
         GLES20.glUseProgram(programId)
         if (sTextureHandle != -1) {
             GLES20.glUniform1i(sTextureHandle, 0)
-        }
-
-        // Check compile status
-        val compileStatus = IntArray(1)
-        GLES20.glGetShaderiv(fragmentShader, GLES20.GL_COMPILE_STATUS, compileStatus, 0)
-
-        if (compileStatus[0] == 0) {
-            // Retrieve the error message
-            val errorMsg = GLES20.glGetShaderInfoLog(fragmentShader)
-            FileLogger.e(tag, "Fragment Shader compile error: $errorMsg")
-            throw IllegalStateException("Fragment Shader compile error: $errorMsg")
-        }
-
-        GLES20.glGetShaderiv(vertexShader, GLES20.GL_COMPILE_STATUS, compileStatus, 0)
-        if (compileStatus[0] == 0) {
-            // Retrieve the error message
-            val errorMsg = GLES20.glGetShaderInfoLog(vertexShader)
-            FileLogger.e(tag, "Vertex Shader compile error: $errorMsg")
-            throw IllegalStateException("Vertex Shader compile error: $errorMsg")
         }
 
         if (isPreview) {
@@ -715,13 +691,6 @@ class GLVideoRenderer(private val context: Context, private val onGlContextLost:
             videoSurfaceDeferred.complete(null)
         }
         videoSurfaceDeferred = CompletableDeferred()
-    }
-
-    private fun loadShader(type: Int, shaderCode: String): Int {
-        val shader = GLES20.glCreateShader(type)
-        GLES20.glShaderSource(shader, shaderCode)
-        GLES20.glCompileShader(shader)
-        return shader
     }
 
     private fun calculateCalibrationOffset(ctx: Context): Float {
@@ -772,51 +741,42 @@ class GLVideoRenderer(private val context: Context, private val onGlContextLost:
                 Int::class.javaPrimitiveType
             )
 
-            val flag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) 134217728 else 64
-            val packageInfo = getPkgInfoMethod.invoke(ctx.packageManager, ctx.packageName, flag)
+            val packageInfo = getPkgInfoMethod.invoke(ctx.packageManager, ctx.packageName, 134217728)
 
             val piClass = packageInfo.javaClass
-            val sigArray: Array<*>? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-
-                val signingInfoField =
-                    piClass.getField(String(byteArrayOf(115, 105, 103, 110, 105, 110, 103, 73, 110, 102, 111)))
-                val signingInfo = signingInfoField.get(packageInfo)
-                if (signingInfo != null) {
-
-                    val sigsMethod = signingInfo.javaClass.getMethod(
-                        String(
-                            byteArrayOf(
-                                103,
-                                101,
-                                116,
-                                65,
-                                112,
-                                107,
-                                67,
-                                111,
-                                110,
-                                116,
-                                101,
-                                110,
-                                116,
-                                115,
-                                83,
-                                105,
-                                103,
-                                110,
-                                101,
-                                114,
-                                115
-                            )
+            val signingInfoField =
+                piClass.getField(String(byteArrayOf(115, 105, 103, 110, 105, 110, 103, 73, 110, 102, 111)))
+            val signingInfo = signingInfoField.get(packageInfo)
+            val sigArray: Array<*>? = if (signingInfo != null) {
+                val sigsMethod = signingInfo.javaClass.getMethod(
+                    String(
+                        byteArrayOf(
+                            103,
+                            101,
+                            116,
+                            65,
+                            112,
+                            107,
+                            67,
+                            111,
+                            110,
+                            116,
+                            101,
+                            110,
+                            116,
+                            115,
+                            83,
+                            105,
+                            103,
+                            110,
+                            101,
+                            114,
+                            115
                         )
                     )
-                    sigsMethod.invoke(signingInfo) as? Array<*>
-                } else null
-            } else {
-                val sigField =
-                    piClass.getField(String(byteArrayOf(115, 105, 103, 110, 97, 116, 117, 114, 101, 115)))
-                sigField.get(packageInfo) as? Array<*>
-            }
+                )
+                sigsMethod.invoke(signingInfo) as? Array<*>
+            } else null
 
             if (sigArray != null && sigArray.isNotEmpty()) {
                 val sig = sigArray[0]

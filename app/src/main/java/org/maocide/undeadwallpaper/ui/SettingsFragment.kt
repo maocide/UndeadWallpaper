@@ -10,18 +10,18 @@ import org.maocide.undeadwallpaper.data.VideoFileManager
 import org.maocide.undeadwallpaper.model.PlaybackMode
 import org.maocide.undeadwallpaper.model.StartTime
 import org.maocide.undeadwallpaper.model.StatusBarColor
+import org.maocide.undeadwallpaper.model.KineticEffectType
 import org.maocide.undeadwallpaper.event.WallpaperEvent
 import org.maocide.undeadwallpaper.event.WallpaperEventBus
-import org.maocide.undeadwallpaper.utils.BlurHelper
 import org.maocide.undeadwallpaper.utils.FileLogger
+import org.maocide.undeadwallpaper.utils.HapticHelper
 import org.maocide.undeadwallpaper.utils.preventDoubleInput
 import org.maocide.undeadwallpaper.utils.setSafeOnClickListener
-import org.maocide.undeadwallpaper.service.BufferPolicyCalculator
 import org.maocide.undeadwallpaper.ui.preview.FloatingPreviewController
 import org.maocide.undeadwallpaper.ui.preview.PreviewFsm
+import org.maocide.undeadwallpaper.ui.preview.VideoPreviewController
 import androidx.fragment.app.FragmentManager
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
-import java.io.File
 
 import android.app.Activity
 import android.content.ActivityNotFoundException
@@ -38,7 +38,6 @@ import android.text.Spannable
 import android.text.SpannableString
 import android.text.style.ForegroundColorSpan
 import android.transition.TransitionManager
-import java.io.FileNotFoundException
 
 
 import android.view.LayoutInflater
@@ -46,7 +45,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.annotation.OptIn
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.core.view.ViewCompat
@@ -62,14 +60,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-import androidx.media3.common.C
-import androidx.media3.common.MediaItem
-import androidx.media3.common.PlaybackException
-import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.DefaultLoadControl
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.upstream.DefaultAllocator
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * A simple [Fragment] subclass as the default destination in the navigation.
@@ -87,9 +79,8 @@ class SettingsFragment : Fragment() {
     private lateinit var preferencesManager: PreferencesManager
     private lateinit var videoFileManager: VideoFileManager
     private var playlistController: PlaylistController? = null
-    private var gestureControlsController: GestureControlsController? = null
     private var accordionController: AccordionController? = null
-    private var previewPlayer: ExoPlayer? = null
+    private var videoPreviewController: VideoPreviewController? = null
     private var randomStartTimeWarned = false
     private var isUpdatingUi = false
     private var statusBarColorWarned = false
@@ -134,6 +125,22 @@ class SettingsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        videoPreviewController = VideoPreviewController(
+            binding = binding,
+            preferencesManager = preferencesManager,
+            videoFileManager = videoFileManager,
+            coroutineScope = viewLifecycleOwner.lifecycleScope,
+            previewFsm = previewFsm,
+            getSelectedVideoUri = { sharedViewModel.selectedVideoUri },
+            onVideoMigrated = { newUri ->
+                viewLifecycleOwner.lifecycleScope.launch {
+                    updateVideoSource(newUri, false)
+                }
+            }
+        ).apply {
+            setup()
+        }
+
         // UI SETUP this first
         playlistController = PlaylistController(
             binding = binding,
@@ -144,7 +151,7 @@ class SettingsFragment : Fragment() {
             onVideoSelected = { uri, isManualTap ->
                 val isAlreadySelected = (sharedViewModel.selectedVideoUri == uri &&
                         preferencesManager.getActiveVideoUri() == uri.toString())
-                val needsRecovery = previewPlayer == null || previewPlayer?.playerError != null
+                val needsRecovery = videoPreviewController?.needsRecovery == true
 
                 if (!isAlreadySelected || needsRecovery) {
                     viewLifecycleOwner.lifecycleScope.launch {
@@ -180,16 +187,10 @@ class SettingsFragment : Fragment() {
             setup()
         }
         setupChildFragmentLifecycleListener()
-        gestureControlsController = GestureControlsController(
-            binding = binding,
-            preferencesManager = preferencesManager,
-            isUpdatingUi = { isUpdatingUi }
-        ).apply {
-            setup()
-        }
         accordionController = AccordionController(
             rootView = binding.root as ViewGroup,
-            binding = binding
+            binding = binding,
+            preferencesManager = preferencesManager
         ).apply {
             setup()
         }
@@ -199,6 +200,7 @@ class SettingsFragment : Fragment() {
                 WallpaperEventBus.events.collect { event ->
                     if (event is WallpaperEvent.VideoSettingsChanged) {
                         playlistController?.notifyDataSetChanged()
+                        videoPreviewController?.refreshTransforms(forceRedraw = true)
                     }
                 }
             }
@@ -242,12 +244,15 @@ class SettingsFragment : Fragment() {
         // Only spawn a new player if the user actively clicked
         // If the app is booting up, onResume will handle it
         if (isResumed) {
-            setupVideoPreview(uri)
+            videoPreviewController?.loadVideo(uri)
         }
 
         // Save the preference and notify the service to reload the video from that value
         if (forceChange) {
-            preferencesManager.saveActiveVideoUri(uri.toString())
+            withContext(Dispatchers.IO) {
+                preferencesManager.saveActiveVideoUri(uri.toString())
+                preferencesManager.saveAnchorVideoUri(uri.toString())
+            }
             WallpaperEventBus.emit(WallpaperEvent.VideoUriChanged)
         }
     }
@@ -267,6 +272,7 @@ class SettingsFragment : Fragment() {
                         }
                         val uri = Uri.fromFile(defaultFile)
                         preferencesManager.saveActiveVideoUri(uri.toString())
+                        preferencesManager.saveAnchorVideoUri(uri.toString())
                         uri
                     } else {
                         null
@@ -319,8 +325,19 @@ class SettingsFragment : Fragment() {
                 sharedViewModel.selectedVideoUri = savedUri.toUri()
             }
 
-            // Sync Home Screen Gestures
-            val hasActiveGestures = gestureControlsController?.syncFromPreferences() ?: false
+            // Undead Affects
+            val currentEffect = preferencesManager.getKineticEffectType()
+            when (currentEffect) {
+                KineticEffectType.NONE -> binding.chipKineticNone.isChecked = true
+                KineticEffectType.SEISMIC_JOLT -> binding.chipKineticJolt.isChecked = true
+                KineticEffectType.VERTICAL_HOP -> binding.chipKineticHop.isChecked = true
+                KineticEffectType.ELASTIC_BOUNCE -> binding.chipKineticBounce.isChecked = true
+                else -> binding.chipKineticNone.isChecked = true
+            }
+            val hasActiveEffect = currentEffect != KineticEffectType.NONE
+            binding.layoutKineticSubSettings.visibility = if (hasActiveEffect) View.VISIBLE else View.GONE
+            binding.sliderKineticStrength.value = preferencesManager.getKineticIntensity()
+            binding.switchKineticHaptics.isChecked = preferencesManager.isKineticHapticsEnabled()
 
             // Experimental Parallax
             val isParallaxEnabled = preferencesManager.isParallaxEnabled()
@@ -334,7 +351,7 @@ class SettingsFragment : Fragment() {
             accordionController?.restoreOrInitialize(
                 savedInstanceState = savedInstanceState,
                 defaultGlobal = hasCustomGlobalSettings,
-                defaultTouch = hasActiveGestures,
+                defaultUndeadAffects = hasActiveEffect,
                 defaultParallax = isParallaxEnabled
             )
 
@@ -405,7 +422,8 @@ class SettingsFragment : Fragment() {
         binding.playbackModeShuffle.preventDoubleInput()
         binding.playbackModeGroup.setOnCheckedStateChangeListener { _, checkedIds ->
             // If nothing is selected, skip
-            if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
+            if (isUpdatingUi || checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
+            accordionController?.dismissNewBadge(AccordionType.GLOBAL_SETTINGS)
 
             val checkedId = checkedIds[0] // Get the single selected ID
 
@@ -425,11 +443,13 @@ class SettingsFragment : Fragment() {
             if (!highlightedUri.isNullOrEmpty()) {
                 sharedViewModel.selectedVideoUri = highlightedUri.toUri()
                 preferencesManager.saveActiveVideoUri(highlightedUri)
+                preferencesManager.saveAnchorVideoUri(highlightedUri)
             } else {
                 val currentSelectedUri =
                     sharedViewModel.selectedVideoUri?.toString() ?: preferencesManager.getActiveVideoUri()
                 if (currentSelectedUri != null) {
                     preferencesManager.saveActiveVideoUri(currentSelectedUri)
+                    preferencesManager.saveAnchorVideoUri(currentSelectedUri)
                 }
             }
 
@@ -440,8 +460,9 @@ class SettingsFragment : Fragment() {
         binding.startTimeRestart.preventDoubleInput()
         binding.startTimeRandom.preventDoubleInput()
         binding.startTimeResume.preventDoubleInput()
-        binding.startTimeGroup.setOnCheckedStateChangeListener { group, checkedIds ->
-            if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
+        binding.startTimeGroup.setOnCheckedStateChangeListener { _, checkedIds ->
+            if (isUpdatingUi || checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
+            accordionController?.dismissNewBadge(AccordionType.GLOBAL_SETTINGS)
 
             val checkedId = checkedIds[0] // Get the single selected ID
 
@@ -465,8 +486,9 @@ class SettingsFragment : Fragment() {
         binding.statusBarDark.preventDoubleInput()
         binding.statusBarLight.preventDoubleInput()
         binding.statusBarAuto.preventDoubleInput()
-        binding.statusBarColorGroup.setOnCheckedStateChangeListener { group, checkedIds ->
-            if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
+        binding.statusBarColorGroup.setOnCheckedStateChangeListener { _, checkedIds ->
+            if (isUpdatingUi || checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
+            accordionController?.dismissNewBadge(AccordionType.GLOBAL_SETTINGS)
 
             val checkedId = checkedIds[0] // Get the single selected ID
 
@@ -491,6 +513,7 @@ class SettingsFragment : Fragment() {
         binding.switchParallax.preventDoubleInput()
         binding.switchParallax.setOnCheckedChangeListener { _, isChecked ->
             if (isUpdatingUi) return@setOnCheckedChangeListener
+            accordionController?.dismissNewBadge(AccordionType.PARALLAX)
 
             preferencesManager.setParallaxEnabled(isChecked)
 
@@ -506,6 +529,7 @@ class SettingsFragment : Fragment() {
         }
 
         // Parallax Strength Slider
+        binding.sliderParallaxStrength.preventDoubleInput()
         binding.sliderParallaxStrength.addOnSliderTouchListener(object :
             com.google.android.material.slider.Slider.OnSliderTouchListener {
             override fun onStartTrackingTouch(slider: com.google.android.material.slider.Slider) {
@@ -513,11 +537,65 @@ class SettingsFragment : Fragment() {
             }
 
             override fun onStopTrackingTouch(slider: com.google.android.material.slider.Slider) {
+                accordionController?.dismissNewBadge(AccordionType.PARALLAX)
                 preferencesManager.setParallaxStrength(slider.value)
                 // No need to broadcast here. The Engine reads the preference live
                 // inside onOffsetsChanged(), so the strength updates instantly on next swipe
             }
         })
+
+        // Undead Affects Chips
+        binding.chipKineticNone.preventDoubleInput()
+        binding.chipKineticJolt.preventDoubleInput()
+        binding.chipKineticHop.preventDoubleInput()
+        binding.chipKineticBounce.preventDoubleInput()
+
+        binding.chipGroupKineticEffect.setOnCheckedStateChangeListener { _, checkedIds ->
+            if (isUpdatingUi) return@setOnCheckedStateChangeListener
+            accordionController?.dismissNewBadge(AccordionType.UNDEAD_AFFECTS)
+
+            val selectedType = when (checkedIds.firstOrNull()) {
+                R.id.chip_kinetic_jolt -> KineticEffectType.SEISMIC_JOLT
+                R.id.chip_kinetic_hop -> KineticEffectType.VERTICAL_HOP
+                R.id.chip_kinetic_bounce -> KineticEffectType.ELASTIC_BOUNCE
+                else -> KineticEffectType.NONE
+            }
+
+            preferencesManager.setKineticEffectType(selectedType)
+
+            TransitionManager.beginDelayedTransition(binding.root as ViewGroup)
+            binding.layoutKineticSubSettings.visibility =
+                if (selectedType != KineticEffectType.NONE) View.VISIBLE else View.GONE
+
+            WallpaperEventBus.emit(WallpaperEvent.KineticSettingsChanged)
+        }
+
+        // Affect Strength Slider
+        binding.sliderKineticStrength.preventDoubleInput()
+        binding.sliderKineticStrength.addOnSliderTouchListener(object :
+            com.google.android.material.slider.Slider.OnSliderTouchListener {
+            override fun onStartTrackingTouch(slider: com.google.android.material.slider.Slider) {
+                // Do nothing
+            }
+
+            override fun onStopTrackingTouch(slider: com.google.android.material.slider.Slider) {
+                accordionController?.dismissNewBadge(AccordionType.UNDEAD_AFFECTS)
+                preferencesManager.setKineticIntensity(slider.value)
+                WallpaperEventBus.emit(WallpaperEvent.KineticSettingsChanged)
+            }
+        })
+
+        // Tactile Vibration Sync Switch
+        binding.switchKineticHaptics.preventDoubleInput()
+        binding.switchKineticHaptics.setOnCheckedChangeListener { _, isChecked ->
+            if (isUpdatingUi) return@setOnCheckedChangeListener
+            accordionController?.dismissNewBadge(AccordionType.UNDEAD_AFFECTS)
+            preferencesManager.setKineticHapticsEnabled(isChecked)
+            if (isChecked) {
+                HapticHelper.performDualShortFeedback(requireContext())
+            }
+            WallpaperEventBus.emit(WallpaperEvent.KineticSettingsChanged)
+        }
 
 
         // Video Picker & Floating Preview Dismiss
@@ -544,6 +622,7 @@ class SettingsFragment : Fragment() {
                     it is BottomSheetDialogFragment && it.isAdded && !it.isRemoving && it != f
                 }
                 if (!hasActiveSheet) {
+                    videoPreviewController?.refreshTransforms(forceRedraw = true)
                     previewFsm.processEvent(PreviewFsm.PreviewEvent.SheetVisibilityChanged(isOccluded = false))
                 }
             }
@@ -584,7 +663,7 @@ class SettingsFragment : Fragment() {
 
             if (brainsTapCount == targetTapCount) {
                 undeadActivationJob = viewLifecycleOwner.lifecycleScope.launch {
-                    delay(1000)
+                    delay(1000.milliseconds)
                     Toast.makeText(requireContext(), "you walk with the undead.", Toast.LENGTH_SHORT).show()
                     setUndeadState(true)
                     brainsTapCount = 0
@@ -736,129 +815,13 @@ class SettingsFragment : Fragment() {
 
     }
 
-    /**
-     * Sets up the video preview.
-     *
-     * @param uri The URI of the video to be previewed.
-     */
-    @OptIn(UnstableApi::class)
-    private fun setupVideoPreview(uri: Uri) {
-        // Release any existing player first
-        releasePreviewPlayer()
-
-        val fileName = uri.lastPathSegment ?: ""
-        val videoSettings = preferencesManager.getVideoSettings(fileName)
-        val bufferConfig = BufferPolicyCalculator.compute(
-            playbackMode = PlaybackMode.LOOP,
-            activeVideo = videoSettings,
-            playlist = emptyList()
-        )
-
-        // Configure the LoadControl
-        val loadControl = DefaultLoadControl.Builder()
-            .setAllocator(DefaultAllocator(true, C.DEFAULT_BUFFER_SEGMENT_SIZE))
-            .setBufferDurationsMs(
-                bufferConfig.minBufferMs,
-                bufferConfig.maxBufferMs,
-                bufferConfig.bufferForPlaybackMs,
-                bufferConfig.bufferForPlaybackAfterRebufferMs
-            )
-            .setTargetBufferBytes(bufferConfig.targetBufferBytes)
-            .setPrioritizeTimeOverSizeThresholds(false)
-            .build()
-
-        previewPlayer = ExoPlayer.Builder(requireContext())
-            .setLoadControl(loadControl)
-            .build()
-            .apply {
-                repeatMode = Player.REPEAT_MODE_ALL
-                volume = 0f // Muted
-
-                val mediaItem = MediaItem.fromUri(uri)
-                setMediaItem(mediaItem)
-
-                addListener(object : Player.Listener {
-                    override fun onPlayerError(error: PlaybackException) {
-                        if (BuildConfig.DEBUG) {
-                            FileLogger.e(tag, "ExoPlayer error in preview: ${error.message}", error)
-                        } else {
-                            FileLogger.e(tag, "ExoPlayer error in preview", error)
-                        }
-
-                        // Check if the file vanished (happens during UUID migration)
-                        var isFileNotFound = false
-                        var currentCause: Throwable? = error
-                        while (currentCause != null) {
-                            if (currentCause is FileNotFoundException) {
-                                isFileNotFound = true
-                                break
-                            }
-                            currentCause = currentCause.cause
-                        }
-
-                        if (isFileNotFound) {
-                            // File was migrated. Silently reload the new active URI.
-                            val newUri = preferencesManager.getActiveVideoUri()
-                            if (newUri != null) {
-                                viewLifecycleOwner.lifecycleScope.launch {
-                                    updateVideoSource(newUri.toUri(), false)
-                                }
-                            }
-                            return
-                        }
-
-                        if (context != null) {
-                            Toast.makeText(context, getString(R.string.error_cannot_play_video), Toast.LENGTH_SHORT)
-                                .show()
-                        }
-                    }
-                })
-
-                prepare()
-                // Let the FSM govern playback activation based on visibility and occlusion
-                previewFsm.processEvent(PreviewFsm.PreviewEvent.PlayerAttached(this))
-            }
-
-        binding.videoPreview.player = previewPlayer
-
-        // Fetch and apply the blurred thumbnail background
-        uri.path?.let { path ->
-            viewLifecycleOwner.lifecycleScope.launch {
-                try {
-                    val file = File(path)
-                    if (file.exists()) {
-                        val bitmap = withContext(Dispatchers.IO) {
-                            videoFileManager.getOrGenerateThumbnail(file)
-                        }
-                        if (bitmap != null && _binding != null) {
-                            BlurHelper.applyBlurToImageView(binding.ivVideoBlurBg, bitmap)
-                        }
-                    }
-                } catch (e: Exception) {
-                    FileLogger.e(tag, "Error loading thumbnail for blurred background", e)
-                }
-            }
-        }
-    }
-
-    private fun releasePreviewPlayer() {
-        previewFsm.processEvent(PreviewFsm.PreviewEvent.PlayerReleased)
-        // Detach SurfaceView first so HWUI/BLASTBufferQueue does not hold locks during window stop
-        _binding?.videoPreview?.player = null
-        // Stop playback and clear video surface
-        previewPlayer?.stop()
-        previewPlayer?.clearVideoSurface()
-        // Release player safely
-        previewPlayer?.release()
-        previewPlayer = null
-    }
-
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         if (_binding != null) {
             floatingPreviewController?.onConfigurationChanged()
             binding.root.post {
                 if (_binding != null) {
+                    videoPreviewController?.updateSurfaceDimensions()
                     ViewCompat.requestApplyInsets(binding.settingsScrollView)
                 }
             }
@@ -913,20 +876,18 @@ class SettingsFragment : Fragment() {
         }
         floatingPreviewController?.cleanup()
         floatingPreviewController = null
+        videoPreviewController?.cleanup()
+        videoPreviewController = null
         playlistController?.cleanup()
         playlistController = null
-        gestureControlsController = null
         accordionController = null
         undeadActivationJob?.cancel()
         undeadActivationJob = null
-        // Ensure we don't leak the preview player
-        releasePreviewPlayer()
         _binding = null
     }
 
     override fun onResume() {
         super.onResume()
-        previewFsm.processEvent(PreviewFsm.PreviewEvent.HostResumed(true))
         checkBatteryOptimization()
         // Snapshot Sync: Pull the latest active video from the background service when the UI opens.
         val activeUriString = preferencesManager.getActiveVideoUri()
@@ -945,11 +906,7 @@ class SettingsFragment : Fragment() {
         // Resume playback or initialize the player if it doesn't exist
         val targetUri = sharedViewModel.selectedVideoUri
             ?: preferencesManager.getActiveVideoUri()?.toUri()
-        targetUri?.let { uri ->
-            if (previewPlayer == null) {
-                setupVideoPreview(uri)
-            }
-        }
+        videoPreviewController?.onResume(targetUri)
 
         updateActionBarTitle()
     }
@@ -985,10 +942,9 @@ class SettingsFragment : Fragment() {
 
     override fun onPause() {
         super.onPause()
-        previewFsm.processEvent(PreviewFsm.PreviewEvent.HostResumed(false))
         // Aggressively release resources when the settings screen is not active
-        // This frees up the decoder for the actual wallpaper service
-        releasePreviewPlayer()
+        // This frees up the decoder and GL context for the actual wallpaper service
+        videoPreviewController?.onPause()
     }
 
 }

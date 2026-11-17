@@ -15,8 +15,8 @@ data class VideoSettings(
     val zoom: Float = 1.0f,
     val rotation: Float = 0.0f,
     val brightness: Float = 1.0f,
-    val speed: Float = 1.0f,
-    val volume: Float = 0.0f, // Replaces boolean `audioEnabled` with a float [0.0 - 1.0]
+    val contrast: Float = 1.0f,
+    val saturation: Float = 1.0f,
     val primaryColor: Int? = null,
     val secondaryColor: Int? = null,
     val tertiaryColor: Int? = null,
@@ -56,14 +56,11 @@ data class VideoSettings(
         if (rotation != defaultSettings.rotation) {
             changedLabels.add(context.getString(R.string.breadcrumb_rotation))
         }
-        if (brightness != defaultSettings.brightness) {
-            changedLabels.add(context.getString(R.string.breadcrumb_brightness))
-        }
-        if (speed != defaultSettings.speed) {
-            changedLabels.add(context.getString(R.string.breadcrumb_speed))
-        }
-        if (volume != defaultSettings.volume) {
-            changedLabels.add(context.getString(R.string.breadcrumb_volume))
+        if (brightness != defaultSettings.brightness ||
+            contrast != defaultSettings.contrast ||
+            saturation != defaultSettings.saturation
+        ) {
+            changedLabels.add(context.getString(R.string.breadcrumb_colors))
         }
         if (flipHorizontal != defaultSettings.flipHorizontal || flipVertical != defaultSettings.flipVertical) {
             changedLabels.add("Flipped")
@@ -111,15 +108,9 @@ data class VideoSettings(
                 this.zoom == other.zoom &&
                 this.rotation == other.rotation &&
                 this.brightness == other.brightness &&
+                this.contrast == other.contrast &&
+                this.saturation == other.saturation &&
                 this.flipHorizontal == other.flipHorizontal &&
                 this.flipVertical == other.flipVertical
-    }
-
-    /**
-     * Applies a quadratic curve to the linear volume slider value.
-     * This mimics the logarithmic perception of human hearing.
-     */
-    fun getPerceivedVolume(): Float {
-        return volume.toDouble().pow(2.0).toFloat()
     }
 }
